@@ -145,11 +145,14 @@ to the phone.
 
 ## Deployment
 
+Open **https://xorr-xlayer.vercel.app** and sign in; `/judge` re-runs every claim below against the live chain.
+
+
 | | |
 |---|---|
-| Executor (X Layer fork) | Railway project `xorr-xlayer`, service `executor-fork` — `scripts/deploy-executor.mjs executor-fork` |
+| Executor (X Layer fork) | https://executor-fork-production-2db8.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-fork`, `node scripts/deploy-executor.mjs executor-fork`) |
 | Fork node | Railway service `xlayer-fork` (anvil v1.7.1 forking chain 196, `/data` volume) — `https://xlayer-fork-production.up.railway.app` |
-| Web app | Vercel project `xorr-xlayer` — `npm run deploy:web` (refuses anything but an X Layer fork or testnet executor) |
+| Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses anything but an X Layer fork or testnet executor) |
 | Contracts, X Layer testnet | `contracts/deploy-xlayer-testnet.sh` → `contracts/deployments/xlayer-testnet.json` |
 
 Chain configuration lives in one place per side: `src/chain.ts` (app) and `server/src/evm/chains.ts` (executor), with
