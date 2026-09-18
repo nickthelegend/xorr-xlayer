@@ -56,6 +56,13 @@ export default defineConfig({
            */
           XORR_CHAIN: 'xlayer-testnet',
           EXPO_PUBLIC_XORR_CHAIN: 'xlayer-testnet',
+          /*
+           * A signing key for modules that load the executor's client at import. Anvil's default account #0 — a key
+           * published in every Foundry tutorial, so it holds nothing anywhere and is no secret. Without it a clean
+           * checkout (CI) failed to collect suites that a laptop with a generated key file passed.
+           */
+          DELEGATE_PRIVATE_KEY:
+            process.env.DELEGATE_PRIVATE_KEY ?? '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
           PRIVY_APP_ID: process.env.PRIVY_APP_ID ?? 'unit-test-placeholder',
           PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET ?? 'unit-test-placeholder',
         },
