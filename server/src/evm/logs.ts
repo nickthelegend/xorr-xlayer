@@ -15,6 +15,9 @@
  *
  * Windows are fetched sequentially on purpose. These providers rate-limit as well as range-limit,
  * and firing thirty parallel windows at a free endpoint trades one refusal for another.
+ *
+ * On X Layer (100 blocks a query on the public RPC) a scan must also not start before the contract existed:
+ * `deploymentBlock` finds that block once, so a history scan of a contract deployed yesterday reads yesterday.
  */
 import type { AbiEvent, Address, GetLogsParameters, GetLogsReturnType } from 'viem';
 import { publicClient } from './client.js';
@@ -22,9 +25,13 @@ import { publicClient } from './client.js';
 /** Conservative first guess: under every Base limit seen so far (2,000), with room to spare. */
 const DEFAULT_SPAN = BigInt(process.env.LOG_WINDOW_BLOCKS ?? 1_800);
 
-/** Providers say the number in the refusal. Reading it beats guessing again. */
+/**
+ * Providers say the number in the refusal. Reading it beats guessing again. X Layer's public RPC words it
+ * `block range greater than 100 max` (and a fork of it wraps that in its own error) — 100 blocks a query.
+ */
 function limitFrom(e: unknown): bigint | undefined {
-  const m = /limited to a ([\d,]+) range/i.exec(e instanceof Error ? e.message : String(e));
+  const text = e instanceof Error ? e.message : String(e);
+  const m = /limited to a ([\d,]+) range/i.exec(text) ?? /block range greater than ([\d,]+) max/i.exec(text);
   if (!m) return undefined;
   const n = BigInt(m[1]!.replace(/,/g, ''));
   return n > 0n ? n : undefined;
@@ -95,4 +102,36 @@ export async function getLogsPaged<const TEvent extends AbiEvent>(params: {
     }
   }
   return out;
+}
+
+const deployedAt = new Map<string, Promise<bigint>>();
+
+/**
+ * The first block at which `address` has code, by binary search on `eth_getCode` — about 27 reads on X Layer, once
+ * per address per process. No event of a contract can come before this block, so a log scan that starts earlier only
+ * asks the provider for windows that are empty by construction. A failed search is not cached: the caller falls back
+ * to its own lower bound and the next call tries again.
+ */
+export function deploymentBlock(address: Address, head: bigint): Promise<bigint> {
+  const key = address.toLowerCase();
+  const hit = deployedAt.get(key);
+  if (hit) return hit;
+  const run = (async () => {
+    const hasCode = async (block: bigint) => {
+      const code = await publicClient.getCode({ address, blockNumber: block });
+      return !!code && code !== '0x';
+    };
+    if (!(await hasCode(head))) return head;
+    let lo = 0n;
+    let hi = head;
+    while (lo < hi) {
+      const mid = (lo + hi) / 2n;
+      if (await hasCode(mid)) hi = mid;
+      else lo = mid + 1n;
+    }
+    return lo;
+  })();
+  deployedAt.set(key, run);
+  run.catch(() => deployedAt.delete(key));
+  return run;
 }

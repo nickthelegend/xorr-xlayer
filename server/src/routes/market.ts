@@ -463,7 +463,8 @@ market.get('/market/tradable', async (c) => {
    * gives any symbol this list does not name.
    */
   if (!CAN_SETTLE) return c.json([]);
-  return c.json(await functioningHere());
+  // Offered for trading only where a pool can fill it: WETH is watchable on X Layer, not tradable.
+  return c.json((await functioningHere()).filter((t) => isRoutable(t.symbol)));
 });
 
 /**
@@ -486,8 +487,6 @@ market.get('/market/watchable', async (c) => c.json(await functioningHere()));
 export async function functioningHere(): Promise<{ symbol: string; address: string; decimals: number }[]> {
   const equitiesOk = await equitiesFunctional();
   return Object.entries(TOKENS)
-    // A token with no pool to a stablecoin (WETH on X Layer) is held and shown, never offered as tradable.
-    .filter(([symbol]) => isRoutable(symbol))
     .filter(([symbol]) => equitiesOk || !isStock(symbol))
     .map(([symbol, t]) => ({
       symbol,

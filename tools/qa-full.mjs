@@ -657,7 +657,9 @@ function backtestContract(r, lookback, cap, what) {
   must(isNum(b.ret) && isNum(b.sharpe) && isNum(b.maxDd) && b.maxDd <= 0, `${what}: ret ${b.ret}, sharpe ${b.sharpe}, maxDd ${b.maxDd}`);
   must(Number.isInteger(b.trades) && b.trades >= 0, `${what}: trades ${b.trades}`);
   must(Array.isArray(b.equity) && b.equity.length >= 2 && b.equity.every(isNum), `${what}: equity ${clip(b.equity, 120)}`);
-  must(near(b.equity[0], Math.min(500, cap), 1e-6), `${what}: equity starts at ${b.equity[0]}, expected the $${Math.min(500, cap)} entry size`);
+  // The entry size, less the engine's own fee and slippage when a breakout lands on the first bar (0.1% + 0.05%).
+  const entry = Math.min(500, cap);
+  must(b.equity[0] <= entry + 1e-6 && b.equity[0] >= entry * (1 - 0.005), `${what}: equity starts at ${b.equity[0]}, expected the $${entry} entry size, less at most its costs`);
   must(b.feed === 'live' && /breakout/.test(b.source ?? '') && typeof b.disclaimer === 'string' && b.disclaimer.length > 0, `${what}: feed ${b.feed}, source ${b.source}`);
 }
 

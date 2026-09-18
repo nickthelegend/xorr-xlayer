@@ -10,10 +10,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const getLogs = vi.fn();
-vi.mock('./client.js', () => ({ publicClient: { getLogs: (a: unknown) => getLogs(a) } }));
+const getCode = vi.fn();
+vi.mock('./client.js', () => ({
+  publicClient: { getLogs: (a: unknown) => getLogs(a), getCode: (a: unknown) => getCode(a) },
+}));
 
 process.env.LOG_WINDOW_BLOCKS = '1000';
-const { getLogsPaged, isRangeRefusal } = await import('./logs.js');
+const { getLogsPaged, isRangeRefusal, deploymentBlock } = await import('./logs.js');
 
 const EVENT = { type: 'event', name: 'Shipped', inputs: [] } as const;
 const ADDRESS = '0x00000000000000000000000000000000000000A1' as const;
@@ -141,5 +144,30 @@ describe('an indexed-topic filter (PLAN.md 3.14)', () => {
 
     expect(getLogs).toHaveBeenCalledTimes(2);
     for (const q of asked()) expect(Object.keys(q).sort()).toEqual(['address', 'event', 'fromBlock', 'toBlock']);
+  });
+});
+
+describe('X Layer', () => {
+  it('reads the public RPC\'s own wording of its 100-block limit, wrapped by a fork or not', async () => {
+    const asked: bigint[] = [];
+    getLogs.mockImplementation(async ({ fromBlock, toBlock }: { fromBlock: bigint; toBlock: bigint }) => {
+      if (toBlock - fromBlock + 1n > 100n) {
+        throw new Error('Fork Error: Transport(HttpError { body: "block range greater than 100 max" })');
+      }
+      asked.push(toBlock - fromBlock + 1n);
+      return [];
+    });
+    await getLogsPaged({ address: ADDRESS, event: EVENT, fromBlock: 0n, toBlock: 299n });
+    expect(asked).toEqual([100n, 100n, 100n]);
+  });
+
+  it('finds the first block with code, so a scan never starts before the contract existed', async () => {
+    getCode.mockImplementation(async ({ blockNumber }: { blockNumber: bigint }) => (blockNumber >= 70_990_941n ? '0x60' : '0x'));
+    const addr = '0x00000000000000000000000000000000000000B2' as const;
+    expect(await deploymentBlock(addr, 71_000_000n)).toBe(70_990_941n);
+    const calls = getCode.mock.calls.length;
+    // Once per address per process.
+    expect(await deploymentBlock(addr, 71_000_000n)).toBe(70_990_941n);
+    expect(getCode.mock.calls.length).toBe(calls);
   });
 });

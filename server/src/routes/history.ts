@@ -18,7 +18,7 @@ import { THIS_CHAIN } from '../db/chain-scope.js';
 import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, explorerTx } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
-import { getLogsPaged } from '../evm/logs.js';
+import { deploymentBlock, getLogsPaged } from '../evm/logs.js';
 import type { SettlementVenue } from '../executor/settle.js';
 import { currentRequestId, log } from '../http/request-id.js';
 import { OKX_ROUTER } from '../venues/okxdex.js';
@@ -255,6 +255,10 @@ historyRoutes.get('/history', async (c) => {
   try {
     head = await publicClient.getBlockNumber();
     fromBlock = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+    // Nothing the delegation emitted predates it: on a fork, where it was deployed after the fork point, this keeps the
+    // whole scan on the fork's own blocks instead of paging X Layer's public RPC 100 blocks at a time.
+    const born = await deploymentBlock(DELEGATION_ADDRESS, head).catch(() => 0n);
+    if (born > fromBlock) fromBlock = born;
     placed = await chainSettlements(owner, fromBlock, head);
   } catch (e) {
     // An unread log is not an empty history. The cause goes to the log in full; the screen gets the provider's words.
