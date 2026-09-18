@@ -417,11 +417,16 @@ async function ensurePolicyFresh(): Promise<PrivyPolicy> {
    * app secret alone can widen what the wallet may do — the exact hole this is meant to close.
    * Claiming it needs no signature precisely because it has no owner yet.
    */
+  let current = existing;
   if (!existing.owner_id && KEY_QUORUM_ID) {
-    await privyFetch(`/policies/${existing.id}`, {
+    const claimed = await privyFetch(`/policies/${existing.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ owner_id: KEY_QUORUM_ID }),
-    }).catch(() => undefined);
+    })
+      .then(() => true)
+      .catch(() => false);
+    // What is returned (and cached) is the policy as it now stands: a claim that landed is an owner, not "no owner".
+    if (claimed) current = { ...existing, owner_id: KEY_QUORUM_ID };
   }
 
   /*
@@ -429,7 +434,7 @@ async function ensurePolicyFresh(): Promise<PrivyPolicy> {
    * alone would call the old destination-only rules "the same" as these and never replace them —
    * which is exactly how a policy keeps allowing `transfer` after the code stopped meaning to.
    */
-  if (rulesKey(existing.rules) === rulesKey(wanted)) return existing;
+  if (rulesKey(current.rules) === rulesKey(wanted)) return current;
 
   return privyFetch<PrivyPolicy>(`/policies/${existing.id}`, {
     method: 'PATCH',
