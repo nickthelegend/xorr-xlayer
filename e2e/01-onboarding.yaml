@@ -1,0 +1,36 @@
+# PLAN.md 13.10 — onboarding -> wallet -> funded -> delegated.
+appId: finance.xorr.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: 'XORR'
+- assertVisible: 'A bot that trades while you get on with your life'
+- tapOn: 'Get started'
+
+# Goals
+- assertVisible: 'What should your'
+- tapOn: 'Earn yield'
+- tapOn: 'Balanced'
+- tapOn: 'Continue'
+
+# Wallet — replaces the handoff's KYC step (G44)
+- assertVisible: 'Your wallet, your keys'
+- assertVisible: 'xorr never holds your money'
+- tapOn: 'Create wallet'
+- assertVisible: 'Wallet created'
+- tapOn: 'Continue — add funds'
+
+# Fund
+- assertVisible: 'Fund the wallet'
+- tapOn: '$500'
+- tapOn: 'On-chain deposit'
+- tapOn:
+    text: 'Deposit .*'
+
+# The delegation grant — the screen the handoff never had (G45)
+- assertVisible: 'Let the bot trade'
+- assertVisible: 'It cannot move your money out'
+- assertVisible: 'You can take it back in one tap'
+- tapOn: 'Sign this permission'
+
+- assertVisible: 'Your draft portfolio'

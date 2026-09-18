@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "xorr",
+    "slug": "xorr",
+    "scheme": "xorr",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "bundleIdentifier": "finance.xorr.app",
+      "supportsTablet": false,
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "xorr uses Face ID to authorise payouts and changes to what your bot is allowed to do."
+      }
+    },
+    "android": {
+      "package": "finance.xorr.app",
+      "userInterfaceStyle": "dark",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/splash.png",
+          "imageWidth": 180
+        }
+      ],
+      "expo-web-browser",
+      "expo-image",
+      "expo-font",
+      "./plugins/with-spaces-in-project-path"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

@@ -1,0 +1,115 @@
+[
+  {
+    "anonymous": false,
+    "type": "event",
+    "name": "Shipped",
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "maker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "app",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "strategyHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "strategy",
+        "type": "bytes"
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "type": "event",
+    "name": "Docked",
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "maker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "app",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "strategyHash",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "type": "event",
+    "name": "Pulled",
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "maker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "app",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "strategyHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "type": "event",
+    "name": "Pushed",
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "maker",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "app",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "strategyHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ]
+  }
+]

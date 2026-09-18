@@ -1,0 +1,13 @@
+# PLAN.md 13.10 / G27 — an untouched proposal expires instead of filling.
+appId: finance.xorr.app
+---
+- launchApp
+- tapOn:
+    id: 'Bot'
+- assertVisible: 'Proposed trade'
+# The fixture proposal is short-lived when EXPO_PUBLIC_PROPOSAL_TTL is set low for this run.
+- extendedWaitUntil:
+    visible: 'expired'
+    timeout: 300000
+- assertVisible: 'That proposal expired before you decided'
+- assertNotVisible: 'Filled'

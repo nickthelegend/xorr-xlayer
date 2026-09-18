@@ -1,0 +1,23 @@
+# PLAN.md 13.10 — approve-before-execute, end to end in the UI.
+appId: finance.xorr.app
+---
+- launchApp
+- tapOn:
+    id: 'Bot'
+- assertVisible: 'Proposed trade'
+- assertVisible:
+    text: 'expires \d:\d\d'             # a LIVE countdown, not a static string (G27)
+- assertVisible: 'Entry'
+- assertVisible: 'Stop'
+- assertVisible: 'Target'
+- tapOn: 'Approve'
+
+# The buttons are REPLACED by a reply bubble — screens.md is explicit about this.
+- assertNotVisible: 'Approve'
+- assertNotVisible: 'Skip'
+- assertVisible: 'Filled'
+
+# And it is in the trail.
+- tapOn:
+    id: 'Home'
+- tapOn: 'Agents'

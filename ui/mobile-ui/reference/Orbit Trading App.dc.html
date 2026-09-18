@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&display=swap" rel="stylesheet"><style>body{margin:0;background:#efece7;font-family:-apple-system,system-ui,sans-serif}</style></helmet>
+
+<section style="padding:40px 44px 20px;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">5</span>
+<span style="font:600 13px/1.2 system-ui;color:#1a1a1a">Full asset universe + a real icon tab bar</span>
+</div>
+
+<div style="max-width:680px;display:flex;flex-direction:column;gap:8px;font:400 12.5px/1.6 system-ui;color:rgba(0,0,0,.6)">
+<p style="margin:0"><strong style="color:#1a1a1a">Five asset classes, live.</strong> Crypto, tokenized stocks, commodities, indices, pre-IPO. The commodity list is the one you asked about: gold, silver, WTI crude, Brent crude, copper — all perpetual swaps, no expiry. Crude rows carry an ICE-feed tag because the price references a delivery contract rather than a spot market; metals reference spot. That distinction is worth surfacing, so it sits on the row and again on the contract screen.</p>
+<p style="margin:0"><strong style="color:#1a1a1a">Tab bar with icons.</strong> Home, Markets, Agents, Trade, Assets — drawn as line icons, Agents centre with a live status ring because that's what makes this app different from a plain exchange. Tap any tab on either screen; the state is shared.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">24 · Markets — all asset classes (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 0;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0">
+    <div style="font-size:22px;font-weight:700;color:#fff">Markets</div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.55)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 L21 21"></path></svg>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;padding:16px 20px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+    <sc-for list="{{ mktSeg }}" as="t" hint-placeholder-count="5">
+      <div style="flex:none;height:34px;padding:0 14px;border-radius:20px;display:flex;align-items:center;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}" onClick="{{ t.pick }}">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0">
+    <div style="font-size:11.5px;color:rgba(255,255,255,.4);max-width:220px;line-height:1.4">{{ mktNote }}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.28);white-space:nowrap">{{ mktCount }}</div>
+  </div>
+
+  <div style="flex:1;padding:6px 20px 0;display:flex;flex-direction:column;overflow:hidden">
+    <sc-for list="{{ mktRows }}" as="r" hint-placeholder-count="5">
+      <div style="display:flex;align-items:center;gap:12px;height:66px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="width:34px;height:34px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 26%,{{ r.c1 }},{{ r.c2 }} 74%)"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">{{ r.sym }}</div>
+          <div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:2px">{{ r.name }} · {{ r.tag }}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">{{ r.px }}</div>
+          <div style="font-size:12px;font-weight:500;margin-top:2px;color:{{ r.chgFg }}">{{ r.chg }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;align-items:center;justify-content:center;gap:7px;padding:16px 0 10px;font-size:12.5px;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer">{{ mktMore }}<span style="font-size:11px">›</span></div>
+  </div>
+
+  <div style="display:flex;padding:8px 8px 22px;border-top:1px solid rgba(255,255,255,.06)">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;cursor:pointer;color:{{ t0fg }}" onClick="{{ pick0 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L12 3.5 L21 10.5 V20 a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"></path><path d="M9.5 21v-6h5v6"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Home</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;cursor:pointer;color:{{ t1fg }}" onClick="{{ pick1 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"></path><path d="M7.5 15.5 L11 11 L14 13.5 L19.5 7"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Markets</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;cursor:pointer;color:{{ t2fg }}" onClick="{{ pick2 }}">
+      <div style="position:relative;width:21px;height:21px">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><circle cx="9.3" cy="10.4" r="1.15" fill="currentColor" stroke="none"></circle><circle cx="14.7" cy="10.4" r="1.15" fill="currentColor" stroke="none"></circle><path d="M9.4 15.2a3.6 3.6 0 0 0 5.2 0"></path></svg>
+        <div style="position:absolute;top:-1px;right:-3px;width:6px;height:6px;border-radius:50%;background:{{ t2ring }}"></div>
+      </div>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Agents</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;cursor:pointer;color:{{ t3fg }}" onClick="{{ pick3 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16"></path><path d="M4 7.5 L7 4 L10 7.5"></path><path d="M17 20V4"></path><path d="M20 16.5 L17 20 L14 16.5"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Trade</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;cursor:pointer;color:{{ t4fg }}" onClick="{{ pick4 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.5" width="18" height="13" rx="2.5"></rect><path d="M3 10.5h18"></path><path d="M16.5 15h2"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Assets</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">25 · Gold perpetual — contract (live leverage)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 0;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#F5CE5F,#B98A0C 74%)"></div>
+      <div style="font-size:15.5px;font-weight:600;color:#fff">XAUT / USDT</div>
+    </div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6)">☆</div>
+  </div>
+
+  <div style="padding:18px 20px 0">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div style="font-size:36px;font-weight:700;color:#fff;letter-spacing:-1.2px">$3,412.10</div>
+      <div style="font-size:13px;font-weight:600;color:#2BD87A">+0.44%</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:.09em;padding:4px 9px;border-radius:12px;background:rgba(245,206,95,.14);color:#F5CE5F">PERPETUAL</div>
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:.09em;padding:4px 9px;border-radius:12px;background:rgba(255,255,255,.07);color:rgba(255,255,255,.5)">NO EXPIRY</div>
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:.09em;padding:4px 9px;border-radius:12px;background:rgba(255,255,255,.07);color:rgba(255,255,255,.5)">SPOT FEED</div>
+    </div>
+  </div>
+
+  <div style="height:132px;margin-top:16px;padding:0 20px">
+    <svg viewBox="0 0 360 110" preserveAspectRatio="none" style="width:100%;height:100%">
+      <defs><linearGradient id="gldg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5CE5F" stop-opacity=".28"></stop><stop offset="1" stop-color="#F5CE5F" stop-opacity="0"></stop></linearGradient></defs>
+      <polygon points="0,84 30,78 60,82 92,64 124,70 156,52 188,58 220,42 252,48 284,32 316,38 360,24 360,110 0,110" fill="url(#gldg)"></polygon>
+      <polyline points="0,84 30,78 60,82 92,64 124,70 156,52 188,58 220,42 252,48 284,32 316,38 360,24" fill="none" stroke="#F5CE5F" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+    </svg>
+  </div>
+
+  <div style="margin:14px 16px 0;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:24px;padding:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#fff">Leverage</div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,.35);margin-top:2px">on $800 margin</div>
+      </div>
+      <div style="font-size:22px;font-weight:700;color:#fff">{{ levLabel }}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <sc-for list="{{ levSteps }}" as="l" hint-placeholder-count="3">
+        <div style="flex:1;height:36px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;background:{{ l.bg }};color:{{ l.fg }}" onClick="{{ l.pick }}">{{ l.label }}</div>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px;margin-top:8px;border-top:1px solid rgba(255,255,255,.05)"><span style="font-size:12.5px;color:rgba(255,255,255,.4)">Position size</span><span style="font-size:13px;font-weight:600;color:#fff">{{ levNotional }}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px;border-top:1px solid rgba(255,255,255,.05)"><span style="font-size:12.5px;color:rgba(255,255,255,.4)">Liquidation</span><span style="font-size:13px;font-weight:600;color:#FF453A">{{ levLiq }}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px;border-top:1px solid rgba(255,255,255,.05)"><span style="font-size:12.5px;color:rgba(255,255,255,.4)">Funding</span><span style="font-size:13px;font-weight:600;color:#fff">{{ levFund }}</span></div>
+    <div style="font-size:11.5px;line-height:1.5;margin-top:12px;color:{{ levWarnFg }}">{{ levWarn }}</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:14px 16px 0;border-radius:20px;overflow:hidden;background:rgba(255,255,255,.06)">
+    <div style="background:#0C0C0D;padding:13px 15px"><div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Open interest</div><div style="font-size:14.5px;font-weight:600;color:#fff;margin-top:5px">$182.4M</div></div>
+    <div style="background:#0C0C0D;padding:13px 15px"><div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">24h volume</div><div style="font-size:14.5px;font-weight:600;color:#fff;margin-top:5px">$1.06B</div></div>
+    <div style="background:#0C0C0D;padding:13px 15px"><div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Mark vs index</div><div style="font-size:14.5px;font-weight:600;color:#2BD87A;margin-top:5px">+$0.42</div></div>
+    <div style="background:#0C0C0D;padding:13px 15px"><div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Next funding</div><div style="font-size:14.5px;font-weight:600;color:#fff;margin-top:5px">02:14:38</div></div>
+  </div>
+
+  <div style="flex:1;min-height:10px"></div>
+  <div style="display:flex;gap:12px;padding:0 16px">
+    <div style="flex:1;height:52px;border-radius:30px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff">Short gold</div>
+    <div style="flex:1;height:52px;border-radius:30px;background:#F5CE5F;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#1A1204">Long gold</div>
+  </div>
+
+  <div style="display:flex;padding:14px 8px 22px">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;cursor:pointer;color:{{ t0fg }}" onClick="{{ pick0 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 L12 3.5 L21 10.5 V20 a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"></path><path d="M9.5 21v-6h5v6"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Home</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;cursor:pointer;color:{{ t1fg }}" onClick="{{ pick1 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"></path><path d="M7.5 15.5 L11 11 L14 13.5 L19.5 7"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Markets</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;cursor:pointer;color:{{ t2fg }}" onClick="{{ pick2 }}">
+      <div style="position:relative;width:21px;height:21px">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><circle cx="9.3" cy="10.4" r="1.15" fill="currentColor" stroke="none"></circle><circle cx="14.7" cy="10.4" r="1.15" fill="currentColor" stroke="none"></circle><path d="M9.4 15.2a3.6 3.6 0 0 0 5.2 0"></path></svg>
+        <div style="position:absolute;top:-1px;right:-3px;width:6px;height:6px;border-radius:50%;background:{{ t2ring }}"></div>
+      </div>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Agents</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;cursor:pointer;color:{{ t3fg }}" onClick="{{ pick3 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16"></path><path d="M4 7.5 L7 4 L10 7.5"></path><path d="M17 20V4"></path><path d="M20 16.5 L17 20 L14 16.5"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Trade</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;cursor:pointer;color:{{ t4fg }}" onClick="{{ pick4 }}">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.5" width="18" height="13" rx="2.5"></rect><path d="M3 10.5h18"></path><path d="M16.5 15h2"></path></svg>
+      <div style="font-size:9.5px;font-weight:600;letter-spacing:.03em">Assets</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+</section>
+
+
+<section style="padding:40px 44px 20px;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">4</span>
+<span style="font:600 13px/1.2 system-ui;color:#1a1a1a">Proper candles, plus three more screens</span>
+</div>
+
+<div style="max-width:680px;font:400 12.5px/1.6 system-ui;color:rgba(0,0,0,.6)">
+<p style="margin:0">The Auto Close chart now runs off a real OHLC series — every candle is projected from actual prices, so wick length, body size and colour all mean something, and the last-price line sits where the close is. Bodies carry a soft colour bloom so green and red read instantly against both the light sheet and the dark chart below. Three screens added: a full trading chart, a live position with a close-out slider, and the news feed with each agent's read on it.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">21 · Pro chart</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#F7931A,#FFC46B)"></div><div style="font-size:15.5px;font-weight:600;color:#fff">BTC / USD</div></div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:13px;color:rgba(255,255,255,.6)">⤢</div>
+  </div>
+
+  <div style="padding:20px 20px 0">
+    <div style="font-size:38px;font-weight:700;color:#fff;letter-spacing:-1.2px">{{ lastPx }}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+      <span style="font-size:12.5px;font-weight:600;color:#2BD87A;background:rgba(43,216,122,.14);padding:3px 9px;border-radius:20px">+0.67%</span>
+      <span style="font-size:12px;color:rgba(255,255,255,.35)">+$442 today</span>
+    </div>
+  </div>
+
+  <div style="position:relative;height:230px;margin-top:18px">
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:4px 0">
+      <div style="height:1px;background:rgba(255,255,255,.05)"></div>
+      <div style="height:1px;background:rgba(255,255,255,.05)"></div>
+      <div style="height:1px;background:rgba(255,255,255,.05)"></div>
+      <div style="height:1px;background:rgba(255,255,255,.05)"></div>
+    </div>
+    <div style="position:absolute;left:0;right:56px;top:8px;bottom:8px;display:flex;align-items:stretch;gap:6px;padding-left:16px">
+      <sc-for list="{{ tightCandles }}" as="c" hint-placeholder-count="12">
+        <div style="flex:1;position:relative">
+          <div style="position:absolute;left:50%;transform:translateX(-50%);width:1.6px;border-radius:2px;opacity:.8;background:{{ c.color }};top:{{ c.wickTop }};height:{{ c.wickH }}"></div>
+          <div style="position:absolute;left:0;right:0;border-radius:3px;background:{{ c.color }};box-shadow:{{ c.glow }};top:{{ c.bodyTop }};height:{{ c.bodyH }}"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="position:absolute;right:0;top:0;bottom:0;width:56px;display:flex;flex-direction:column;justify-content:space-between;padding:2px 0;font-size:10px;color:rgba(255,255,255,.3)">
+      <sc-for list="{{ axisLabels }}" as="a" hint-placeholder-count="5"><span>{{ a }}</span></sc-for>
+    </div>
+    <div style="position:absolute;left:0;right:56px;transform:translateY(-50%);height:0;border-top:1px dashed rgba(255,255,255,.22);top:{{ tightLastTop }}"></div>
+    <div style="position:absolute;right:0;transform:translateY(-50%);background:#fff;color:#000;font-size:10.5px;font-weight:700;padding:3px 6px;border-radius:5px;top:{{ tightLastTop }}">{{ lastPx }}</div>
+  </div>
+
+  <div style="height:42px;display:flex;align-items:flex-end;gap:6px;padding:0 72px 0 16px">
+    <sc-for list="{{ volBars }}" as="v" hint-placeholder-count="12">
+      <div style="flex:1;border-radius:2px 2px 0 0;background:{{ v.bg }};height:{{ v.h }}"></div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;gap:6px;padding:16px 20px 0">
+    <div style="flex:1;height:30px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">15m</div>
+    <div style="flex:1;height:30px;border-radius:18px;background:#fff;color:#0B0B0B;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">1H</div>
+    <div style="flex:1;height:30px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">4H</div>
+    <div style="flex:1;height:30px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">1D</div>
+    <div style="flex:1;height:30px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">1W</div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:10px;margin:18px 20px 0;background:#0C0C0D;border-radius:18px;padding:13px">
+    <div style="width:22px;height:22px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 26%,#5B93FF,#1B44CE 74%)"></div>
+    <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.45)">Three green closes off the $65.2K shelf. Momentum Scout is watching for a break of $66.6K to add.</div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="display:flex;gap:12px;padding:0 16px">
+    <div style="flex:1;height:54px;border-radius:30px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#fff">Short</div>
+    <div style="flex:1;height:54px;border-radius:30px;background:#16C060;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#fff">Long</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">22 · Position &amp; close (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="font-size:15.5px;font-weight:600;color:#fff">Position</div>
+    <div style="width:34px;height:34px"></div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:22px">
+    <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#F7931A,#FFC46B)"></div>
+    <div style="font-size:16px;font-weight:600;color:#fff">BTC long</div>
+    <div style="font-size:11px;font-weight:700;color:#7FA9FF;background:rgba(91,147,255,.15);padding:3px 8px;border-radius:12px">2× lev</div>
+  </div>
+
+  <div style="text-align:center;margin-top:22px">
+    <div style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.32)">Unrealised P&amp;L</div>
+    <div style="font-size:46px;font-weight:700;color:#2BD87A;letter-spacing:-1.4px;margin-top:6px">+$318.40</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.35);margin-top:4px">+4.2% on $7,600 notional</div>
+  </div>
+
+  <div style="margin-top:26px;padding:16px 18px;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Entry</span><span style="font-size:13.5px;font-weight:600;color:#fff">$63,880</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Mark</span><span style="font-size:13.5px;font-weight:600;color:#fff">{{ lastPx }}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Liquidation</span><span style="font-size:13.5px;font-weight:600;color:#FF453A">$58,110</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Funding paid</span><span style="font-size:13.5px;font-weight:600;color:#fff">−$4.22</span></div>
+  </div>
+
+  <div style="margin-top:16px;padding:16px 18px;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13.5px;font-weight:600;color:#fff">Close</span>
+      <span style="font-size:15px;font-weight:700;color:#fff">{{ closePct }}</span>
+    </div>
+    <div style="height:6px;border-radius:6px;background:rgba(255,255,255,.08);margin-top:14px;position:relative">
+      <div style="height:100%;border-radius:6px;background:#fff;transition:width .18s;width:{{ closePct }}"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <sc-for list="{{ closeSteps }}" as="c" hint-placeholder-count="4">
+        <div style="flex:1;height:34px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }}" onClick="{{ c.pick }}">{{ c.label }}</div>
+      </sc-for>
+    </div>
+    <div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:14px">Realises <span style="color:#2BD87A;font-weight:600">{{ closeRealise }}</span> and frees <span style="color:#fff;font-weight:600">{{ closeFree }}</span> of margin.</div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="display:flex;gap:12px">
+    <div style="flex:1;height:54px;border-radius:30px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff">Edit TP/SL</div>
+    <div style="flex:1.3;height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#000">{{ closeCta }}</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">23 · News, with agent takes</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="font-size:22px;font-weight:700;color:#fff">Briefing</div>
+    <div style="font-size:11.5px;color:rgba(255,255,255,.35)">Updated 18m ago</div>
+  </div>
+  <div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.4);margin-top:8px">Only what moved your book, and what each agent did about it.</div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:22px">
+    <sc-for list="{{ news }}" as="n" hint-placeholder-count="3">
+      <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:24px;padding:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:9.5px;font-weight:700;letter-spacing:.12em;padding:3px 8px;border-radius:10px;background:{{ n.tagBg }};color:{{ n.tagFg }}">{{ n.tag }}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.28)">{{ n.t }}</div>
+        </div>
+        <div style="font-size:15px;font-weight:600;line-height:1.35;color:#fff;margin-top:12px">{{ n.head }}</div>
+        <div style="display:flex;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
+          <div style="width:8px;height:8px;border-radius:50%;background:#2BD87A;flex:none;margin-top:5px"></div>
+          <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.45)">{{ n.take }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:48px;border-radius:26px;border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.65)">Ask for the full rundown</div>
+</div>
+</x-import>
+</div>
+
+</div>
+</section>
+
+
+<section style="padding:40px 44px 20px;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">3</span>
+<span style="font:600 13px/1.2 system-ui;color:#1a1a1a">Five more screens — the ones that make it feel like a real desk</span>
+</div>
+
+<div style="max-width:680px;font:400 12.5px/1.6 system-ui;color:rgba(0,0,0,.6)">
+<p style="margin:0">Rank your agents against each other, backtest a strategy before you fund it, set the alerts that matter, swap without leaving the app, and kill everything in one tap. All five are live — sort, lookback, capital, toggles, amounts.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">16 · Agent leaderboard (live sort)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="font-size:22px;font-weight:700;color:#fff">Leaderboard</div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.55)">⇅</div>
+  </div>
+  <div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.4);margin-top:8px">How your agents are actually doing against each other. Fire the laggards.</div>
+
+  <div style="display:flex;gap:4px;margin-top:20px;padding:4px;border-radius:24px;background:#111214;border:1px solid rgba(255,255,255,.07)">
+    <sc-for list="{{ lbSeg }}" as="t" hint-placeholder-count="3">
+      <div style="flex:1;height:38px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}" onClick="{{ t.pick }}">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:20px">
+    <sc-for list="{{ lbRows }}" as="a" hint-placeholder-count="4">
+      <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:22px;padding:15px 16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{{ a.rankFg }};width:20px">{{ a.rank }}</div>
+          <div style="width:38px;height:38px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 26%,{{ a.c1 }},{{ a.c2 }} 74%)"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14.5px;font-weight:600;color:#fff">{{ a.name }}</div>
+            <div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:2px">{{ a.meta }}</div>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:{{ a.pnlFg }}">{{ a.pnlLabel }}</div>
+        </div>
+        <div style="height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin-top:12px;overflow:hidden">
+          <div style="height:100%;border-radius:4px;transition:width .25s;width:{{ a.barW }};background:{{ a.barBg }}"></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="font-size:11px;color:rgba(255,255,255,.28);text-align:center">{{ lbFooter }}</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">17 · Backtest before funding (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 26px;background:#000;display:flex;flex-direction:column">
+  <div style="padding:8px 20px 0;display:flex;align-items:center;gap:12px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="font-size:15.5px;font-weight:600;color:#fff">Backtest</div>
+  </div>
+  <div style="padding:14px 20px 0;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.4)">Momentum Scout, run against real history at your current limits. Nothing here is a promise.</div>
+
+  <div style="display:flex;gap:6px;padding:18px 20px 0">
+    <sc-for list="{{ btSeg }}" as="t" hint-placeholder-count="4">
+      <div style="flex:1;height:34px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}" onClick="{{ t.pick }}">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="height:150px;margin-top:20px;padding:0 20px;position:relative">
+    <svg viewBox="0 0 360 110" preserveAspectRatio="none" style="width:100%;height:100%">
+      <defs><linearGradient id="btg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2BD87A" stop-opacity=".3"></stop><stop offset="1" stop-color="#2BD87A" stop-opacity="0"></stop></linearGradient></defs>
+      <line x1="0" y1="27" x2="360" y2="27" stroke="rgba(255,255,255,.06)" stroke-width="1"></line>
+      <line x1="0" y1="55" x2="360" y2="55" stroke="rgba(255,255,255,.06)" stroke-width="1"></line>
+      <line x1="0" y1="83" x2="360" y2="83" stroke="rgba(255,255,255,.06)" stroke-width="1"></line>
+      <polygon points="{{ btArea }}" fill="url(#btg)"></polygon>
+      <polyline points="{{ btPath }}" fill="none" stroke="#2BD87A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+    </svg>
+  </div>
+
+  <div style="display:flex;gap:8px;padding:14px 20px 0">
+    <div style="flex:1;background:#0C0C0D;border-radius:16px;padding:12px 13px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Return</div>
+      <div style="font-size:17px;font-weight:700;color:#2BD87A;margin-top:5px">{{ btRet }}</div>
+    </div>
+    <div style="flex:1;background:#0C0C0D;border-radius:16px;padding:12px 13px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Max DD</div>
+      <div style="font-size:17px;font-weight:700;color:#FF453A;margin-top:5px">{{ btDd }}</div>
+    </div>
+    <div style="flex:1;background:#0C0C0D;border-radius:16px;padding:12px 13px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Sharpe</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-top:5px">{{ btSharpe }}</div>
+    </div>
+    <div style="flex:1;background:#0C0C0D;border-radius:16px;padding:12px 13px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Trades</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-top:5px">{{ btTrades }}</div>
+    </div>
+  </div>
+
+  <div style="margin:20px 20px 0;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:22px;padding:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:600;color:#fff">If you'd started with</div>
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="width:26px;height:26px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;cursor:pointer" onClick="{{ btCapDown }}">−</div>
+        <div style="font-size:14.5px;font-weight:700;color:#fff;min-width:70px;text-align:center">{{ btCapLabel }}</div>
+        <div style="width:26px;height:26px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;cursor:pointer" onClick="{{ btCapUp }}">+</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:14px">
+      <div style="font-size:30px;font-weight:700;color:#fff;letter-spacing:-1px">{{ btEndLabel }}</div>
+      <div style="font-size:14px;font-weight:600;color:#2BD87A">{{ btGain }}</div>
+    </div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="padding:0 16px">
+    <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">Run this strategy live</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">18 · Alerts (live toggles)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="font-size:22px;font-weight:700;color:#fff">Alerts</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.4)">{{ alertCount }}</div>
+  </div>
+  <div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.4);margin-top:8px">The agents watch everything. These are the moments they interrupt you for.</div>
+
+  <div style="display:flex;flex-direction:column;margin-top:22px">
+    <sc-for list="{{ alertRows }}" as="a" hint-placeholder-count="5">
+      <div style="display:flex;align-items:center;gap:14px;height:70px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">{{ a.name }}</div>
+          <div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:3px">{{ a.sub }}</div>
+        </div>
+        <div style="width:48px;height:29px;border-radius:18px;padding:2px;flex:none;cursor:pointer;transition:background .18s;background:{{ a.bg }}" onClick="{{ a.toggle }}">
+          <div style="width:25px;height:25px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .18s;transform:{{ a.knob }}"></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;gap:10px;background:#0C0C0D;border-radius:18px;padding:14px;margin-top:22px">
+    <div style="width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);flex:none;margin-top:1px"></div>
+    <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.42)">Circuit breakers stay on even when notifications are muted. They stop trading, not just your phone.</div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:48px;border-radius:26px;border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.65)">Add custom alert</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">19 · Swap (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="font-size:16px;font-weight:600;color:#fff">Swap</div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6)">⚙</div>
+  </div>
+
+  <div style="position:relative;margin-top:26px">
+    <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:26px;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">You pay</div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,.32)">Balance 1,750.30</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:32px;font-weight:700;color:#fff;letter-spacing:-1px">{{ swapIn }}</div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,.35);margin-top:3px">{{ swapInUsd }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:22px;background:#1B1C1E;flex:none">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#5B93FF,#49E39B)"></div>
+          <div style="font-size:14px;font-weight:600;color:#fff">SOL</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4)">▾</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:16px">
+        <div style="width:30px;height:30px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;cursor:pointer;flex:none" onClick="{{ swapDown }}">−</div>
+        <div style="flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.08);position:relative">
+          <div style="height:100%;border-radius:4px;background:#fff;transition:width .18s;width:{{ swapPct }}"></div>
+        </div>
+        <div style="width:30px;height:30px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;cursor:pointer;flex:none" onClick="{{ swapUp }}">+</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;margin:-14px 0 -14px;position:relative;z-index:2">
+      <div style="width:40px;height:40px;border-radius:50%;background:#1B1C1E;border:3px solid #000;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff">⇅</div>
+    </div>
+
+    <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:26px;padding:20px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">You receive</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:32px;font-weight:700;color:#fff;letter-spacing:-1px">{{ swapOut }}</div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,.35);margin-top:3px">{{ swapRate }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:22px;background:#1B1C1E;flex:none">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#49E39B,#12A45F)"></div>
+          <div style="font-size:14px;font-weight:600;color:#fff">USDC</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4)">▾</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;margin-top:22px">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:42px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13px;color:rgba(255,255,255,.4)">Route</span><span style="font-size:13px;font-weight:600;color:#fff">Best of 3 venues</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:42px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13px;color:rgba(255,255,255,.4)">Fee</span><span style="font-size:13px;font-weight:600;color:#fff">{{ swapFee }}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:42px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Max slippage</span><span style="font-size:13px;font-weight:600;color:#fff">0.30%</span></div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">Review swap</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">20 · Kill switch (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding-top:8px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="font-size:15.5px;font-weight:600;color:#fff">Safety</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;margin-top:34px">
+    <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 14px;border-radius:18px;background:#111214;border:1px solid rgba(255,255,255,.07)">
+      <div style="width:7px;height:7px;border-radius:50%;background:{{ killDot }}"></div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.6)">{{ killState }}</div>
+    </div>
+    <div style="font-size:24px;font-weight:700;color:#fff;margin-top:20px;text-align:center">{{ killTitle }}</div>
+    <div style="font-size:13px;line-height:1.5;color:rgba(255,255,255,.42);text-align:center;margin-top:8px;max-width:250px">{{ killSub }}</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:32px">
+    <div style="display:flex;align-items:center;gap:12px;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px">
+      <div style="width:9px;height:9px;border-radius:50%;background:#FF453A;flex:none"></div>
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#fff">New orders</div><div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:2px">Stopped immediately</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px">
+      <div style="width:9px;height:9px;border-radius:50%;background:#2BD87A;flex:none"></div>
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#fff">Stops and take-profits</div><div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:2px">Stay active — your risk is still covered</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:15px 16px">
+      <div style="width:9px;height:9px;border-radius:50%;background:#2BD87A;flex:none"></div>
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#fff">Open positions</div><div style="font-size:11.5px;color:rgba(255,255,255,.38);margin-top:2px">Left exactly as they are</div></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;margin-top:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:48px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Face ID for every payout</span><span style="font-size:13px;font-weight:600;color:#2BD87A">On</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:48px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Withdrawal allowlist</span><span style="font-size:13px;font-weight:600;color:#fff">2 addresses</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:48px"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Recovery phrase</span><span style="font-size:13px;font-weight:600;color:#E8C64A">Not backed up</span></div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:56px;border-radius:30px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;background:{{ killBg }};color:{{ killFg }}" onClick="{{ toggleKill }}">{{ killCta }}</div>
+  <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.3);margin-top:12px">Takes effect in under a second across every device.</div>
+</div>
+</x-import>
+</div>
+
+</div>
+</section>
+
+
+<section style="padding:40px 44px 20px;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">2</span>
+<span style="font:600 13px/1.2 system-ui;color:#1a1a1a">Nine more screens — the flow around the agents</span>
+</div>
+
+<div style="max-width:680px;display:flex;flex-direction:column;gap:8px;font:400 12.5px/1.6 system-ui;color:rgba(0,0,0,.6)">
+<p style="margin:0"><strong style="color:#1a1a1a">What the research pointed at.</strong> The pattern the newest agentic exchanges are converging on: onboarding that asks for goals, risk tolerance and funding in one flow, then has the AI draft a portfolio the user reviews, adjusts and approves — with an explanation attached to every recommendation. <a href="https://www.cnbc.com/2026/07/10/kraken-to-launch-agentic-trading-as-crypto-exchanges-evolve-beyond-crypto.html" style="color:#1a1a1a">CNBC on Kraken's rebuild</a>. Compliance work has moved the same way: agents run ID match, liveness and sanctions screening, and the thing regulators actually ask for is a <strong style="color:#1a1a1a">structured audit trail of every agent action</strong>.</p>
+<p style="margin:0"><strong style="color:#1a1a1a">So these nine cover:</strong> goals → verification → funding → AI proposal → agent roster → agent chat with an approve-before-execute trade → asset detail → order ticket → audit log. All live: chips, steppers, keypad, filters, hire toggles.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">7 · Goals &amp; risk (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="flex:1;height:4px;border-radius:4px;background:#141516;overflow:hidden"><div style="width:33%;height:100%;background:#fff"></div></div>
+    <div style="font-size:11.5px;color:rgba(255,255,255,.35)">1/3</div>
+  </div>
+  <div style="font-size:26px;font-weight:700;color:#fff;line-height:1.2;margin-top:30px">What should your<br>agents optimise for?</div>
+  <div style="font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:10px">Pick as many as apply. This sets the strategies you get offered, and the hard limits they run inside.</div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:9px;margin-top:26px">
+    <sc-for list="{{ goalChips }}" as="g" hint-placeholder-count="5">
+      <div style="height:40px;padding:0 16px;border-radius:22px;display:flex;align-items:center;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ g.bg }};color:{{ g.fg }};border:{{ g.bd }}" onClick="{{ g.pick }}">{{ g.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:14px;font-weight:600;color:#fff;margin-top:38px">How much drawdown can you sit through?</div>
+  <div style="display:flex;gap:4px;margin-top:14px;padding:4px;border-radius:26px;background:#111214;border:1px solid rgba(255,255,255,.07)">
+    <sc-for list="{{ riskSeg }}" as="r" hint-placeholder-count="3">
+      <div style="flex:1;height:42px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }}" onClick="{{ r.pick }}">{{ r.label }}</div>
+    </sc-for>
+  </div>
+  <div style="font-size:12px;color:rgba(255,255,255,.35);margin-top:10px;line-height:1.5">{{ riskWord }} caps single-position size and how far a stop can sit from entry.</div>
+
+  <div style="flex:1"></div>
+  <div style="font-size:11.5px;color:rgba(255,255,255,.35);text-align:center;margin-bottom:10px">{{ goalSummary }}</div>
+  <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">Continue</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">8 · Verify identity (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="flex:1;height:4px;border-radius:4px;background:#141516;overflow:hidden"><div style="height:100%;background:#fff;width:{{ kycPct }};transition:width .25s"></div></div>
+    <div style="font-size:11.5px;color:rgba(255,255,255,.35)">2/3</div>
+  </div>
+  <div style="font-size:26px;font-weight:700;color:#fff;line-height:1.2;margin-top:30px">Verify it's you</div>
+  <div style="font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:10px">Checks run automatically and usually clear in under a minute. Nothing is shared with the agents.</div>
+
+  <div style="display:flex;flex-direction:column;margin-top:30px">
+    <sc-for list="{{ kycRows }}" as="k" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:14px;height:66px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="width:26px;height:26px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#04160C;background:{{ k.bg }};border:{{ k.bd }}">{{ k.mark }}</div>
+        <div style="flex:1">
+          <div style="font-size:14.5px;font-weight:600;color:{{ k.fg }}">{{ k.label }}</div>
+          <div style="font-size:12px;color:{{ k.subFg }};margin-top:2px">{{ k.sub }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;gap:10px;background:#0C0C0D;border-radius:18px;padding:14px;margin-top:24px">
+    <div style="width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);flex:none;margin-top:1px"></div>
+    <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.42)">Your documents are checked against sanctions and watchlists once at signup, then quietly re-screened in the background.</div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#000;cursor:pointer" onClick="{{ kycNext }}" style-hover="background:rgba(255,255,255,.88)">{{ kycCta }}</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">9 · Add funds (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="flex:1;height:4px;border-radius:4px;background:#141516;overflow:hidden"><div style="width:100%;height:100%;background:#fff"></div></div>
+    <div style="font-size:11.5px;color:rgba(255,255,255,.35)">3/3</div>
+  </div>
+
+  <div style="font-size:26px;font-weight:700;color:#fff;line-height:1.2;margin-top:30px">Fund the account</div>
+  <div style="font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:10px">Agents can only trade what's settled. You can top up or withdraw whenever you like.</div>
+
+  <div style="text-align:center;font-size:52px;font-weight:700;color:#fff;letter-spacing:-2px;margin-top:32px">{{ depAmount }}</div>
+
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:20px">
+    <sc-for list="{{ depPresets }}" as="p" hint-placeholder-count="4">
+      <div style="height:36px;padding:0 16px;border-radius:20px;display:flex;align-items:center;font-size:13px;font-weight:600;cursor:pointer;background:{{ p.bg }};color:{{ p.fg }}" onClick="{{ p.pick }}">{{ p.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);margin-top:34px">How you're paying</div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+    <sc-for list="{{ depMethods }}" as="m" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:14px;background:#0C0C0D;border-radius:22px;padding:16px;cursor:pointer;border:{{ m.bd }}" onClick="{{ m.pick }}">
+        <div style="width:20px;height:20px;border-radius:50%;flex:none;box-sizing:border-box;border:{{ m.dotBd }}"></div>
+        <div style="flex:1">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">{{ m.name }}</div>
+          <div style="font-size:11.5px;color:rgba(255,255,255,.4);margin-top:3px">{{ m.sub }}</div>
+        </div>
+        <div style="font-size:10.5px;font-weight:600;color:rgba(255,255,255,.45);background:#18191B;padding:4px 9px;border-radius:12px">{{ m.tag }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-direction:column;margin-top:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Fee</span><span style="font-size:13px;font-weight:600;color:#fff">{{ depFee }}</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:38px"><span style="font-size:13px;color:rgba(255,255,255,.4)">Available to trade</span><span style="font-size:13px;font-weight:600;color:#fff">{{ depLands }}</span></div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">{{ depCta }}</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">10 · AI portfolio proposal (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 16px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;flex-direction:column;align-items:center;padding-top:10px">
+    <div style="width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#C79BFF,#7B3FE4 74%)"></div>
+    <div style="font-size:19px;font-weight:700;color:#fff;margin-top:14px">Your draft portfolio</div>
+    <div style="font-size:12.5px;color:rgba(255,255,255,.4);text-align:center;margin-top:4px;line-height:1.45;max-width:230px">Built from your goals and a {{ riskWord }} risk setting. Move the weights — nothing is placed until you approve.</div>
+  </div>
+
+  <div style="flex:1;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:30px;padding:20px 18px;margin-top:20px;display:flex;flex-direction:column">
+    <div style="display:flex;height:8px;border-radius:6px;overflow:hidden;gap:2px">
+      <sc-for list="{{ sleeveRows }}" as="s" hint-placeholder-count="3">
+        <div style="height:100%;background:{{ s.color }};width:{{ s.barW }};transition:width .2s"></div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;margin-top:8px">
+      <sc-for list="{{ sleeveRows }}" as="s" hint-placeholder-count="3">
+        <div style="padding:18px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:9px;height:9px;border-radius:50%;flex:none;background:{{ s.color }}"></div>
+            <div style="flex:1;font-size:14.5px;font-weight:600;color:#fff">{{ s.name }}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:24px;height:24px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;cursor:pointer" onClick="{{ s.down }}">−</div>
+              <div style="font-size:14px;font-weight:700;color:#fff;min-width:42px;text-align:center">{{ s.pct }}</div>
+              <div style="width:24px;height:24px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;cursor:pointer" onClick="{{ s.up }}">+</div>
+            </div>
+          </div>
+          <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.38);margin-top:7px;padding-left:19px">{{ s.note }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-top:16px">
+      <div style="font-size:13px;color:rgba(255,255,255,.4)">Allocated</div>
+      <div style="font-size:15px;font-weight:700;color:{{ totalColor }}">{{ totalLabel }}</div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div style="height:52px;border-radius:30px;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;cursor:pointer;background:{{ proposalBg }};color:{{ proposalFg }}" onClick="{{ approve }}">{{ proposalCta }}</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">11 · Hire agents (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 20px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px">
+    <div style="font-size:22px;font-weight:700;color:#fff">Agents</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.4)">{{ hiredCount }}</div>
+  </div>
+  <div style="font-size:13px;line-height:1.5;color:rgba(255,255,255,.4);margin-top:8px">Each one runs a single strategy inside the limits you set. Hire and fire them any time.</div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:22px">
+    <sc-for list="{{ storeRows }}" as="a" hint-placeholder-count="4">
+      <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:24px;padding:16px;display:flex;align-items:center;gap:14px">
+        <div style="width:52px;height:52px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 26%,{{ a.c1 }},{{ a.c2 }} 74%)"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">{{ a.name }}</div>
+          <div style="font-size:11.5px;line-height:1.4;color:rgba(255,255,255,.4);margin-top:3px">{{ a.role }}</div>
+          <div style="font-size:11px;font-weight:600;color:#2BD87A;margin-top:5px">{{ a.win }}</div>
+        </div>
+        <div style="height:34px;padding:0 16px;border-radius:20px;display:flex;align-items:center;font-size:13px;font-weight:600;cursor:pointer;flex:none;background:{{ a.ctaBg }};color:{{ a.ctaFg }}" onClick="{{ a.toggle }}">{{ a.cta }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="font-size:11px;color:rgba(255,255,255,.28);text-align:center">Past performance of a strategy says nothing about tomorrow.</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">12 · Agent chat + approval (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:12px;padding:8px 20px 16px;border-bottom:1px solid rgba(255,255,255,.06)">
+    <div style="width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#5B93FF,#1B44CE 74%)"></div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:600;color:#fff">Momentum Scout</div>
+      <div style="font-size:11px;color:#2BD87A">Watching 14 markets</div>
+    </div>
+    <div style="font-size:15px;color:rgba(255,255,255,.4);letter-spacing:1px">···</div>
+  </div>
+
+  <div style="flex:1;padding:18px 16px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+    <div style="align-self:center;font-size:10.5px;color:rgba(255,255,255,.25)">Today 9:38 AM</div>
+
+    <div style="max-width:78%;background:#111214;border-radius:20px 20px 20px 6px;padding:12px 14px;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.85)">SOL just cleared its 20-day high on twice the usual volume. Funding is still flat, so this isn't a crowded long yet.</div>
+
+    <div style="background:#0C0C0D;border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#2BD87A">PROPOSED TRADE</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.35)">expires 4:12</div>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px">
+        <div style="font-size:21px;font-weight:700;color:#fff">Buy 12.4 SOL</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.4)">$1,095</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="flex:1;background:#141516;border-radius:14px;padding:9px 11px"><div style="font-size:10px;color:rgba(255,255,255,.35)">Entry</div><div style="font-size:13px;font-weight:600;color:#fff;margin-top:2px">$88.32</div></div>
+        <div style="flex:1;background:#141516;border-radius:14px;padding:9px 11px"><div style="font-size:10px;color:rgba(255,255,255,.35)">Stop</div><div style="font-size:13px;font-weight:600;color:#FF453A;margin-top:2px">$87.44</div></div>
+        <div style="flex:1;background:#141516;border-radius:14px;padding:9px 11px"><div style="font-size:10px;color:rgba(255,255,255,.35)">Target</div><div style="font-size:13px;font-weight:600;color:#2BD87A;margin-top:2px">$91.20</div></div>
+      </div>
+      <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.4);margin-top:12px">Risking $10.90 to make $35.70. Within your $1,600 daily cap.</div>
+      <sc-if value="{{ showActions }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <div style="flex:1;height:44px;border-radius:24px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:rgba(255,255,255,.7);cursor:pointer" onClick="{{ decline }}">Skip</div>
+          <div style="flex:1.4;height:44px;border-radius:24px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#000;cursor:pointer" onClick="{{ accept }}">Approve</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ decisionState }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:78%;background:#111214;border-radius:20px 20px 20px 6px;padding:12px 14px;font-size:13.5px;line-height:1.5;color:{{ decisionColor }}">{{ decisionMsg }}</div>
+    </sc-if>
+  </div>
+
+  <div style="padding:0 16px">
+    <div style="height:52px;border-radius:30px;background:#121213;border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px;padding:0 8px 0 18px">
+      <div style="flex:1;font-size:14.5px;color:rgba(255,255,255,.35)">Ask about this trade…</div>
+      <div style="width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;color:#000">↑</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">13 · Asset detail</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 20px 0">
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.6)">‹</div>
+    <div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#5B93FF,#49E39B)"></div><div style="font-size:15.5px;font-weight:600;color:#fff">Solana</div></div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6)">☆</div>
+  </div>
+
+  <div style="text-align:center;margin-top:26px;font-size:42px;font-weight:700;color:#fff;letter-spacing:-1.2px">$88.32</div>
+  <div style="display:flex;justify-content:center;margin-top:8px"><span style="font-size:11.5px;font-weight:600;color:#2BD87A;background:rgba(43,216,122,.14);padding:3px 9px;border-radius:20px">up 2.4% today</span></div>
+
+  <div style="height:170px;margin-top:22px;position:relative">
+    <svg viewBox="0 0 360 170" preserveAspectRatio="none" style="width:100%;height:100%">
+      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2BD87A" stop-opacity=".28"></stop><stop offset="1" stop-color="#2BD87A" stop-opacity="0"></stop></linearGradient></defs>
+      <path d="M0,130 L28,118 L56,124 L84,96 L112,108 L140,74 L168,86 L196,58 L224,70 L252,44 L280,52 L308,30 L336,38 L360,22 L360,170 L0,170 Z" fill="url(#sg)"></path>
+      <path d="M0,130 L28,118 L56,124 L84,96 L112,108 L140,74 L168,86 L196,58 L224,70 L252,44 L280,52 L308,30 L336,38 L360,22" fill="none" stroke="#2BD87A" stroke-width="2" stroke-linejoin="round"></path>
+    </svg>
+  </div>
+
+  <div style="display:flex;gap:6px;justify-content:center;margin-top:14px">
+    <div style="height:30px;padding:0 14px;border-radius:18px;background:#fff;color:#0B0B0B;font-size:12.5px;font-weight:600;display:flex;align-items:center">1D</div>
+    <div style="height:30px;padding:0 14px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12.5px;font-weight:600;display:flex;align-items:center">1W</div>
+    <div style="height:30px;padding:0 14px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12.5px;font-weight:600;display:flex;align-items:center">1M</div>
+    <div style="height:30px;padding:0 14px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12.5px;font-weight:600;display:flex;align-items:center">1Y</div>
+    <div style="height:30px;padding:0 14px;border-radius:18px;background:#141516;color:rgba(255,255,255,.5);font-size:12.5px;font-weight:600;display:flex;align-items:center">All</div>
+  </div>
+
+  <div style="padding:22px 20px 0;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:44px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Your position</span><span style="font-size:13.5px;font-weight:600;color:#fff">1,750.30 SOL</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:44px;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Avg cost</span><span style="font-size:13.5px;font-weight:600;color:#fff">$81.14</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;height:44px"><span style="font-size:13.5px;color:rgba(255,255,255,.45)">Unrealised</span><span style="font-size:13.5px;font-weight:600;color:#2BD87A">+$12,566</span></div>
+  </div>
+
+  <div style="display:flex;align-items:flex-start;gap:10px;margin:14px 20px 0;background:#0C0C0D;border-radius:18px;padding:13px">
+    <div style="width:22px;height:22px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 26%,#5B93FF,#1B44CE 74%)"></div>
+    <div style="font-size:11.5px;line-height:1.5;color:rgba(255,255,255,.45)">Momentum Scout holds this. It'll trim at $91.20 unless you say otherwise.</div>
+  </div>
+
+  <div style="flex:1"></div>
+  <div style="display:flex;gap:12px;padding:0 16px">
+    <div style="flex:1;height:54px;border-radius:30px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#fff">Sell</div>
+    <div style="flex:1;height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#000">Buy</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">14 · Order ticket (live keypad)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 0;background:#000;display:flex;flex-direction:column">
+  <div style="flex:1;background:#fff;border-radius:30px 30px 0 0;display:flex;flex-direction:column;padding:18px 0 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px">
+      <div style="width:24px"></div>
+      <div style="font-size:16.5px;font-weight:700;color:#0B0B0B">Solana</div>
+      <div style="font-size:17px;color:#9A9A9F">✕</div>
+    </div>
+
+    <div style="display:flex;gap:4px;margin:16px 20px 0;padding:4px;border-radius:24px;background:#F2F2F5">
+      <div style="flex:1;height:38px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ buyBg }};color:{{ buyFg }}" onClick="{{ setBuy }}">Buy</div>
+      <div style="flex:1;height:38px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ sellBg }};color:{{ sellFg }}" onClick="{{ setSell }}">Sell</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;margin-top:34px">
+      <div style="font-size:52px;font-weight:700;color:#0B0B0B;letter-spacing:-2px">{{ orderAmtLabel }}</div>
+      <div style="font-size:13.5px;color:#8A8A90;margin-top:6px">{{ orderUnits }}</div>
+    </div>
+
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:22px">
+      <div style="height:32px;padding:0 16px;border-radius:20px;background:#F2F2F5;font-size:12.5px;font-weight:600;color:#4A4A50;display:flex;align-items:center">$100</div>
+      <div style="height:32px;padding:0 16px;border-radius:20px;background:#F2F2F5;font-size:12.5px;font-weight:600;color:#4A4A50;display:flex;align-items:center">$500</div>
+      <div style="height:32px;padding:0 16px;border-radius:20px;background:#F2F2F5;font-size:12.5px;font-weight:600;color:#4A4A50;display:flex;align-items:center">Max</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:24px;padding:0 12px">
+      <sc-for list="{{ keys }}" as="k" hint-placeholder-count="12">
+        <div style="height:56px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500;color:#0B0B0B;border-radius:16px;cursor:pointer;user-select:none" style-hover="background:#F2F2F5" onClick="{{ k.tap }}">{{ k.label }}</div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px 0;font-size:12px;color:#8A8A90">
+      <span>Network + spread fee</span><span style="font-weight:600;color:#4A4A50">{{ orderFee }}</span>
+    </div>
+
+    <div style="flex:1"></div>
+    <div style="padding:0 16px 12px">
+      <div style="height:54px;border-radius:30px;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#fff;background:{{ orderCtaBg }}">{{ orderCta }}</div>
+    </div>
+    <div style="text-align:center;font-size:11px;color:#9A9A9F;padding-bottom:26px">Auto Close is on: TP +1.0% / SL −1.0%</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">15 · Activity / audit log (live filters)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 0 26px;background:#000;display:flex;flex-direction:column">
+  <div style="padding:8px 20px 0;font-size:22px;font-weight:700;color:#fff">Activity</div>
+  <div style="padding:6px 20px 0;font-size:12.5px;color:rgba(255,255,255,.4);line-height:1.5">Every action an agent took, and every one it chose not to take.</div>
+
+  <div style="display:flex;gap:8px;padding:16px 20px 0">
+    <sc-for list="{{ actTabRow }}" as="t" hint-placeholder-count="4">
+      <div style="height:32px;padding:0 14px;border-radius:20px;display:flex;align-items:center;font-size:12.5px;font-weight:600;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}" onClick="{{ t.pick }}">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="flex:1;padding:8px 20px 0;display:flex;flex-direction:column">
+    <sc-for list="{{ actRows }}" as="a" hint-placeholder-count="5">
+      <div style="display:flex;gap:12px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="width:8px;height:8px;border-radius:50%;flex:none;margin-top:6px;background:{{ a.dot }}"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:#fff">{{ a.act }}</div>
+          <div style="font-size:11.5px;line-height:1.45;color:rgba(255,255,255,.4);margin-top:3px">{{ a.sub }}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.28);margin-top:5px">{{ a.ag }} · {{ a.t }}</div>
+        </div>
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;color:{{ a.amtColor }}">{{ a.amt }}</div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ actEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 0;text-align:center;font-size:13px;color:rgba(255,255,255,.3)">Nothing here yet.</div>
+    </sc-if>
+  </div>
+
+  <div style="margin:0 20px;height:46px;border-radius:26px;border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.65)">Export audit trail</div>
+</div>
+</x-import>
+</div>
+
+</div>
+</section>
+
+
+<section style="padding:40px 44px 60px;display:flex;flex-direction:column;gap:28px">
+
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">1</span>
+<span style="font:600 13px/1.2 system-ui;color:#1a1a1a">Orbit — agent-driven stocks &amp; crypto trading</span>
+</div>
+
+<div style="max-width:680px;display:flex;flex-direction:column;gap:8px;font:400 12.5px/1.6 system-ui;color:rgba(0,0,0,.6)">
+<p style="margin:0"><strong style="color:#1a1a1a">Read from your references.</strong> Pure-black canvas, oversized centered balance, tiny colored delta chip, dark grey pill row for actions, agents as glossy character spheres with a status word under each, hairline list rows with sparklines, one white full-width CTA per sheet, and a light-mode sheet for order controls.</p>
+<p style="margin:0"><strong style="color:#1a1a1a">Made original.</strong> Same UI system and layouts, own wordmark and agent cast — I don't reproduce another company's branding. Live in these frames: agent pause/resume, Run For / Risk / Spend Cap controls, watchlist tabs, and the Auto Close TP/SL steppers with recomputed prices.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">1 · Onboarding</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:54px 22px 30px;display:flex;flex-direction:column;background:#000">
+  <div style="text-align:center;font-family:'Baloo 2',system-ui;font-weight:800;font-size:42px;letter-spacing:1px;color:#fff;line-height:1.1;margin-top:14px">ORBIT</div>
+  <div style="text-align:center;font-size:14px;color:rgba(255,255,255,.42);margin-top:2px">Your crypto &amp; stocks AI desk</div>
+  <div style="margin-top:26px;flex:1;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:32px;padding:30px 20px 26px;display:flex;flex-direction:column">
+    <div style="text-align:center;font-size:40px;font-weight:700;color:#fff;letter-spacing:-1px">$63.28</div>
+    <div style="display:flex;justify-content:center;margin-top:6px"><span style="font-size:11px;font-weight:600;color:#FF453A;background:rgba(255,69,58,.14);padding:2px 8px;border-radius:20px">down 5.1%</span></div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+      <div style="width:74px;height:26px;border-radius:20px;background:#191A1C"></div>
+      <div style="width:74px;height:26px;border-radius:20px;background:#191A1C"></div>
+      <div style="width:34px;height:26px;border-radius:20px;background:#191A1C"></div>
+    </div>
+    <div style="margin-top:30px;font-size:13px;font-weight:600;color:rgba(255,255,255,.6)">Agents ›</div>
+    <div style="display:flex;gap:22px;margin-top:16px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:76px">
+        <div style="width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#F0BE55,#C98518 72%);position:relative">
+          <div style="position:absolute;top:28px;left:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+          <div style="position:absolute;top:28px;right:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#fff">Stocks</div>
+        <div style="font-size:10.5px;color:#2BD87A">Message</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:76px">
+        <div style="width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#5B93FF,#1B44CE 72%);position:relative">
+          <div style="position:absolute;top:28px;left:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+          <div style="position:absolute;top:28px;right:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#fff">Signals</div>
+        <div style="font-size:10.5px;color:#2BD87A">Message</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:76px">
+        <div style="width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#B58CFF,#7A45E0 72%);position:relative">
+          <div style="position:absolute;top:28px;left:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+          <div style="position:absolute;top:28px;right:20px;width:8px;height:12px;border-radius:6px;background:#fff"></div>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#fff">Yield</div>
+        <div style="font-size:10.5px;color:#2BD87A">Message</div>
+      </div>
+    </div>
+  </div>
+  <div style="height:54px;border-radius:30px;background:#29A3F5;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#fff;margin-top:22px" style-hover="filter:brightness(1.08)">Get started</div>
+  <div style="text-align:center;font-size:10.5px;color:rgba(255,255,255,.35);margin-top:12px;line-height:1.5">By continuing you agree to our<br><a href="#terms" style="color:#29A3F5;text-decoration:underline">Terms &amp; Conditions</a></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">2 · Wallet home</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:52px 0 0;display:flex;flex-direction:column;background:#000">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 0">
+    <div style="width:38px;height:38px;border-radius:50%;background:#18191B;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.65)">⚙</div>
+    <div style="font-size:16px;font-weight:600;color:#fff">Wallets ⌄</div>
+    <div style="width:38px;height:38px;border-radius:50%;background:#18191B;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.65);letter-spacing:1px">···</div>
+  </div>
+
+  <div style="text-align:center;margin-top:22px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.32)">Total value</div>
+  <div style="text-align:center;margin-top:6px;font-size:46px;font-weight:700;color:#fff;letter-spacing:-1.4px">$4,862.18</div>
+  <div style="display:flex;justify-content:center;margin-top:8px"><span style="font-size:11.5px;font-weight:600;color:#2BD87A;background:rgba(43,216,122,.14);padding:3px 9px;border-radius:20px">up 0.3%</span></div>
+
+  <div style="display:flex;gap:10px;padding:0 20px;margin-top:22px">
+    <div style="flex:1;min-width:0;height:42px;border-radius:24px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;color:#fff" style-hover="background:#252629">Send</div>
+    <div style="flex:1;min-width:0;height:42px;border-radius:24px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;color:#fff" style-hover="background:#252629">Swap</div>
+    <div style="flex:1;min-width:0;height:42px;border-radius:24px;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;color:#fff" style-hover="background:#252629">More</div>
+  </div>
+
+  <div style="flex:1;overflow:hidden;margin-top:26px;padding:0 20px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:44px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#B58CFF,#6E3ED8 74%)"></div>
+        <div style="font-size:15px;font-weight:600;color:#fff">Cash</div>
+      </div>
+      <div style="font-size:15px;font-weight:600;color:#fff">$53.08</div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,.55)">Agents ›</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.4)">2 ⌄</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:106px;padding:12px 4px;border-radius:20px;background:#0C0C0D;cursor:pointer" onClick="{{ toggleStocks }}">
+          <div style="position:relative">
+            <div style="width:74px;height:74px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#5B93FF,#1B44CE 72%);position:relative">
+              <div style="position:absolute;top:30px;left:21px;width:9px;height:13px;border-radius:6px;background:#fff"></div>
+              <div style="position:absolute;top:30px;right:21px;width:9px;height:13px;border-radius:6px;background:#fff"></div>
+              <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);width:16px;height:7px;border-radius:0 0 12px 12px;background:#fff"></div>
+            </div>
+            <div style="position:absolute;top:-8px;left:-6px;font-size:10px;font-weight:700;color:#04160C;background:#2BD87A;padding:2px 7px;border-radius:12px">+$10.5</div>
+          </div>
+          <div style="font-size:12.5px;font-weight:600;color:#fff">Stocks</div>
+          <div style="font-size:10.5px;font-weight:600;color:{{ stocksStatusColor }}">{{ stocksStatus }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:106px;padding:12px 4px;border-radius:20px;background:#0C0C0D">
+          <div style="width:74px;height:74px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#49E39B,#12A45F 72%);position:relative">
+            <div style="position:absolute;top:32px;left:21px;width:14px;height:4px;border-radius:4px;background:#fff"></div>
+            <div style="position:absolute;top:32px;right:21px;width:14px;height:4px;border-radius:4px;background:#fff"></div>
+            <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);width:16px;height:7px;border-radius:0 0 12px 12px;background:#fff"></div>
+          </div>
+          <div style="font-size:12.5px;font-weight:600;color:#fff">Crypto</div>
+          <div style="font-size:10.5px;font-weight:600;color:#2BD87A">New</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,.55);margin-bottom:6px">Coins ›</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:48px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#5B93FF,#49E39B)"></div>
+          <div>
+            <div style="font-size:14.5px;font-weight:600;color:#fff">Solana</div>
+            <div style="font-size:11.5px;color:rgba(255,255,255,.4)">1,750.30 SOL</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14.5px;font-weight:600;color:#fff">$4,675.2</div>
+          <div style="font-size:11.5px;color:#2BD87A">+120.12</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;background:#0C0C0D;border-radius:16px;padding:12px">
+        <div style="width:16px;height:16px;border-radius:50%;background:#2BD87A;flex:none"></div>
+        <div style="flex:1;font-size:11.5px;line-height:1.45;color:rgba(255,255,255,.55)">Earn <span style="color:#2BD87A;font-weight:600">12.6% yield</span> on your idle SOL</div>
+        <div style="flex:none;height:28px;padding:0 12px;border-radius:16px;background:rgba(43,216,122,.14);display:flex;align-items:center;font-size:12px;font-weight:600;color:#2BD87A;cursor:pointer">Stake</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px;height:46px;margin-right:20px;padding:0 6px 0 16px;border-radius:26px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,.55);cursor:pointer">
+      <div style="font-size:13.5px;font-weight:600;color:#0B0B0B">Ask agents</div>
+      <div style="width:34px;height:34px;border-radius:50%;background:#0B0B0B;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff">↑</div>
+    </div>
+    <div style="align-self:stretch;display:flex;padding:8px 0 22px;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding-top:10px;font-size:10.5px;font-weight:600;color:#fff"><div style="width:20px;height:16px;border-radius:4px;border:1.5px solid #fff"></div>Wallet</div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding-top:10px;font-size:10.5px;font-weight:600;color:rgba(255,255,255,.35)"><div style="width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.35)"></div>Agents</div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding-top:10px;font-size:10.5px;font-weight:600;color:rgba(255,255,255,.35)"><div style="width:18px;height:18px;border-radius:5px;border:1.5px solid rgba(255,255,255,.35)"></div>Markets</div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding-top:10px;font-size:10.5px;font-weight:600;color:rgba(255,255,255,.35)"><div style="width:18px;height:18px;border-radius:5px;border:1.5px solid rgba(255,255,255,.35);border-left-width:4px"></div>Activity</div>
+    </div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">3 · Agent intro sheet</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:52px 16px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="flex:1;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:34px;padding:22px 26px 26px;display:flex;flex-direction:column;position:relative">
+    <div style="position:absolute;top:18px;right:18px;width:30px;height:30px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.55)">✕</div>
+    <div style="display:flex;flex-direction:column;align-items:center;margin-top:34px">
+      <div style="width:104px;height:104px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#F5C864,#C4820F 74%)"></div>
+      <div style="font-size:22px;font-weight:700;color:#fff;margin-top:22px">Stocks Trader</div>
+      <div style="font-size:13.5px;color:rgba(255,255,255,.42);text-align:center;margin-top:4px;line-height:1.4;max-width:190px">Autonomous stock trading agent</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:26px;margin-top:44px">
+      <div style="display:flex;gap:14px">
+        <div style="width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);flex:none;margin-top:1px"></div>
+        <div><div style="font-size:14.5px;font-weight:600;color:#fff">Runs for you 24/7</div><div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:3px">Keeps watching your markets and running your rules, even when you're offline.</div></div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <div style="width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,.5);flex:none;margin-top:1px"></div>
+        <div><div style="font-size:14.5px;font-weight:600;color:#fff">Never miss big moves</div><div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:3px">Tracks big price moves and key news, then triggers your preset actions.</div></div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <div style="width:22px;height:22px;transform:rotate(45deg);border:1.5px solid rgba(255,255,255,.5);flex:none;margin-top:1px"></div>
+        <div><div style="font-size:14.5px;font-weight:600;color:#fff">You're always in control</div><div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.42);margin-top:3px">Set limits, edit or pause strategies anytime. The agent never trades outside your rules.</div></div>
+      </div>
+    </div>
+    <div style="flex:1"></div>
+    <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">Get Started</div>
+  </div>
+  <div style="text-align:center;font-size:10.5px;color:rgba(255,255,255,.3);margin-top:14px">All agents can make mistakes. Markets are risky.</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">4 · Trade settings (live)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:52px 16px 26px;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;flex-direction:column;align-items:center;padding:14px 0 4px;position:relative">
+    <div style="position:absolute;top:8px;right:6px;width:30px;height:30px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.55)">✕</div>
+    <div style="font-size:19px;font-weight:700;color:#fff">Stocks Trader</div>
+    <div style="font-size:12.5px;color:rgba(255,255,255,.4);text-align:center;margin-top:3px;line-height:1.4;max-width:170px">Always-on autonomous stock trading agent</div>
+  </div>
+  <div style="flex:1;background:#0C0C0D;border:1px solid rgba(255,255,255,.06);border-radius:34px;padding:24px 22px 22px;margin-top:20px;display:flex;flex-direction:column">
+    <div style="width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#C79BFF,#7B3FE4 74%);display:flex;align-items:center;justify-content:center;font-size:15px">⚡</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+      <div style="font-size:16px;font-weight:600;color:#fff">Trade Settings</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.4)">⌄</div>
+    </div>
+    <div style="font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.28);margin-top:8px">You can change these anytime. The agent always stays within these limits.</div>
+
+    <div style="display:flex;flex-direction:column;margin-top:26px">
+      <div style="display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-size:14.5px;font-weight:500;color:#fff">Run For</div>
+        <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:20px;background:#1B1C1E;font-size:13.5px;font-weight:600;color:#fff;cursor:pointer" onClick="{{ cycleRunFor }}" style-hover="background:#252629">{{ runForLabel }}<span style="color:rgba(255,255,255,.4);font-size:11px">⌄</span></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div><div style="font-size:14.5px;font-weight:500;color:#fff">Trade Autonomously</div><div style="font-size:11.5px;color:rgba(255,255,255,.32);margin-top:2px">{{ autoNote }}</div></div>
+        <div style="width:52px;height:31px;border-radius:20px;padding:2px;cursor:pointer;transition:background .2s;background:{{ switchBg }}" onClick="{{ toggleAuto }}">
+          <div style="width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .2s;transform:{{ switchKnob }}"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-size:14.5px;font-weight:500;color:#fff">Risk Level</div>
+        <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:20px;background:#1B1C1E;font-size:13.5px;font-weight:600;color:#fff;cursor:pointer" onClick="{{ cycleRisk }}" style-hover="background:#252629">{{ riskLabel }}<span style="color:rgba(255,255,255,.4);font-size:11px">⌄</span></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;height:56px">
+        <div style="font-size:14.5px;font-weight:500;color:#fff">Daily Spend Cap</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:26px;height:26px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;cursor:pointer" onClick="{{ capDown }}">−</div>
+          <div style="font-size:14.5px;font-weight:600;color:#fff;min-width:88px;text-align:right">{{ capLabel }}</div>
+          <div style="width:26px;height:26px;border-radius:50%;background:#1B1C1E;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;cursor:pointer" onClick="{{ capUp }}">+</div>
+        </div>
+      </div>
+      <div style="margin-top:6px;height:6px;border-radius:6px;background:linear-gradient(90deg,#2BD87A,#E8C64A 55%,#FF453A);position:relative">
+        <div style="position:absolute;top:-4px;width:3px;height:14px;border-radius:3px;background:#fff;box-shadow:0 0 0 2px #0C0C0D;transition:left .18s;left:{{ capMarker }}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:10.5px;color:rgba(255,255,255,.3)"><span>$200 · conservative</span><span>$5,000 · max</span></div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div style="height:54px;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#000" style-hover="background:rgba(255,255,255,.88)">{{ runLabel }}</div>
+  </div>
+  <div style="text-align:center;font-size:10.5px;color:rgba(255,255,255,.3);margin-top:14px">All agents can make mistakes. Markets are risky.</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">5 · Watchlist (live tabs)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:52px 0 0;background:#000;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 18px 0">
+    <div style="font-size:22px;font-weight:700;color:#fff">Markets</div>
+    <div style="width:34px;height:34px;border-radius:50%;background:#141516;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.55)">⌕</div>
+  </div>
+  <div style="display:flex;flex-wrap:nowrap;gap:8px;padding:16px 18px 0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <div style="flex:none;height:34px;padding:0 14px;border-radius:20px;display:flex;align-items:center;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}" onClick="{{ t.pick }}">{{ t.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 18px 0"><span style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.32)">{{ groupLabel }}</span><span style="font-size:11px;color:rgba(255,255,255,.28)">{{ rowCount }} · 24h</span></div>
+
+  <div style="flex:1;padding:6px 18px 0;display:flex;flex-direction:column">
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;justify-content:space-between;height:64px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-size:15.5px;font-weight:600;color:#fff;width:78px">{{ r.sym }}</div>
+        <svg viewBox="0 0 90 30" width="90" height="30" style="opacity:.9"><polyline points="{{ r.spark }}" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"></polyline></svg>
+        <div style="text-align:right;width:96px">
+          <div style="font-size:15px;font-weight:600;color:#fff">{{ r.price }}</div>
+          <div style="font-size:12px;font-weight:500;color:{{ r.chgColor }}">{{ r.chg }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="margin:0 12px 12px;background:#fff;border-radius:30px;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+    <div style="font-size:17px;color:#111">⚙</div>
+    <div style="font-size:15.5px;font-weight:600;color:#111">Wallets ⌄</div>
+    <div style="font-size:17px;color:#111;letter-spacing:1px">···</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:400 11px system-ui;color:rgba(0,0,0,.55)">6 · Auto close (live TP / SL)</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;padding:52px 0 0;background:#000;display:flex;flex-direction:column">
+  <div style="flex:1;background:#fff;border-radius:30px 30px 0 0;display:flex;flex-direction:column;padding:20px 0 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px">
+      <div style="width:24px"></div>
+      <div style="font-size:17px;font-weight:700;color:#0B0B0B">Auto Close</div>
+      <div style="font-size:17px;color:#9A9A9F">✕</div>
+    </div>
+
+    <div style="position:relative;flex:1;min-height:230px;margin-top:16px">
+      <div style="position:absolute;left:0;right:0;background:rgba(22,192,96,.10);top:0;height:{{ tpZoneH }}"></div>
+      <div style="position:absolute;left:0;right:0;background:rgba(255,69,58,.09);bottom:0;height:{{ slZoneH }}"></div>
+
+      <div style="position:absolute;left:0;right:0;top:6px;bottom:26px;display:flex;align-items:stretch;gap:6px;padding:0 16px">
+        <sc-for list="{{ candles }}" as="c" hint-placeholder-count="12">
+          <div style="flex:1;position:relative">
+            <div style="position:absolute;left:50%;transform:translateX(-50%);width:1.6px;border-radius:2px;opacity:.75;background:{{ c.color }};top:{{ c.wickTop }};height:{{ c.wickH }}"></div>
+            <div style="position:absolute;left:0;right:0;border-radius:3px;background:{{ c.color }};box-shadow:{{ c.glow }};top:{{ c.bodyTop }};height:{{ c.bodyH }}"></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="position:absolute;left:0;right:0;height:0;border-top:1px dashed rgba(11,11,11,.2);top:{{ lastPxTop }}"></div>
+      <div style="position:absolute;left:16px;transform:translateY(-50%);background:#0B0B0B;color:#fff;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:12px;top:{{ lastPxTop }}">Mark {{ lastPx }}</div>
+
+      <div style="position:absolute;left:0;right:0;height:1.5px;background:#16C060;opacity:.55;top:{{ tpLineTop }};margin-top:10px"></div>
+      <div style="position:absolute;left:0;right:0;height:1.5px;background:#EF3B36;opacity:.55;top:{{ slLineTop }};margin-top:10px"></div>
+      <div style="position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;top:{{ tpLineTop }}">
+        <div style="display:flex;align-items:center;gap:6px;background:#16C060;color:#fff;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:14px">✕ Take Profit</div>
+        <div style="background:#16C060;color:#fff;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:14px">{{ tpPrice }}</div>
+      </div>
+      <div style="position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;top:{{ slLineTop }}">
+        <div style="display:flex;align-items:center;gap:6px;background:#EF3B36;color:#fff;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:14px">✕ Stop Loss</div>
+        <div style="background:#EF3B36;color:#fff;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:14px">{{ slPrice }}</div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:0 16px;font-size:10.5px;color:#A0A0A6">
+        <span>1:30 PM</span><span>5:30 PM</span><span>10:00 PM</span>
+      </div>
+    </div>
+
+    <div style="padding:20px 20px 0;display:flex;flex-direction:column;gap:26px">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:14.5px;font-weight:600;color:#0B0B0B">Stop Loss</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:24px;height:24px;border-radius:50%;background:#F2F2F5;display:flex;align-items:center;justify-content:center;font-size:14px;color:#111;cursor:pointer" onClick="{{ slDown }}">−</div>
+            <div style="background:#EF3B36;color:#fff;font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:16px;min-width:56px;text-align:center">{{ slLabel }}</div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#F2F2F5;display:flex;align-items:center;justify-content:center;font-size:14px;color:#111;cursor:pointer" onClick="{{ slUp }}">+</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;height:22px;position:relative;background:repeating-linear-gradient(90deg,#E4E4E9 0 1px,transparent 1px 9px);background-position:0 50%;background-size:100% 12px;background-repeat:repeat-x">
+          <div style="position:absolute;top:0;bottom:0;width:2px;background:#EF3B36;left:{{ slTick }}"></div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:14.5px;font-weight:600;color:#0B0B0B">Take Profit</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:24px;height:24px;border-radius:50%;background:#F2F2F5;display:flex;align-items:center;justify-content:center;font-size:14px;color:#111;cursor:pointer" onClick="{{ tpDown }}">−</div>
+            <div style="background:#16C060;color:#fff;font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:16px;min-width:56px;text-align:center">{{ tpLabel }}</div>
+            <div style="width:24px;height:24px;border-radius:50%;background:#F2F2F5;display:flex;align-items:center;justify-content:center;font-size:14px;color:#111;cursor:pointer" onClick="{{ tpUp }}">+</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;height:22px;position:relative;background:repeating-linear-gradient(90deg,#E4E4E9 0 1px,transparent 1px 9px);background-position:0 50%;background-size:100% 12px;background-repeat:repeat-x">
+          <div style="position:absolute;top:0;bottom:0;width:2px;background:#16C060;left:{{ tpTick }}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;padding:16px 16px 12px">
+      <div style="flex:1;height:52px;border-radius:28px;background:#E4F7EC;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#16A254">Cancel</div>
+      <div style="flex:1;height:52px;border-radius:28px;background:#16C060;display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:600;color:#fff" style-hover="background:#13ab55">Set</div>
+    </div>
+    <div style="text-align:center;font-size:11px;color:#9A9A9F;padding-bottom:26px">Make <span style="color:#16C060;font-weight:600">{{ tpPnl }}</span> at TP or lose <span style="color:#EF3B36;font-weight:600">{{ slPnl }}</span> at SL</div>
+  </div>
+</div>
+</x-import>
+</div>
+
+</div>
+
+<p style="margin:6px 0 0;font:12px/1.5 system-ui;color:rgba(0,0,0,.5);max-width:640px">Try next: "add the agent chat thread screen" · "show a portfolio screen with the big sparkline from the last reference" · "make the whole thing one tappable flow instead of six frames"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { auto: true, runFor: 1, risk: 0, cap: 1600, tab: 0, tp: 1.0, sl: -1.0, stocksPaused: false,
+    goals: ['Grow long term'], riskQ: 1, weights: [55, 30, 15], approved: false,
+    decision: null, orderAmt: '250', side: 'buy', actFilter: 0, hired: { 'Momentum Scout': true }, kyc: 1,
+    lbSort: 0, btLook: 1, btCapital: 5000, alerts: { 'SOL above $95': true, 'NVDAx earnings' : true },
+    swapAmt: 12, killed: false };
+
+  money(n) { return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+
+  renderVals() {
+    const s = this.state;
+    const runs = ['1 Day', '3 Days', '7 Days', '30 Days'];
+    const risks = ['Low', 'Medium', 'High'];
+    const mid = 66000;
+    const tpP = mid * (1 + s.tp / 100), slP = mid * (1 + s.sl / 100);
+    const size = 2500;
+    const tabDefs = ['Conviction List', 'Metals', 'Stocks', 'Defi', 'Overview'];
+    const data = {
+      0: { label: 'Tokens', rows: [
+        { sym: 'TSLAx', price: '$389.82', chg: '+0.9%', up: true, spark: '0,22 12,18 24,20 36,12 48,15 60,8 72,11 90,4' },
+        { sym: 'SOL', price: '$88.32', chg: '+2.4%', up: true, spark: '0,20 14,14 26,17 38,9 52,13 66,7 78,10 90,5' },
+        { sym: 'HYPE', price: '$40.96', chg: '-1.2%', up: false, spark: '0,8 14,12 28,10 40,17 54,14 68,20 80,18 90,24' }] },
+      1: { label: 'Metals', rows: [
+        { sym: 'XAUt', price: '$3,412.10', chg: '+0.4%', up: true, spark: '0,20 16,17 30,18 44,12 58,14 74,9 90,7' },
+        { sym: 'XAGx', price: '$38.71', chg: '-0.6%', up: false, spark: '0,10 16,13 30,11 46,16 60,15 74,19 90,21' }] },
+      2: { label: 'Equities', rows: [
+        { sym: 'NVDAx', price: '$182.44', chg: '+1.8%', up: true, spark: '0,24 14,19 28,21 42,13 56,15 72,8 90,5' },
+        { sym: 'AAPLx', price: '$241.09', chg: '+0.2%', up: true, spark: '0,17 16,15 32,16 48,13 64,14 78,11 90,12' },
+        { sym: 'COINx', price: '$318.55', chg: '-2.1%', up: false, spark: '0,7 16,11 30,9 44,15 60,17 76,16 90,23' }] },
+      3: { label: 'Protocols', rows: [
+        { sym: 'AAVE', price: '$291.03', chg: '+3.1%', up: true, spark: '0,25 14,20 30,22 46,12 62,14 78,7 90,4' },
+        { sym: 'JUP', price: '$0.87', chg: '-0.4%', up: false, spark: '0,11 18,14 34,12 50,16 66,15 90,20' }] },
+      4: { label: 'Overview', rows: [
+        { sym: 'Total', price: '$4,862.18', chg: '+0.3%', up: true, spark: '0,21 18,17 34,18 50,13 66,12 82,9 90,8' }] }
+    };
+    const set = data[s.tab];
+
+    const goalOpts = ['Grow long term', 'Trade actively', 'Earn yield', 'Hedge my job', 'Learn first'];
+    const riskWords = ['Steady', 'Balanced', 'Aggressive'];
+    const sleeves = [
+      { name: 'Blue-chip crypto', note: 'BTC, ETH, SOL — the liquid core the agent rebalances weekly.', color: '#5B93FF' },
+      { name: 'Tokenized equities', note: 'NVDAx, AAPLx. Tracks earnings dates and gaps out before prints.', color: '#F0BE55' },
+      { name: 'Stable yield', note: 'Staked SOL and T-bill tokens. Funds the agent\'s dry powder.', color: '#49E39B' }
+    ];
+    const total = s.weights.reduce((a, b) => a + b, 0);
+    const bump = (i, d) => this.setState(p => {
+      const w = p.weights.slice(); w[i] = Math.max(0, Math.min(100, w[i] + d)); return { weights: w, approved: false };
+    });
+
+    const activity = [
+      { t: '09:41', ag: 'Momentum Scout', act: 'Bought 4.2 SOL', sub: 'Breakout above 20d high · $88.10 avg', amt: '−$370.02', good: true, kind: 'trade' },
+      { t: '09:12', ag: 'Momentum Scout', act: 'Stop loss moved', sub: 'Trailing to −1.0% after +2.4% run', amt: '', good: true, kind: 'risk' },
+      { t: '08:55', ag: 'Earnings Desk', act: 'Skipped NVDAx', sub: 'Spread 0.42% > your 0.25% limit', amt: '', good: false, kind: 'block' },
+      { t: 'Yst', ag: 'Yield Keeper', act: 'Staked 120 SOL', sub: '12.6% APY · unlock in 3 days', amt: '+$4.11/day', good: true, kind: 'yield' },
+      { t: 'Yst', ag: 'Momentum Scout', act: 'Take profit hit', sub: 'Closed HYPE at +1.8%', amt: '+$44.90', good: true, kind: 'trade' }
+    ];
+    const actTabs = ['All', 'Trades', 'Risk', 'Blocked'];
+    const actMap = { 0: null, 1: 'trade', 2: 'risk', 3: 'block' };
+    const actKind = actMap[s.actFilter];
+
+    const store = [
+      { name: 'Momentum Scout', role: 'Rides breakouts on liquid majors', win: '61% win rate', c1: '#5B93FF', c2: '#1B44CE' },
+      { name: 'Earnings Desk', role: 'Trades tokenized equity earnings', win: '54% win rate', c1: '#F0BE55', c2: '#C98518' },
+      { name: 'Yield Keeper', role: 'Moves idle cash into best APY', win: '12.6% APY', c1: '#49E39B', c2: '#12A45F' },
+      { name: 'Drawdown Guard', role: 'Cuts risk when the book bleeds', win: 'Always on', c1: '#B58CFF', c2: '#7A45E0' }
+    ];
+
+    const kycSteps = [
+      { label: 'Phone verified', sub: '+1 ••• ••• 4417' },
+      { label: 'Photo ID', sub: 'Front and back, well lit' },
+      { label: 'Liveness check', sub: 'A short selfie video' },
+      { label: 'Funding source', sub: 'Bank or card' }
+    ];
+
+    const amt = parseFloat(s.orderAmt || '0') || 0;
+
+    // Candle series: o/h/l/c in price space, projected to 0-100 of the plot box.
+    const raw = [
+      [66120, 66480, 66020, 66400], [66400, 66520, 66180, 66240], [66240, 66300, 65860, 65920],
+      [65920, 66040, 65600, 65700], [65700, 65780, 65380, 65460], [65460, 65540, 65180, 65240],
+      [65240, 65700, 65200, 65640], [65640, 65720, 65420, 65480], [65480, 65960, 65440, 65900],
+      [65900, 66140, 65840, 66080], [66080, 66360, 66020, 66300], [66300, 66620, 66240, 66560]
+    ];
+    const mid0 = 66000;
+    const tpPx = mid0 * (1 + s.tp / 100), slPx = mid0 * (1 + s.sl / 100);
+    const hi = Math.max(Math.max.apply(null, raw.map(c => c[1])), tpPx) + 150;
+    const lo = Math.min(Math.min.apply(null, raw.map(c => c[2])), slPx) - 150;
+    const y = v => ((hi - v) / (hi - lo)) * 100;
+    const tHi = Math.max.apply(null, raw.map(c => c[1])) + 120;
+    const tLo = Math.min.apply(null, raw.map(c => c[2])) - 120;
+    const ty = v => ((tHi - v) / (tHi - tLo)) * 100;
+    const mk = proj => raw.map((c, i) => {
+      const up = c[3] >= c[0];
+      const bt = proj(Math.max(c[0], c[3])), bb = proj(Math.min(c[0], c[3]));
+      return {
+        up: up,
+        color: up ? '#16C060' : '#EF3B36',
+        glow: up ? '0 0 10px rgba(22,192,96,.35)' : '0 0 10px rgba(239,59,54,.32)',
+        wickTop: proj(c[1]).toFixed(2) + '%',
+        wickH: (proj(c[2]) - proj(c[1])).toFixed(2) + '%',
+        bodyTop: bt.toFixed(2) + '%',
+        bodyH: Math.max(1.4, bb - bt).toFixed(2) + '%',
+        last: i === raw.length - 1
+      };
+    });
+    const candles = mk(y);
+    const tightCandles = mk(ty);
+    const lastClose = raw[raw.length - 1][3];
+    const axis = [0, 0.25, 0.5, 0.75, 1].map(t => ((tHi - t * (tHi - tLo)) / 1000).toFixed(1) + 'K');
+
+    const cp = s.closePct === undefined ? 50 : s.closePct;
+
+    const mkt = s.mkt === undefined ? 2 : s.mkt;
+    const mktClasses = ['Crypto', 'Stocks', 'Commodities', 'Indices', 'Pre-IPO'];
+    const universe = [
+      { note: '300+ coins · spot, margin, perps, options', more: 'See all 312 crypto markets', rows: [
+        { sym: 'BTC', name: 'Bitcoin', tag: 'Perp · 100x', px: '$66,560', chg: '+0.67%', up: true, c1: '#F7931A', c2: '#B96908' },
+        { sym: 'ETH', name: 'Ethereum', tag: 'Perp · 100x', px: '$2,443', chg: '+2.11%', up: true, c1: '#8FA6E8', c2: '#4B5FA8' },
+        { sym: 'SOL', name: 'Solana', tag: 'Spot · Perp', px: '$88.32', chg: '+2.40%', up: true, c1: '#5B93FF', c2: '#49E39B' },
+        { sym: 'XRP', name: 'XRP', tag: 'Perp · 50x', px: '$2.94', chg: '−1.08%', up: false, c1: '#9AA3AD', c2: '#4A5058' },
+        { sym: 'DOGE', name: 'Dogecoin', tag: 'Perp · 50x', px: '$0.1842', chg: '+4.12%', up: true, c1: '#E0C36B', c2: '#A5842A' },
+        { sym: 'HYPE', name: 'Hyperliquid', tag: 'Spot · Perp', px: '$40.96', chg: '−1.20%', up: false, c1: '#49E39B', c2: '#0E8F55' },
+        { sym: 'AAVE', name: 'Aave', tag: 'Spot · Perp', px: '$291.03', chg: '+3.10%', up: true, c1: '#B58CFF', c2: '#6E3ED8' },
+        { sym: 'LINK', name: 'Chainlink', tag: 'Perp · 50x', px: '$18.44', chg: '+1.05%', up: true, c1: '#5B93FF', c2: '#1B44CE' },
+        { sym: 'TON', name: 'Toncoin', tag: 'Spot · Perp', px: '$5.21', chg: '−0.36%', up: false, c1: '#63C3F5', c2: '#1D6FA8' }
+      ] },
+      { note: 'Tokenized spot vs USDT · X-Perps up to 10x', more: 'See all 43 tokenized equities', rows: [
+        { sym: 'NVDAx', name: 'Nvidia', tag: 'Spot · Perp', px: '$182.44', chg: '+1.80%', up: true, c1: '#7CD64F', c2: '#3D8B1E' },
+        { sym: 'AAPLx', name: 'Apple', tag: 'Spot · Perp', px: '$241.09', chg: '+0.24%', up: true, c1: '#C9CDD4', c2: '#7A7F87' },
+        { sym: 'TSLAx', name: 'Tesla', tag: 'Spot · Perp', px: '$389.82', chg: '+0.91%', up: true, c1: '#E8464B', c2: '#98181C' },
+        { sym: 'METAx', name: 'Meta', tag: 'Perp · 10x', px: '$611.20', chg: '−0.42%', up: false, c1: '#5B93FF', c2: '#1B44CE' },
+        { sym: 'MSFTx', name: 'Microsoft', tag: 'Perp · 10x', px: '$438.66', chg: '+0.33%', up: true, c1: '#63C3F5', c2: '#1D6FA8' },
+        { sym: 'AMZNx', name: 'Amazon', tag: 'Perp · 10x', px: '$204.31', chg: '+0.58%', up: true, c1: '#F0BE55', c2: '#B8791A' },
+        { sym: 'GOOGLx', name: 'Alphabet', tag: 'Perp · 10x', px: '$196.88', chg: '−0.19%', up: false, c1: '#7FA9FF', c2: '#2D57C4' },
+        { sym: 'COINx', name: 'Coinbase', tag: 'Spot · Perp', px: '$318.55', chg: '−2.10%', up: false, c1: '#5B93FF', c2: '#12379E' },
+        { sym: 'MSTRx', name: 'Strategy', tag: 'Perp · 10x', px: '$342.90', chg: '+2.74%', up: true, c1: '#F5A05A', c2: '#B0561A' }
+      ] },
+      { note: 'Perpetual swaps · no expiry · ICE feed on crude', more: 'See all 11 commodity contracts', rows: [
+        { sym: 'XAUT', name: 'Gold', tag: 'Perp · spot feed', px: '$3,412.10', chg: '+0.44%', up: true, c1: '#F5CE5F', c2: '#B98A0C' },
+        { sym: 'XAGT', name: 'Silver', tag: 'Perp · spot feed', px: '$38.71', chg: '−0.61%', up: false, c1: '#D6DBE2', c2: '#8C929B' },
+        { sym: 'CL', name: 'WTI Crude', tag: 'Perp · ICE feed', px: '$71.84', chg: '+1.92%', up: true, c1: '#4A5058', c2: '#1B1E22' },
+        { sym: 'BZ', name: 'Brent Crude', tag: 'Perp · ICE feed', px: '$75.30', chg: '+1.66%', up: true, c1: '#5C6470', c2: '#22262C' },
+        { sym: 'HG', name: 'Copper', tag: 'Perp · delivery ref', px: '$4.62', chg: '−0.28%', up: false, c1: '#E08B5A', c2: '#9A4E22' },
+        { sym: 'PL', name: 'Platinum', tag: 'Perp · spot feed', px: '$1,042.60', chg: '+0.83%', up: true, c1: '#C9CDD4', c2: '#7A7F87' },
+        { sym: 'PA', name: 'Palladium', tag: 'Perp · spot feed', px: '$1,118.40', chg: '−1.44%', up: false, c1: '#B8BEC8', c2: '#6A7078' },
+        { sym: 'NG', name: 'Natural Gas', tag: 'Perp · ICE feed', px: '$3.18', chg: '+2.51%', up: true, c1: '#7FD6F5', c2: '#1D7FA8' },
+        { sym: 'ZW', name: 'Wheat', tag: 'Perp · CBOT ref', px: '$5.74', chg: '−0.62%', up: false, c1: '#E8C46B', c2: '#A5822A' }
+      ] },
+      { note: 'Index exposure through tokenized ETFs', more: 'See all 9 index products', rows: [
+        { sym: 'SPYx', name: 'S&P 500', tag: 'Spot · Perp', px: '$598.14', chg: '+0.38%', up: true, c1: '#5B93FF', c2: '#1B44CE' },
+        { sym: 'QQQx', name: 'Nasdaq 100', tag: 'Spot · Perp', px: '$521.77', chg: '+0.62%', up: true, c1: '#B58CFF', c2: '#7A45E0' },
+        { sym: 'IWMx', name: 'Russell 2000', tag: 'Perp · 10x', px: '$232.05', chg: '+0.94%', up: true, c1: '#49E39B', c2: '#12A45F' },
+        { sym: 'DIAx', name: 'Dow 30', tag: 'Perp · 10x', px: '$438.12', chg: '+0.21%', up: true, c1: '#7FA9FF', c2: '#2D57C4' },
+        { sym: 'EFAx', name: 'MSCI EAFE', tag: 'Perp · 10x', px: '$84.66', chg: '−0.33%', up: false, c1: '#C9CDD4', c2: '#7A7F87' },
+        { sym: 'GLDx', name: 'Gold ETF', tag: 'Spot · Perp', px: '$316.44', chg: '+0.41%', up: true, c1: '#F5CE5F', c2: '#B98A0C' },
+        { sym: 'TLTx', name: '20Y Treasury', tag: 'Perp · 10x', px: '$88.90', chg: '−0.72%', up: false, c1: '#8FA6E8', c2: '#4B5FA8' },
+        { sym: 'HYGx', name: 'High Yield', tag: 'Perp · 10x', px: '$79.34', chg: '+0.12%', up: true, c1: '#E8A05A', c2: '#B0561A' },
+        { sym: 'VIXx', name: 'Volatility', tag: 'Perp · 5x', px: '$16.28', chg: '−3.10%', up: false, c1: '#E8464B', c2: '#98181C' }
+      ] },
+      { note: 'Private-company exposure · settles at IPO', more: 'See all 12 pre-IPO perps', rows: [
+        { sym: 'OPENAI', name: 'OpenAI', tag: 'Pre-IPO perp', px: '$164.20', chg: '+3.40%', up: true, c1: '#49E39B', c2: '#12A45F' },
+        { sym: 'ANTHRP', name: 'Anthropic', tag: 'Pre-IPO perp', px: '$121.55', chg: '+1.14%', up: true, c1: '#E8A05A', c2: '#B0561A' },
+        { sym: 'SPACEX', name: 'SpaceX', tag: 'Pre-IPO perp', px: '$402.70', chg: '+0.88%', up: true, c1: '#9AA3AD', c2: '#3A4048' },
+        { sym: 'XAI', name: 'xAI', tag: 'Pre-IPO perp', px: '$74.15', chg: '+5.62%', up: true, c1: '#C9CDD4', c2: '#5A6068' },
+        { sym: 'STRIPE', name: 'Stripe', tag: 'Pre-IPO perp', px: '$98.40', chg: '−0.74%', up: false, c1: '#8FA6E8', c2: '#4B5FA8' },
+        { sym: 'DBRK', name: 'Databricks', tag: 'Pre-IPO perp', px: '$142.08', chg: '+1.36%', up: true, c1: '#E8464B', c2: '#98181C' },
+        { sym: 'PPLX', name: 'Perplexity', tag: 'Pre-IPO perp', px: '$61.92', chg: '+2.05%', up: true, c1: '#49E39B', c2: '#12A45F' },
+        { sym: 'FIGMA', name: 'Figma', tag: 'Lists at IPO', px: '—', chg: 'Soon', up: true, c1: '#B58CFF', c2: '#7A45E0' }
+      ] }
+    ];
+    const uni = universe[mkt];
+    const lev = s.lev === undefined ? 5 : s.lev;
+    const margin = 800;
+    const tabIdx = s.tab5 === undefined ? 1 : s.tab5;
+
+    const methods = [
+      { name: 'Bank transfer', sub: 'Free · lands in 1–2 days', tag: 'Free' },
+      { name: 'Debit card', sub: 'Instant · 1.5% fee', tag: 'Instant' },
+      { name: 'Send crypto', sub: 'USDC, USDT or SOL', tag: 'On-chain' }
+    ];
+    const dep = s.dep === undefined ? 500 : s.dep;
+    const meth = s.method === undefined ? 0 : s.method;
+
+    const lbAgents = [
+      { name: 'Momentum Scout', pnl: 842, win: 61, trades: 37, c1: '#5B93FF', c2: '#1B44CE' },
+      { name: 'Yield Keeper', pnl: 318, win: 94, trades: 11, c1: '#49E39B', c2: '#12A45F' },
+      { name: 'Earnings Desk', pnl: 1204, win: 54, trades: 22, c1: '#F0BE55', c2: '#C98518' },
+      { name: 'Drawdown Guard', pnl: -96, win: 48, trades: 8, c1: '#B58CFF', c2: '#7A45E0' }
+    ];
+    const lbKeys = ['pnl', 'win', 'trades'];
+    const lbLabels = ['P&L', 'Win rate', 'Volume'];
+    const lbKey = lbKeys[s.lbSort];
+    const lbSorted = lbAgents.slice().sort((a, b) => b[lbKey] - a[lbKey]);
+
+    const looks = ['30d', '90d', '6m', '1y'];
+    const btData = [
+      { ret: 4.2, dd: -2.1, sharpe: 1.4, trades: 18, path: '0,86 30,80 60,84 92,66 124,72 156,52 188,58 220,40 252,46 284,30 316,34 360,20' },
+      { ret: 11.8, dd: -5.4, sharpe: 1.7, trades: 54, path: '0,90 30,74 60,82 92,58 124,70 156,44 188,54 220,30 252,42 284,22 316,30 360,12' },
+      { ret: 23.5, dd: -9.2, sharpe: 1.2, trades: 121, path: '0,92 30,70 60,86 92,50 124,74 156,38 188,60 220,26 252,44 284,18 316,34 360,10' },
+      { ret: 41.9, dd: -14.6, sharpe: 1.1, trades: 244, path: '0,94 34,60 62,88 94,44 126,78 158,30 190,66 222,20 254,50 286,14 318,38 360,6' }
+    ];
+    const bt = btData[s.btLook];
+    const btEnd = Math.round(s.btCapital * (1 + bt.ret / 100));
+
+    const alertDefs = [
+      { name: 'SOL above $95', sub: 'Price alert · push + agent note' },
+      { name: 'NVDAx earnings', sub: '48h before the print' },
+      { name: 'Agent hits daily cap', sub: 'So you can raise it or stop' },
+      { name: 'Drawdown past 5%', sub: 'Whole-portfolio circuit breaker' },
+      { name: 'Staking unlock ready', sub: '120 SOL, 3 days out' }
+    ];
+
+    const swapOut = (s.swapAmt * 88.32 * 0.9975);
+
+    return {
+      lbSeg: lbLabels.map((label, i) => ({ label, bg: s.lbSort === i ? '#fff' : '#141516',
+        fg: s.lbSort === i ? '#0B0B0B' : 'rgba(255,255,255,.5)', pick: () => this.setState({ lbSort: i }) })),
+      lbRows: lbSorted.map((a, i) => ({ ...a,
+        rank: '0' + (i + 1),
+        rankFg: i === 0 ? '#F0BE55' : 'rgba(255,255,255,.3)',
+        pnlLabel: (a.pnl >= 0 ? '+$' : '−$') + Math.abs(a.pnl).toLocaleString('en-US'),
+        pnlFg: a.pnl >= 0 ? '#2BD87A' : '#FF453A',
+        meta: a.win + '% win · ' + a.trades + ' trades',
+        barW: Math.round(Math.abs(a.pnl) / 1204 * 100) + '%',
+        barBg: a.pnl >= 0 ? '#2BD87A' : '#FF453A' })),
+      lbFooter: 'Ranked by ' + lbLabels[s.lbSort] + ' · last 30 days',
+
+      btSeg: looks.map((label, i) => ({ label, bg: s.btLook === i ? '#fff' : '#141516',
+        fg: s.btLook === i ? '#0B0B0B' : 'rgba(255,255,255,.5)', pick: () => this.setState({ btLook: i }) })),
+      btPath: bt.path,
+      btArea: bt.path + ' 360,110 0,110',
+      btRet: '+' + bt.ret.toFixed(1) + '%',
+      btDd: '−' + Math.abs(bt.dd).toFixed(1) + '%',
+      btSharpe: bt.sharpe.toFixed(1),
+      btTrades: String(bt.trades),
+      btCapLabel: '$' + s.btCapital.toLocaleString('en-US'),
+      btEndLabel: '$' + btEnd.toLocaleString('en-US'),
+      btGain: '+$' + (btEnd - s.btCapital).toLocaleString('en-US'),
+      btCapUp: () => this.setState(p => ({ btCapital: Math.min(50000, p.btCapital + 1000) })),
+      btCapDown: () => this.setState(p => ({ btCapital: Math.max(1000, p.btCapital - 1000) })),
+
+      alertRows: alertDefs.map(a => {
+        const on = !!s.alerts[a.name];
+        return { ...a, bg: on ? '#2BD87A' : '#2A2B2E', knob: on ? 'translateX(19px)' : 'translateX(0px)',
+          toggle: () => this.setState(p => ({ alerts: { ...p.alerts, [a.name]: !on } })) };
+      }),
+      alertCount: Object.keys(s.alerts).filter(k => s.alerts[k]).length + ' of 5 on',
+
+      swapIn: s.swapAmt.toFixed(2),
+      swapInUsd: '$' + (s.swapAmt * 88.32).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      swapOut: swapOut.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      swapRate: '1 SOL = $88.32',
+      swapFee: '$' + (s.swapAmt * 88.32 * 0.0025).toFixed(2),
+      swapUp: () => this.setState(p => ({ swapAmt: Math.min(1750, p.swapAmt + 4) })),
+      swapDown: () => this.setState(p => ({ swapAmt: Math.max(1, p.swapAmt - 4) })),
+      swapPct: Math.round(s.swapAmt / 1750 * 100) + '%',
+
+      killed: s.killed,
+      killLive: !s.killed,
+      killTitle: s.killed ? 'All agents stopped' : 'Agents are live',
+      killSub: s.killed ? 'Nothing will be placed until you resume. Open positions are untouched.'
+        : '3 agents can place orders inside your limits right now.',
+      killCta: s.killed ? 'Resume agents' : 'Stop all agents',
+      killBg: s.killed ? '#fff' : '#EF3B36',
+      killFg: s.killed ? '#000' : '#fff',
+      killDot: s.killed ? '#FF453A' : '#2BD87A',
+      killState: s.killed ? 'STOPPED' : 'LIVE',
+      toggleKill: () => this.setState(p => ({ killed: !p.killed })),
+
+      goalChips: goalOpts.map(g => {
+        const on = s.goals.indexOf(g) > -1;
+        return { label: g, bg: on ? '#fff' : '#111214', fg: on ? '#0B0B0B' : 'rgba(255,255,255,.6)',
+          bd: on ? '1px solid #fff' : '1px solid rgba(255,255,255,.09)',
+          pick: () => this.setState(p => ({ goals: on ? p.goals.filter(x => x !== g) : p.goals.concat(g) })) };
+      }),
+      riskSeg: riskWords.map((w, i) => ({ label: w, bg: s.riskQ === i ? '#fff' : 'transparent',
+        fg: s.riskQ === i ? '#0B0B0B' : 'rgba(255,255,255,.5)', pick: () => this.setState({ riskQ: i, approved: false }) })),
+      goalSummary: s.goals.length ? s.goals.length + ' selected · ' + riskWords[s.riskQ] : 'Pick at least one',
+      riskWord: riskWords[s.riskQ],
+
+      sleeveRows: sleeves.map((sl, i) => ({ ...sl, pct: s.weights[i] + '%',
+        barW: Math.round(s.weights[i] / Math.max(total, 1) * 100) + '%',
+        up: () => bump(i, 5), down: () => bump(i, -5) })),
+      totalLabel: total + '%',
+      totalColor: total === 100 ? '#2BD87A' : '#E8C64A',
+      proposalCta: s.approved ? 'Portfolio approved ✓' : (total === 100 ? 'Approve & fund' : 'Balance to 100% first'),
+      proposalBg: s.approved ? '#2BD87A' : (total === 100 ? '#fff' : '#1B1C1E'),
+      proposalFg: s.approved ? '#04160C' : (total === 100 ? '#000' : 'rgba(255,255,255,.35)'),
+      approve: () => { if (total === 100) this.setState({ approved: true }); },
+
+      decisionState: s.decision,
+      showActions: s.decision === null,
+      decisionMsg: s.decision === 'yes' ? 'Filled 12.4 SOL at $88.32. Stop set at $87.44.'
+        : s.decision === 'no' ? 'Skipped. I will not re-propose SOL today.' : '',
+      decisionColor: s.decision === 'yes' ? '#2BD87A' : '#FF453A',
+      accept: () => this.setState({ decision: 'yes' }),
+      decline: () => this.setState({ decision: 'no' }),
+
+      orderAmtLabel: '$' + (s.orderAmt === '' ? '0' : s.orderAmt),
+      orderUnits: (amt / 88.32).toFixed(4) + ' SOL',
+      orderFee: '$' + (amt * 0.001).toFixed(2),
+      orderCta: (s.side === 'buy' ? 'Buy ' : 'Sell ') + '$' + (s.orderAmt === '' ? '0' : s.orderAmt) + ' of SOL',
+      orderCtaBg: s.side === 'buy' ? '#16C060' : '#EF3B36',
+      buyBg: s.side === 'buy' ? '#0B0B0B' : 'transparent',
+      buyFg: s.side === 'buy' ? '#fff' : '#7A7A80',
+      sellBg: s.side === 'sell' ? '#0B0B0B' : 'transparent',
+      sellFg: s.side === 'sell' ? '#fff' : '#7A7A80',
+      setBuy: () => this.setState({ side: 'buy' }),
+      setSell: () => this.setState({ side: 'sell' }),
+      keys: ['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(k => ({ label: k,
+        tap: () => this.setState(p => {
+          if (k === '⌫') return { orderAmt: p.orderAmt.slice(0, -1) };
+          if (k === '.' && p.orderAmt.indexOf('.') > -1) return {};
+          if (p.orderAmt.length > 6) return {};
+          return { orderAmt: (p.orderAmt === '0' && k !== '.') ? k : p.orderAmt + k };
+        }) })),
+
+      actTabRow: actTabs.map((label, i) => ({ label, bg: s.actFilter === i ? '#fff' : '#141516',
+        fg: s.actFilter === i ? '#0B0B0B' : 'rgba(255,255,255,.5)', pick: () => this.setState({ actFilter: i }) })),
+      actRows: activity.filter(a => !actKind || a.kind === actKind).map(a => ({ ...a,
+        dot: a.kind === 'block' ? '#FF453A' : a.kind === 'risk' ? '#E8C64A' : '#2BD87A',
+        amtColor: a.amt.indexOf('−') === 0 ? 'rgba(255,255,255,.55)' : '#2BD87A' })),
+      actEmpty: activity.filter(a => !actKind || a.kind === actKind).length === 0,
+
+      storeRows: store.map(a => {
+        const on = !!s.hired[a.name];
+        return { ...a, cta: on ? 'Hired' : 'Hire',
+          ctaBg: on ? 'rgba(43,216,122,.15)' : '#fff', ctaFg: on ? '#2BD87A' : '#000',
+          toggle: () => this.setState(p => ({ hired: { ...p.hired, [a.name]: !on } })) };
+      }),
+      hiredCount: Object.keys(s.hired).filter(k => s.hired[k]).length + ' of 4 hired',
+
+      kycRows: kycSteps.map((k, i) => ({ ...k,
+        mark: i < s.kyc ? '✓' : (i === s.kyc ? '' : ''),
+        bg: i < s.kyc ? '#2BD87A' : (i === s.kyc ? 'transparent' : 'transparent'),
+        bd: i < s.kyc ? 'none' : (i === s.kyc ? '2px solid #fff' : '2px solid rgba(255,255,255,.18)'),
+        fg: i <= s.kyc ? '#fff' : 'rgba(255,255,255,.35)',
+        subFg: i <= s.kyc ? 'rgba(255,255,255,.42)' : 'rgba(255,255,255,.2)' })),
+      kycCta: s.kyc >= kycSteps.length ? 'You are verified' : 'Continue — ' + kycSteps[s.kyc].label,
+      kycNext: () => this.setState(p => ({ kyc: Math.min(kycSteps.length, p.kyc + 1) })),
+      kycPct: Math.round(s.kyc / kycSteps.length * 100) + '%',
+
+      depAmount: '$' + dep.toLocaleString('en-US'),
+      depPresets: [250, 500, 1000, 2500].map(v => ({ label: '$' + v.toLocaleString('en-US'),
+        bg: dep === v ? '#fff' : '#141516', fg: dep === v ? '#0B0B0B' : 'rgba(255,255,255,.55)',
+        pick: () => this.setState({ dep: v }) })),
+      depMethods: methods.map((m, i) => ({ ...m,
+        bd: meth === i ? '1px solid rgba(255,255,255,.55)' : '1px solid rgba(255,255,255,.06)',
+        dotBd: meth === i ? '6px solid #fff' : '1.5px solid rgba(255,255,255,.25)',
+        pick: () => this.setState({ method: i }) })),
+      depFee: meth === 1 ? '$' + (dep * 0.015).toFixed(2) : '$0.00',
+      depLands: meth === 0 ? 'Tue, Sep 8' : meth === 1 ? 'Right away' : 'After 1 confirmation',
+      depCta: 'Deposit ' + '$' + dep.toLocaleString('en-US'),
+      autoNote: s.auto ? 'Executes inside your limits without asking' : 'Every trade waits for your approval',
+      rowCount: set.rows.length + (set.rows.length === 1 ? ' market' : ' markets'),
+      runForLabel: runs[s.runFor],
+      riskLabel: risks[s.risk],
+      capLabel: this.money(s.cap) + '/day',
+      capMarker: Math.round(((s.cap - 200) / 4800) * 100) + '%',
+      runLabel: s.auto ? 'Run Agent' : 'Save Settings',
+      switchBg: s.auto ? '#2BD87A' : '#2A2B2E',
+      switchKnob: s.auto ? 'translateX(21px)' : 'translateX(0px)',
+      cycleRunFor: () => this.setState(p => ({ runFor: (p.runFor + 1) % runs.length })),
+      cycleRisk: () => this.setState(p => ({ risk: (p.risk + 1) % risks.length })),
+      toggleAuto: () => this.setState(p => ({ auto: !p.auto })),
+      capUp: () => this.setState(p => ({ cap: Math.min(5000, p.cap + 200) })),
+      capDown: () => this.setState(p => ({ cap: Math.max(200, p.cap - 200) })),
+
+      stocksStatus: s.stocksPaused ? 'Paused' : 'Active',
+      stocksStatusColor: s.stocksPaused ? 'rgba(255,255,255,.4)' : '#2BD87A',
+      toggleStocks: () => this.setState(p => ({ stocksPaused: !p.stocksPaused })),
+
+      tabs: tabDefs.map((label, i) => ({
+        label,
+        bg: s.tab === i ? '#fff' : '#141516',
+        fg: s.tab === i ? '#0B0B0B' : 'rgba(255,255,255,.5)',
+        pick: () => this.setState({ tab: i })
+      })),
+      groupLabel: set.label,
+      rows: set.rows.map(r => ({ ...r, chgColor: r.up ? '#2BD87A' : '#FF453A' })),
+
+      tpLabel: '+' + s.tp.toFixed(1) + '%',
+      slLabel: s.sl.toFixed(1) + '%',
+      tpPrice: '$' + Math.round(tpP).toLocaleString('en-US'),
+      slPrice: '$' + Math.round(slP).toLocaleString('en-US'),
+      tpLineTop: y(tpP).toFixed(2) + '%',
+      slLineTop: y(slP).toFixed(2) + '%',
+      tpZoneH: y(tpP).toFixed(2) + '%',
+      slZoneH: (100 - y(slP)).toFixed(2) + '%',
+      tpTick: Math.round(20 + s.tp * 22) + '%',
+      slTick: Math.round(80 + s.sl * 22) + '%',
+      candles: candles,
+      tightCandles: tightCandles,
+      tightLastTop: ty(lastClose).toFixed(2) + '%',
+      axisLabels: axis,
+      volBars: raw.map((c, i) => ({
+        h: (28 + ((i * 37) % 62)) + '%',
+        bg: c[3] >= c[0] ? 'rgba(22,192,96,.5)' : 'rgba(239,59,54,.5)'
+      })),
+      news: [
+        { tag: 'MACRO', tagBg: 'rgba(91,147,255,.16)', tagFg: '#7FA9FF', t: '18m',
+          head: 'Fed holds, signals one more cut this year',
+          take: 'Momentum Scout: risk-on. Raising crypto sleeve exposure to the top of your band.' },
+        { tag: 'EARNINGS', tagBg: 'rgba(240,190,85,.16)', tagFg: '#F0BE55', t: '2h',
+          head: 'NVDAx reports Thursday after the close',
+          take: 'Earnings Desk: flattening the position Wednesday. Spread widens too much into prints.' },
+        { tag: 'ON-CHAIN', tagBg: 'rgba(73,227,155,.16)', tagFg: '#49E39B', t: '5h',
+          head: 'Solana staking yield ticks up to 12.6%',
+          take: 'Yield Keeper: moved $1,240 of idle cash in. Unlock is 3 days.' }
+      ],
+      lastPx: '$' + lastClose.toLocaleString('en-US'),
+      lastPxTop: y(lastClose).toFixed(2) + '%',
+      mktSeg: mktClasses.map((label, i) => ({ label,
+        bg: mkt === i ? '#fff' : '#141516', fg: mkt === i ? '#0B0B0B' : 'rgba(255,255,255,.5)',
+        pick: () => this.setState({ mkt: i }) })),
+      mktNote: uni.note,
+      mktCount: uni.rows.length + ' shown · 24/7',
+      mktMore: uni.more,
+      mktRows: uni.rows.map(r => ({ ...r, chgFg: r.up ? '#2BD87A' : '#FF453A' })),
+
+      levLabel: lev + '×',
+      levSteps: [2, 5, 10].map(v => ({ label: v + '×',
+        bg: lev === v ? '#fff' : '#1B1C1E', fg: lev === v ? '#0B0B0B' : 'rgba(255,255,255,.6)',
+        pick: () => this.setState({ lev: v }) })),
+      levNotional: '$' + (margin * lev).toLocaleString('en-US'),
+      levLiq: '$' + Math.round(3412.1 * (1 - 0.92 / lev)).toLocaleString('en-US'),
+      levFund: '0.0041% / 8h',
+      levWarnFg: lev >= 10 ? '#FF453A' : lev >= 5 ? '#E8C64A' : 'rgba(255,255,255,.4)',
+      levWarn: lev >= 10 ? 'A 9% move against you wipes the margin.' : lev >= 5 ? 'A 18% move against you wipes the margin.' : 'A 46% move against you wipes the margin.',
+
+      t0fg: tabIdx === 0 ? '#fff' : 'rgba(255,255,255,.3)',
+      t1fg: tabIdx === 1 ? '#fff' : 'rgba(255,255,255,.3)',
+      t2fg: tabIdx === 2 ? '#fff' : 'rgba(255,255,255,.3)',
+      t3fg: tabIdx === 3 ? '#fff' : 'rgba(255,255,255,.3)',
+      t4fg: tabIdx === 4 ? '#fff' : 'rgba(255,255,255,.3)',
+      t2ring: tabIdx === 2 ? '#2BD87A' : 'rgba(255,255,255,.3)',
+      pick0: () => this.setState({ tab5: 0 }),
+      pick1: () => this.setState({ tab5: 1 }),
+      pick2: () => this.setState({ tab5: 2 }),
+      pick3: () => this.setState({ tab5: 3 }),
+      pick4: () => this.setState({ tab5: 4 }),
+
+      closePct: cp + '%',
+      closeSteps: [25, 50, 75, 100].map(v => ({ label: v + '%',
+        bg: cp === v ? '#fff' : '#1B1C1E', fg: cp === v ? '#0B0B0B' : 'rgba(255,255,255,.6)',
+        pick: () => this.setState({ closePct: v }) })),
+      closeRealise: '+$' + (318.4 * cp / 100).toFixed(2),
+      closeFree: '$' + Math.round(3800 * cp / 100).toLocaleString('en-US'),
+      closeCta: cp === 100 ? 'Close position' : 'Close ' + cp + '%',
+      tpPnl: '$' + (size * s.tp / 100).toFixed(2),
+      slPnl: '$' + Math.abs(size * s.sl / 100).toFixed(2),
+      tpUp: () => this.setState(p => ({ tp: Math.min(3, +(p.tp + 0.5).toFixed(1)) })),
+      tpDown: () => this.setState(p => ({ tp: Math.max(0.5, +(p.tp - 0.5).toFixed(1)) })),
+      slUp: () => this.setState(p => ({ sl: Math.min(-0.5, +(p.sl + 0.5).toFixed(1)) })),
+      slDown: () => this.setState(p => ({ sl: Math.max(-3, +(p.sl - 0.5).toFixed(1)) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

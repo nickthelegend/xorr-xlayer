@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "xorr-landing",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd '/Volumes/Extreme SSD/Projects/xorr-eth/landing' && npm run dev -- --port 3210"],
+      "port": 3210
+    }
+  ]
+}

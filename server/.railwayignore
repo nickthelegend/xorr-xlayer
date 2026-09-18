@@ -1,0 +1,10 @@
+# Never ship a private key in the deploy tarball. Production injects them as secrets —
+# DELEGATE_PRIVATE_KEY, PRIVY_APP_SECRET, ONEINCH_API_KEY. See src/evm/delegation.ts.
+.env
+.env.*
+node_modules
+# The executor's default key directory resolves to server/.keys. `railway up` uploads this folder,
+# so a locally generated key would otherwise travel in the tarball.
+.keys/
+*.key
+*.pem

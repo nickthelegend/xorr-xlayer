@@ -1,0 +1,63 @@
+# The Graph — Aqua liquidity index.
+#
+# The second half of the agent's picture. The `xorr` subgraph answers "what may I spend"; this one
+# answers "is there anything to trade against". They are separate protocols on separate networks
+# indexed independently, and a routing decision needs both: a permission with no venue is as
+# useless as a venue with no permission.
+#
+# It indexes the OFFICIAL 1inch Aqua deployment, not our own contract, so the liquidity view is the
+# protocol's own truth rather than our bookkeeping.
+
+"A maker's book, keyed by the strategy hash Aqua itself assigns."
+type Strategy @entity(immutable: false) {
+  "strategyHash"
+  id: ID!
+  maker: Bytes!
+  "The Aqua app that owns the pricing logic. Ours is XorrAquaBook."
+  app: Bytes!
+  strategyHash: Bytes!
+  "The abi-encoded strategy, as shipped. Decoding is the app's business, not the index's."
+  encoded: Bytes!
+  open: Boolean!
+  shippedAt: BigInt!
+  shippedTx: Bytes!
+  dockedAt: BigInt
+  "Number of fills this book has taken."
+  fillCount: Int!
+  balances: [StrategyBalance!]! @derivedFrom(field: "strategy")
+  flows: [Flow!]! @derivedFrom(field: "strategy")
+}
+
+"Live virtual balance per token — what the book can actually pay out."
+type StrategyBalance @entity(immutable: false) {
+  "strategyHash-token"
+  id: ID!
+  strategy: Strategy!
+  token: Bytes!
+  "Pushed in minus pulled out. Aqua never custodies, so this is a claim on the maker's wallet."
+  amount: BigInt!
+  updatedAt: BigInt!
+}
+
+"Every pull and push, so depth can be reasoned about over time rather than as a snapshot."
+type Flow @entity(immutable: true) {
+  id: ID!
+  strategy: Strategy!
+  kind: FlowKind!
+  token: Bytes!
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+enum FlowKind { PULL, PUSH }
+
+"Protocol-wide totals, so the agent can tell a live venue from an empty one."
+type AquaStats @entity(immutable: false) {
+  id: ID!
+  strategiesShipped: Int!
+  strategiesOpen: Int!
+  flowCount: Int!
+  lastActivityAt: BigInt!
+}

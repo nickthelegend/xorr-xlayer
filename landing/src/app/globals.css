@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme {
+  /* The art direction's palette: near-black ground, warm off-white type, electric lime first, cobalt second, lavender last. */
+  --color-ink: #f3f0e8;
+  --color-night: #030304;
+  --color-lime: #c8f53c;
+  --color-mint: #0dd87e;
+  --color-cobalt: #2f5bff;
+  --color-lavender: #b7a6ff;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-float-slow: float 11s ease-in-out infinite;
+  --animate-twinkle: twinkle 4.5s ease-in-out infinite;
+  --animate-ripple: ripple 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  --animate-orbit: orbit 20s linear infinite;
+  --animate-glow: glow 3.4s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -12px, 0);
+    }
+  }
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.15;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+  @keyframes ripple {
+    0% {
+      transform: scale(0.7);
+      opacity: 0;
+    }
+    25% {
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.65);
+      opacity: 0;
+    }
+  }
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+html {
+  background: var(--color-night);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* `clip`, not `hidden`: hidden would make the body a scroll container and break the sticky sheet. */
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-lime);
+  color: #07080a;
+}
+
+/* Film grain: an SVG turbulence tile, overlaid so it textures what is lit and leaves the black alone. */
+.noise {
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+  opacity: 0.16;
+}
+
+/* A receipt's torn bottom edge. */
+.receipt {
+  --zig: 9px;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--zig)) 100%;
+}

@@ -1,0 +1,3 @@
+[submodule "contracts/lib/swap-vm"]
+	path = contracts/lib/swap-vm
+	url = https://github.com/1inch/swap-vm

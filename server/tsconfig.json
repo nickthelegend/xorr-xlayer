@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node", "vitest/globals"],
+    "noEmit": true,
+    /*
+     * The app's own `@/` alias, as `vitest.config.mts` resolves it at the repo root.
+     *
+     * Two of the executor's tests read the app's modules on purpose — `evm/chain-agreement.test.ts`
+     * holds the two chain vocabularies to each other, and `routes/order-amount.test.ts` checks the
+     * executor's bounds against the ones the app enforces before sending. Those tests run from the
+     * root config, which already resolves `@/`; without the same mapping here the executor's
+     * typecheck was the only place in the repo that could not see what they import.
+     */
+    "paths": {
+      "@/*": ["../src/*"]
+    }
+  },
+  /*
+   * `scripts/` as well as `src/`, because a demo nobody typechecks is a demo that rots.
+   * `demo-autonomous-agent.ts` reaches into a dozen modules the agent owns, and the first thing a
+   * reviewer does with it is run it — which is the wrong moment to find out a signature moved.
+   */
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+}

@@ -1,0 +1,31 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "contracts": {
+    "XorrDelegation": {
+      "address": "0x6c5528Fd8E74a047A85bAb413856A9239E73540e",
+      "deployTx": "0x51a2ec809258e1b502c43a5dd8dfddc27492eea638e10dfb69f24295c4002ac0",
+      "blockNumber": 46746780,
+      "deployer": "0x364d7Bbc139541e0e37450D527ae154B5C292581",
+      "constructorArgs": {
+        "settlementToken": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+      },
+      "sourceCommit": "47b12960f6a974af8f97d27ca617c07b84538fbc",
+      "compiler": {
+        "solc": "0.8.30+commit.73712a01",
+        "viaIR": true,
+        "optimizer": true,
+        "optimizerRuns": 200
+      },
+      "verification": {
+        "sourcify": "exact_match",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match",
+        "verifiedAt": "2026-09-13T01:10:54Z",
+        "lookup": "https://sourcify.dev/server/v2/contract/84532/0x6c5528Fd8E74a047A85bAb413856A9239E73540e",
+        "repository": "https://repo.sourcify.dev/84532/0x6c5528Fd8E74a047A85bAb413856A9239E73540e"
+      },
+      "supersedes": "0xb14CF3D0b5269aCDE52322218adb6d5C1daE0a4e"
+    }
+  }
+}

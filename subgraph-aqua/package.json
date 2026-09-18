@@ -1,0 +1,13 @@
+{
+  "name": "xorr-aqua-subgraph",
+  "private": true,
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy xorr-aqua --version-label v0.0.1"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.98.1",
+    "@graphprotocol/graph-ts": "0.38.1"
+  }
+}

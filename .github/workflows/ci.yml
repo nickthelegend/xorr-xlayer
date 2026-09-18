@@ -1,0 +1,194 @@
+# What can be checked without a chain, a key or a paid API — on every push — and, on demand, what cannot.
+#
+# `checks` and `contracts` are hermetic and run on every push and pull request. The interesting proofs in
+# this repo need a Base mainnet fork, a 1inch key, or a Solana validator with mainnet programs cloned into
+# it, and a job that skipped them silently would report green for a suite it never ran, which is worse than
+# not having CI. So those run only when asked for (Actions → ci → Run workflow), with the repository's
+# `ONEINCH_API_KEY`, `BASE_RPC` and `MAINNET_RPC` secrets, and they fail loudly when a secret is missing
+# rather than skipping (PLAN.md 3.19).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          (cd server && npm ci --ignore-scripts)
+
+      - name: Typecheck the app
+        run: npx tsc --noEmit
+
+      - name: Typecheck the executor
+        run: npx tsc --noEmit -p server/tsconfig.json
+
+      - name: Lint
+        run: npm run lint
+
+      # The client and the executor. The `.live.test.ts` files are excluded here and by name — they
+      # need real credentials and a real chain, and pretending otherwise is how a suite starts lying
+      # about its own coverage. `live-1inch` runs the 1inch ones on demand.
+      - name: Unit tests
+        run: npm test
+
+      # The app bundled for iOS, as a phone loads it. Web never loads a `.native` file, so a dependency only the
+      # native build imports can be missing while every step above passes — Privy's QR code peer was, and the iOS
+      # app could not start (PLAN.md X78).
+      - name: Bundle the app for iOS
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/ios-export"
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Build
+        run: forge build
+        working-directory: contracts
+
+      # Only the tests that need no fork. The fork suites — Aqua, SwapVM, the tokenized equities — need
+      # a Base mainnet RPC, so they run in `fork-contracts`, on demand.
+      - name: Contract tests (no fork required)
+        run: forge test --match-contract XorrDelegationTest -vv
+        working-directory: contracts
+
+  # On demand: the contracts against a fork of real Base, through the BASE_RPC secret.
+  fork-contracts:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      BASE_RPC: ${{ secrets.BASE_RPC }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require the secret
+        run: test -n "$BASE_RPC" || { echo "::error::BASE_RPC is not set as a repository secret"; exit 1; }
+
+      - name: Build
+        run: forge build
+        working-directory: contracts
+
+      - name: Fork suites (Aqua book, SwapVM, tokenized equities)
+        run: forge test --match-path 'test/*.fork.t.sol' -vv
+        working-directory: contracts
+
+  # On demand: the real 1inch API, with calldata built against a local anvil fork of real Base.
+  live-1inch:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
+      BASE_RPC: ${{ secrets.BASE_RPC }}
+      LIVE: '1'
+      # A fork of Base, where 1inch settles — and, with a local node, a chain the executor may give a
+      # throwaway signing key, which is all a job that signs nothing needs.
+      XORR_CHAIN: base-fork
+      FORK_RPC: http://127.0.0.1:8545
+      # The live suite waits for an executor's market cache before judging anything; the deployed one answers.
+      EXPO_PUBLIC_API_URL: https://api.xorr.finance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Require the secrets
+        run: |
+          test -n "$ONEINCH_API_KEY" || { echo "::error::ONEINCH_API_KEY is not set as a repository secret"; exit 1; }
+          test -n "$BASE_RPC" || { echo "::error::BASE_RPC is not set as a repository secret"; exit 1; }
+
+      # Both installs, not just the executor's: its suite loads `tools/wait-for-warm.ts`, which esbuild compiles
+      # against the repo-root tsconfig — and that extends `expo/tsconfig.base`, which only the root install provides.
+      # With the executor's install alone the run died before collecting a file.
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          (cd server && npm ci --ignore-scripts)
+
+      - name: Fork Base
+        run: |
+          nohup anvil --fork-url "$BASE_RPC" --chain-id 8453 --port 8545 --silent > anvil.log 2>&1 &
+          for i in $(seq 1 90); do
+            cast chain-id --rpc-url "$FORK_RPC" >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat anvil.log
+          echo "::error::the fork never answered"
+          exit 1
+
+      - name: 1inch — quotes, calldata, the venue comparison, the tokenized equities
+        run: npx vitest run src/venues/oneinch.live.test.ts src/venues/compare.live.test.ts src/venues/stocks.live.test.ts
+        working-directory: server
+
+  # On demand: the Solana chain proofs, against a real solana-test-validator that clones the live Jupiter
+  # program and the xStocks mints out of mainnet through MAINNET_RPC. `checks` cannot host these — it is
+  # hermetic, and the validator needs an upstream RPC that the public endpoint rate-limits from CI. The
+  # suite skips itself where the toolchain is absent, so the version step below is what stops this job
+  # reporting green for a suite that never ran (PLAN.md §14).
+  solana-fork:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      MAINNET_RPC: ${{ secrets.MAINNET_RPC }}
+      # No FORK_RPC: the suite starts its own validator on free ports, as it does on a dev machine.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Require the secret
+        run: test -n "$MAINNET_RPC" || { echo "::error::MAINNET_RPC is not set as a repository secret"; exit 1; }
+
+      # There is no published setup action for the Anza toolchain, so the official installer it is.
+      - name: Install the Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      # If the install above silently failed, the suite would skip itself and this job would pass having
+      # proved nothing. Fail here instead.
+      - name: Require the validator
+        run: solana-test-validator --version
+
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          (cd server && npm ci --ignore-scripts)
+
+      - name: Solana fork chain proofs
+        run: npx vitest run server/src/solana/fork.chain.test.ts

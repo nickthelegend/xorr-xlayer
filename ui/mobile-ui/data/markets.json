@@ -1,0 +1,845 @@
+{
+  "_note": "Illustrative prices from the design prototype — replace with live feeds. c1/c2 are the asset mark gradient stops: radial-gradient(circle at 32% 26%, c1, c2 74%).",
+  "classes": [
+    {
+      "id": "crypto",
+      "label": "Crypto",
+      "note": "300+ coins · spot, margin, perps, options",
+      "more": "See all 312 crypto markets",
+      "instruments": [
+        {
+          "sym": "BTC",
+          "name": "Bitcoin",
+          "tag": "Perp · 100x",
+          "px": "$66,560",
+          "chg": "+0.67%",
+          "up": true,
+          "c1": "#F7931A",
+          "c2": "#B96908"
+        },
+        {
+          "sym": "ETH",
+          "name": "Ethereum",
+          "tag": "Perp · 100x",
+          "px": "$2,443",
+          "chg": "+2.11%",
+          "up": true,
+          "c1": "#8FA6E8",
+          "c2": "#4B5FA8"
+        },
+        {
+          "sym": "SOL",
+          "name": "Solana",
+          "tag": "Spot · Perp",
+          "px": "$88.32",
+          "chg": "+2.40%",
+          "up": true,
+          "c1": "#5B93FF",
+          "c2": "#49E39B"
+        },
+        {
+          "sym": "XRP",
+          "name": "XRP",
+          "tag": "Perp · 50x",
+          "px": "$2.94",
+          "chg": "−1.08%",
+          "up": false,
+          "c1": "#9AA3AD",
+          "c2": "#4A5058"
+        },
+        {
+          "sym": "DOGE",
+          "name": "Dogecoin",
+          "tag": "Perp · 50x",
+          "px": "$0.1842",
+          "chg": "+4.12%",
+          "up": true,
+          "c1": "#E0C36B",
+          "c2": "#A5842A"
+        },
+        {
+          "sym": "HYPE",
+          "name": "Hyperliquid",
+          "tag": "Spot · Perp",
+          "px": "$40.96",
+          "chg": "−1.20%",
+          "up": false,
+          "c1": "#49E39B",
+          "c2": "#0E8F55"
+        },
+        {
+          "sym": "AAVE",
+          "name": "Aave",
+          "tag": "Spot · Perp",
+          "px": "$291.03",
+          "chg": "+3.10%",
+          "up": true,
+          "c1": "#B58CFF",
+          "c2": "#6E3ED8"
+        },
+        {
+          "sym": "LINK",
+          "name": "Chainlink",
+          "tag": "Perp · 50x",
+          "px": "$18.44",
+          "chg": "+1.05%",
+          "up": true,
+          "c1": "#5B93FF",
+          "c2": "#1B44CE"
+        },
+        {
+          "sym": "TON",
+          "name": "Toncoin",
+          "tag": "Spot · Perp",
+          "px": "$5.21",
+          "chg": "−0.36%",
+          "up": false,
+          "c1": "#63C3F5",
+          "c2": "#1D6FA8"
+        }
+      ]
+    },
+    {
+      "id": "stocks",
+      "label": "Stocks",
+      "note": "Tokenized spot vs USDT · X-Perps up to 10x",
+      "more": "See all 43 tokenized equities",
+      "instruments": [
+        {
+          "sym": "NVDAx",
+          "name": "Nvidia",
+          "tag": "Spot · Perp",
+          "px": "$182.44",
+          "chg": "+1.80%",
+          "up": true,
+          "c1": "#7CD64F",
+          "c2": "#3D8B1E"
+        },
+        {
+          "sym": "AAPLx",
+          "name": "Apple",
+          "tag": "Spot · Perp",
+          "px": "$241.09",
+          "chg": "+0.24%",
+          "up": true,
+          "c1": "#C9CDD4",
+          "c2": "#7A7F87"
+        },
+        {
+          "sym": "TSLAx",
+          "name": "Tesla",
+          "tag": "Spot · Perp",
+          "px": "$389.82",
+          "chg": "+0.91%",
+          "up": true,
+          "c1": "#E8464B",
+          "c2": "#98181C"
+        },
+        {
+          "sym": "METAx",
+          "name": "Meta",
+          "tag": "Perp · 10x",
+          "px": "$611.20",
+          "chg": "−0.42%",
+          "up": false,
+          "c1": "#5B93FF",
+          "c2": "#1B44CE"
+        },
+        {
+          "sym": "MSFTx",
+          "name": "Microsoft",
+          "tag": "Perp · 10x",
+          "px": "$438.66",
+          "chg": "+0.33%",
+          "up": true,
+          "c1": "#63C3F5",
+          "c2": "#1D6FA8"
+        },
+        {
+          "sym": "AMZNx",
+          "name": "Amazon",
+          "tag": "Perp · 10x",
+          "px": "$204.31",
+          "chg": "+0.58%",
+          "up": true,
+          "c1": "#F0BE55",
+          "c2": "#B8791A"
+        },
+        {
+          "sym": "GOOGLx",
+          "name": "Alphabet",
+          "tag": "Perp · 10x",
+          "px": "$196.88",
+          "chg": "−0.19%",
+          "up": false,
+          "c1": "#7FA9FF",
+          "c2": "#2D57C4"
+        },
+        {
+          "sym": "COINx",
+          "name": "Coinbase",
+          "tag": "Spot · Perp",
+          "px": "$318.55",
+          "chg": "−2.10%",
+          "up": false,
+          "c1": "#5B93FF",
+          "c2": "#12379E"
+        },
+        {
+          "sym": "MSTRx",
+          "name": "Strategy",
+          "tag": "Perp · 10x",
+          "px": "$342.90",
+          "chg": "+2.74%",
+          "up": true,
+          "c1": "#F5A05A",
+          "c2": "#B0561A"
+        }
+      ]
+    },
+    {
+      "id": "commodities",
+      "label": "Commodities",
+      "note": "Perpetual swaps · no expiry · ICE feed on crude",
+      "more": "See all 11 commodity contracts",
+      "instruments": [
+        {
+          "sym": "XAUT",
+          "name": "Gold",
+          "tag": "Perp · spot feed",
+          "px": "$3,412.10",
+          "chg": "+0.44%",
+          "up": true,
+          "c1": "#F5CE5F",
+          "c2": "#B98A0C"
+        },
+        {
+          "sym": "XAGT",
+          "name": "Silver",
+          "tag": "Perp · spot feed",
+          "px": "$38.71",
+          "chg": "−0.61%",
+          "up": false,
+          "c1": "#D6DBE2",
+          "c2": "#8C929B"
+        },
+        {
+          "sym": "CL",
+          "name": "WTI Crude",
+          "tag": "Perp · ICE feed",
+          "px": "$71.84",
+          "chg": "+1.92%",
+          "up": true,
+          "c1": "#4A5058",
+          "c2": "#1B1E22"
+        },
+        {
+          "sym": "BZ",
+          "name": "Brent Crude",
+          "tag": "Perp · ICE feed",
+          "px": "$75.30",
+          "chg": "+1.66%",
+          "up": true,
+          "c1": "#5C6470",
+          "c2": "#22262C"
+        },
+        {
+          "sym": "HG",
+          "name": "Copper",
+          "tag": "Perp · delivery ref",
+          "px": "$4.62",
+          "chg": "−0.28%",
+          "up": false,
+          "c1": "#E08B5A",
+          "c2": "#9A4E22"
+        },
+        {
+          "sym": "PL",
+          "name": "Platinum",
+          "tag": "Perp · spot feed",
+          "px": "$1,042.60",
+          "chg": "+0.83%",
+          "up": true,
+          "c1": "#C9CDD4",
+          "c2": "#7A7F87"
+        },
+        {
+          "sym": "PA",
+          "name": "Palladium",
+          "tag": "Perp · spot feed",
+          "px": "$1,118.40",
+          "chg": "−1.44%",
+          "up": false,
+          "c1": "#B8BEC8",
+          "c2": "#6A7078"
+        },
+        {
+          "sym": "NG",
+          "name": "Natural Gas",
+          "tag": "Perp · ICE feed",
+          "px": "$3.18",
+          "chg": "+2.51%",
+          "up": true,
+          "c1": "#7FD6F5",
+          "c2": "#1D7FA8"
+        },
+        {
+          "sym": "ZW",
+          "name": "Wheat",
+          "tag": "Perp · CBOT ref",
+          "px": "$5.74",
+          "chg": "−0.62%",
+          "up": false,
+          "c1": "#E8C46B",
+          "c2": "#A5822A"
+        }
+      ]
+    },
+    {
+      "id": "indices",
+      "label": "Indices",
+      "note": "Index exposure through tokenized ETFs",
+      "more": "See all 9 index products",
+      "instruments": [
+        {
+          "sym": "SPYx",
+          "name": "S&P 500",
+          "tag": "Spot · Perp",
+          "px": "$598.14",
+          "chg": "+0.38%",
+          "up": true,
+          "c1": "#5B93FF",
+          "c2": "#1B44CE"
+        },
+        {
+          "sym": "QQQx",
+          "name": "Nasdaq 100",
+          "tag": "Spot · Perp",
+          "px": "$521.77",
+          "chg": "+0.62%",
+          "up": true,
+          "c1": "#B58CFF",
+          "c2": "#7A45E0"
+        },
+        {
+          "sym": "IWMx",
+          "name": "Russell 2000",
+          "tag": "Perp · 10x",
+          "px": "$232.05",
+          "chg": "+0.94%",
+          "up": true,
+          "c1": "#49E39B",
+          "c2": "#12A45F"
+        },
+        {
+          "sym": "DIAx",
+          "name": "Dow 30",
+          "tag": "Perp · 10x",
+          "px": "$438.12",
+          "chg": "+0.21%",
+          "up": true,
+          "c1": "#7FA9FF",
+          "c2": "#2D57C4"
+        },
+        {
+          "sym": "EFAx",
+          "name": "MSCI EAFE",
+          "tag": "Perp · 10x",
+          "px": "$84.66",
+          "chg": "−0.33%",
+          "up": false,
+          "c1": "#C9CDD4",
+          "c2": "#7A7F87"
+        },
+        {
+          "sym": "GLDx",
+          "name": "Gold ETF",
+          "tag": "Spot · Perp",
+          "px": "$316.44",
+          "chg": "+0.41%",
+          "up": true,
+          "c1": "#F5CE5F",
+          "c2": "#B98A0C"
+        },
+        {
+          "sym": "TLTx",
+          "name": "20Y Treasury",
+          "tag": "Perp · 10x",
+          "px": "$88.90",
+          "chg": "−0.72%",
+          "up": false,
+          "c1": "#8FA6E8",
+          "c2": "#4B5FA8"
+        },
+        {
+          "sym": "HYGx",
+          "name": "High Yield",
+          "tag": "Perp · 10x",
+          "px": "$79.34",
+          "chg": "+0.12%",
+          "up": true,
+          "c1": "#E8A05A",
+          "c2": "#B0561A"
+        },
+        {
+          "sym": "VIXx",
+          "name": "Volatility",
+          "tag": "Perp · 5x",
+          "px": "$16.28",
+          "chg": "−3.10%",
+          "up": false,
+          "c1": "#E8464B",
+          "c2": "#98181C"
+        }
+      ]
+    },
+    {
+      "id": "preipo",
+      "label": "Pre-IPO",
+      "note": "Private-company exposure · settles at IPO",
+      "more": "See all 12 pre-IPO perps",
+      "instruments": [
+        {
+          "sym": "OPENAI",
+          "name": "OpenAI",
+          "tag": "Pre-IPO perp",
+          "px": "$164.20",
+          "chg": "+3.40%",
+          "up": true,
+          "c1": "#49E39B",
+          "c2": "#12A45F"
+        },
+        {
+          "sym": "ANTHRP",
+          "name": "Anthropic",
+          "tag": "Pre-IPO perp",
+          "px": "$121.55",
+          "chg": "+1.14%",
+          "up": true,
+          "c1": "#E8A05A",
+          "c2": "#B0561A"
+        },
+        {
+          "sym": "SPACEX",
+          "name": "SpaceX",
+          "tag": "Pre-IPO perp",
+          "px": "$402.70",
+          "chg": "+0.88%",
+          "up": true,
+          "c1": "#9AA3AD",
+          "c2": "#3A4048"
+        },
+        {
+          "sym": "XAI",
+          "name": "xAI",
+          "tag": "Pre-IPO perp",
+          "px": "$74.15",
+          "chg": "+5.62%",
+          "up": true,
+          "c1": "#C9CDD4",
+          "c2": "#5A6068"
+        },
+        {
+          "sym": "STRIPE",
+          "name": "Stripe",
+          "tag": "Pre-IPO perp",
+          "px": "$98.40",
+          "chg": "−0.74%",
+          "up": false,
+          "c1": "#8FA6E8",
+          "c2": "#4B5FA8"
+        },
+        {
+          "sym": "DBRK",
+          "name": "Databricks",
+          "tag": "Pre-IPO perp",
+          "px": "$142.08",
+          "chg": "+1.36%",
+          "up": true,
+          "c1": "#E8464B",
+          "c2": "#98181C"
+        },
+        {
+          "sym": "PPLX",
+          "name": "Perplexity",
+          "tag": "Pre-IPO perp",
+          "px": "$61.92",
+          "chg": "+2.05%",
+          "up": true,
+          "c1": "#49E39B",
+          "c2": "#12A45F"
+        },
+        {
+          "sym": "FIGMA",
+          "name": "Figma",
+          "tag": "Lists at IPO",
+          "px": "—",
+          "chg": "Soon",
+          "up": true,
+          "c1": "#B58CFF",
+          "c2": "#7A45E0"
+        }
+      ]
+    }
+  ],
+  "candles_ohlc": {
+    "_note": "12 hourly bars used by both the pro chart (screen 21) and Auto Close (screen 6). Format [open, high, low, close].",
+    "symbol": "BTC/USD",
+    "bars": [
+      [
+        66120,
+        66480,
+        66020,
+        66400
+      ],
+      [
+        66400,
+        66520,
+        66180,
+        66240
+      ],
+      [
+        66240,
+        66300,
+        65860,
+        65920
+      ],
+      [
+        65920,
+        66040,
+        65600,
+        65700
+      ],
+      [
+        65700,
+        65780,
+        65380,
+        65460
+      ],
+      [
+        65460,
+        65540,
+        65180,
+        65240
+      ],
+      [
+        65240,
+        65700,
+        65200,
+        65640
+      ],
+      [
+        65640,
+        65720,
+        65420,
+        65480
+      ],
+      [
+        65480,
+        65960,
+        65440,
+        65900
+      ],
+      [
+        65900,
+        66140,
+        65840,
+        66080
+      ],
+      [
+        66080,
+        66360,
+        66020,
+        66300
+      ],
+      [
+        66300,
+        66620,
+        66240,
+        66560
+      ]
+    ]
+  },
+  "agents": [
+    {
+      "name": "Momentum Scout",
+      "role": "Rides breakouts on liquid majors",
+      "metric": "61% win rate",
+      "pnl30d": 842,
+      "win": 61,
+      "trades": 37,
+      "c1": "#5B93FF",
+      "c2": "#1B44CE"
+    },
+    {
+      "name": "Earnings Desk",
+      "role": "Trades tokenized equity earnings",
+      "metric": "54% win rate",
+      "pnl30d": 1204,
+      "win": 54,
+      "trades": 22,
+      "c1": "#F0BE55",
+      "c2": "#C98518"
+    },
+    {
+      "name": "Yield Keeper",
+      "role": "Moves idle cash into best APY",
+      "metric": "12.6% APY",
+      "pnl30d": 318,
+      "win": 94,
+      "trades": 11,
+      "c1": "#49E39B",
+      "c2": "#12A45F"
+    },
+    {
+      "name": "Drawdown Guard",
+      "role": "Cuts risk when the book bleeds",
+      "metric": "Always on",
+      "pnl30d": -96,
+      "win": 48,
+      "trades": 8,
+      "c1": "#B58CFF",
+      "c2": "#7A45E0"
+    }
+  ],
+  "backtest": [
+    {
+      "lookback": "30d",
+      "ret": 4.2,
+      "maxDd": -2.1,
+      "sharpe": 1.4,
+      "trades": 18
+    },
+    {
+      "lookback": "90d",
+      "ret": 11.8,
+      "maxDd": -5.4,
+      "sharpe": 1.7,
+      "trades": 54
+    },
+    {
+      "lookback": "6m",
+      "ret": 23.5,
+      "maxDd": -9.2,
+      "sharpe": 1.2,
+      "trades": 121
+    },
+    {
+      "lookback": "1y",
+      "ret": 41.9,
+      "maxDd": -14.6,
+      "sharpe": 1.1,
+      "trades": 244
+    }
+  ],
+  "portfolio_sleeves": [
+    {
+      "name": "Blue-chip crypto",
+      "weight": 55,
+      "note": "BTC, ETH, SOL — the liquid core the agent rebalances weekly.",
+      "color": "#5B93FF"
+    },
+    {
+      "name": "Tokenized equities",
+      "weight": 30,
+      "note": "NVDAx, AAPLx. Tracks earnings dates and gaps out before prints.",
+      "color": "#F0BE55"
+    },
+    {
+      "name": "Stable yield",
+      "weight": 15,
+      "note": "Staked SOL and T-bill tokens. Funds the agent's dry powder.",
+      "color": "#49E39B"
+    }
+  ],
+  "activity": [
+    {
+      "t": "09:41",
+      "agent": "Momentum Scout",
+      "action": "Bought 4.2 SOL",
+      "detail": "Breakout above 20d high · $88.10 avg",
+      "amount": "−$370.02",
+      "kind": "trade"
+    },
+    {
+      "t": "09:12",
+      "agent": "Momentum Scout",
+      "action": "Stop loss moved",
+      "detail": "Trailing to −1.0% after +2.4% run",
+      "amount": "",
+      "kind": "risk"
+    },
+    {
+      "t": "08:55",
+      "agent": "Earnings Desk",
+      "action": "Skipped NVDAx",
+      "detail": "Spread 0.42% > your 0.25% limit",
+      "amount": "",
+      "kind": "block"
+    },
+    {
+      "t": "Yst",
+      "agent": "Yield Keeper",
+      "action": "Staked 120 SOL",
+      "detail": "12.6% APY · unlock in 3 days",
+      "amount": "+$4.11/day",
+      "kind": "yield"
+    },
+    {
+      "t": "Yst",
+      "agent": "Momentum Scout",
+      "action": "Take profit hit",
+      "detail": "Closed HYPE at +1.8%",
+      "amount": "+$44.90",
+      "kind": "trade"
+    }
+  ],
+  "alerts": [
+    {
+      "name": "SOL above $95",
+      "detail": "Price alert · push + agent note",
+      "default": true
+    },
+    {
+      "name": "NVDAx earnings",
+      "detail": "48h before the print",
+      "default": true
+    },
+    {
+      "name": "Agent hits daily cap",
+      "detail": "So you can raise it or stop",
+      "default": false
+    },
+    {
+      "name": "Drawdown past 5%",
+      "detail": "Whole-portfolio circuit breaker",
+      "default": false
+    },
+    {
+      "name": "Staking unlock ready",
+      "detail": "120 SOL, 3 days out",
+      "default": false
+    }
+  ],
+  "news": [
+    {
+      "tag": "MACRO",
+      "t": "18m",
+      "headline": "Fed holds, signals one more cut this year",
+      "take": "Momentum Scout: risk-on. Raising crypto sleeve exposure to the top of your band.",
+      "tagBg": "rgba(91,147,255,.16)",
+      "tagFg": "#7FA9FF"
+    },
+    {
+      "tag": "EARNINGS",
+      "t": "2h",
+      "headline": "NVDAx reports Thursday after the close",
+      "take": "Earnings Desk: flattening the position Wednesday. Spread widens too much into prints.",
+      "tagBg": "rgba(240,190,85,.16)",
+      "tagFg": "#F0BE55"
+    },
+    {
+      "tag": "ON-CHAIN",
+      "t": "5h",
+      "headline": "Solana staking yield ticks up to 12.6%",
+      "take": "Yield Keeper: moved $1,240 of idle cash in. Unlock is 3 days.",
+      "tagBg": "rgba(73,227,155,.16)",
+      "tagFg": "#49E39B"
+    }
+  ],
+  "onboarding": {
+    "goals": [
+      "Grow long term",
+      "Trade actively",
+      "Earn yield",
+      "Hedge my job",
+      "Learn first"
+    ],
+    "riskLevels": [
+      "Steady",
+      "Balanced",
+      "Aggressive"
+    ],
+    "kycSteps": [
+      {
+        "label": "Phone verified",
+        "detail": "+1 ••• ••• 4417"
+      },
+      {
+        "label": "Photo ID",
+        "detail": "Front and back, well lit"
+      },
+      {
+        "label": "Liveness check",
+        "detail": "A short selfie video"
+      },
+      {
+        "label": "Funding source",
+        "detail": "Bank or card"
+      }
+    ],
+    "fundingMethods": [
+      {
+        "name": "Bank transfer",
+        "detail": "Free · lands in 1–2 days",
+        "tag": "Free",
+        "feePct": 0,
+        "lands": "Tue, Sep 8"
+      },
+      {
+        "name": "Debit card",
+        "detail": "Instant · 1.5% fee",
+        "tag": "Instant",
+        "feePct": 1.5,
+        "lands": "Right away"
+      },
+      {
+        "name": "Send crypto",
+        "detail": "USDC, USDT or SOL",
+        "tag": "On-chain",
+        "feePct": 0,
+        "lands": "After 1 confirmation"
+      }
+    ],
+    "depositPresets": [
+      250,
+      500,
+      1000,
+      2500
+    ]
+  },
+  "agent_controls": {
+    "runFor": [
+      "1 Day",
+      "3 Days",
+      "7 Days",
+      "30 Days"
+    ],
+    "riskLevels": [
+      "Low",
+      "Medium",
+      "High"
+    ],
+    "spendCap": {
+      "min": 200,
+      "max": 5000,
+      "step": 200,
+      "default": 1600
+    }
+  },
+  "chat_proposal": {
+    "agent": "Momentum Scout",
+    "status": "Watching 14 markets",
+    "opening": "SOL just cleared its 20-day high on twice the usual volume. Funding is still flat, so this isn't a crowded long yet.",
+    "eyebrow": "PROPOSED TRADE",
+    "expires": "expires 4:12",
+    "action": "Buy 12.4 SOL",
+    "notional": "$1,095",
+    "entry": "$88.32",
+    "stop": "$87.44",
+    "target": "$91.20",
+    "rationale": "Risking $10.90 to make $35.70. Within your $1,600 daily cap.",
+    "onApprove": "Filled 12.4 SOL at $88.32. Stop set at $87.44.",
+    "onSkip": "Skipped. I will not re-propose SOL today."
+  }
+}

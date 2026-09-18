@@ -1,0 +1,17 @@
+# PLAN.md 13.10 — the kill switch, and that it survives a relaunch.
+appId: finance.xorr.app
+---
+- launchApp
+- openLink: 'xorr://safety'
+
+- assertVisible: 'Trading is live'
+
+- tapOn: 'Stop all trading'
+- assertVisible: 'Trading is stopped'
+- assertVisible: 'Nothing trades until you resume.'
+- assertVisible: 'Resume trading'
+
+# The state is real, read back from the chain after a relaunch, not a screen-local toggle.
+- launchApp
+- openLink: 'xorr://safety'
+- assertVisible: 'Trading is stopped'

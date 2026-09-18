@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo/scripts/react-native-xcode.sh b/node_modules/expo/scripts/react-native-xcode.sh
+index e6ae4af..84142d9 100755
+--- a/node_modules/expo/scripts/react-native-xcode.sh
++++ b/node_modules/expo/scripts/react-native-xcode.sh
+@@ -81,7 +81,7 @@ source "$REACT_NATIVE_DIR/scripts/node-binary.sh"
+ 
+ # If hermes-engine is in the Podfile.lock, it means that Hermes is a dependency of the project
+ # and it is enabled. If not, it means that hermes is disabled.
+-HERMES_ENABLED=$(grep hermes-engine $PODS_PODFILE_DIR_PATH/Podfile.lock)
++HERMES_ENABLED=$(grep hermes-engine "$PODS_PODFILE_DIR_PATH/Podfile.lock")
+ 
+ # If hermes-engine is not in the Podfile.lock, it means that the app is not using Hermes.
+ # Setting USE_HERMES is no the only way to set whether the app can use hermes or not: users

@@ -1,0 +1,36 @@
+specVersion: 1.0.0
+description: 1inch Aqua liquidity on Base — open books, live depth, and every pull and push.
+repository: https://github.com/xorr-finance/xorr-eth
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Aqua
+    network: base
+    source:
+      abi: Aqua
+      # The official Aqua deployment. Same address on every chain it ships to.
+      address: "0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a"
+      startBlock: 36000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Strategy
+        - StrategyBalance
+        - Flow
+        - AquaStats
+      abis:
+        - name: Aqua
+          file: ./abis/Aqua.json
+      eventHandlers:
+        - event: Shipped(address,address,bytes32,bytes)
+          handler: handleShipped
+        - event: Docked(address,address,bytes32)
+          handler: handleDocked
+        - event: Pulled(address,address,bytes32,address,uint256)
+          handler: handlePulled
+        - event: Pushed(address,address,bytes32,address,uint256)
+          handler: handlePushed
+      file: ./src/mapping.ts

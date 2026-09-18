@@ -1,0 +1,20 @@
+# PLAN.md 13.10 — a recurring buy is created and shows up where it should.
+appId: finance.xorr.app
+---
+- launchApp
+- tapOn:
+    id: 'Strategies'
+- tapOn: 'Add new'
+- assertVisible: 'Recurring buy'
+- assertVisible: 'No forecast'          # tier 1 is legible by design (§1.2)
+- tapOn: 'Set up a recurring buy'
+
+- assertVisible: 'Next three runs'      # verifiable BEFORE you agree to it
+- tapOn: 'SOL'
+- tapOn: 'Weekly'
+- tapOn:
+    text: 'Buy .* of SOL, weekly'
+
+- tapOn: 'Running'
+- assertVisible: 'of SOL, weekly'
+- assertVisible: 'Next run'
