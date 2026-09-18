@@ -13,7 +13,7 @@ export function CtaPill({ className = "" }: { className?: string }) {
     >
       <span className="flex items-center gap-2 pr-5 text-ink/60">
         <span aria-hidden className="size-1.5 rounded-full bg-mint shadow-[0_0_10px_rgba(13,216,126,0.9)]" />
-        Built on Base
+        Built on X Layer
       </span>
       <span className="flex h-full items-center gap-1.5 rounded-full bg-ink px-5 font-medium text-[#07080a] transition-colors duration-200 group-hover:bg-white">
         Open the app

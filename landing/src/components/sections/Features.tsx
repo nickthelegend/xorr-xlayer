@@ -40,7 +40,7 @@ const FEATURES: Feature[] = [
     icon: "receipt",
     points: [
       ["Hash-chained", "every action the bot takes, and every one it declines, commits to the row before it."],
-      ["Anchored on Base", "the head of that chain is published on an hourly sweep."],
+      ["Anchored on X Layer", "the head of that chain is published on an hourly sweep."],
     ],
     Art: TrailArt,
   },

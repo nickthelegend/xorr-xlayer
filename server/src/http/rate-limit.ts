@@ -1,7 +1,7 @@
 /**
  * A ceiling on how fast one caller can spend everybody's upstream quota.
  *
- * The executor has one 1inch key, one CoinGecko tier and one delegate key. Nothing bounded how
+ * The executor has one OKX DEX key, one CoinGecko tier and one delegate key. Nothing bounded how
  * often a single caller could use them, so one agent key in a tight loop — or one screen with a
  * runaway `useEffect`, which this repo has produced before — could exhaust the rate limit for every
  * other user and every scheduled run. The scheduler competes for the same quota, so the first thing
@@ -54,7 +54,7 @@ const GENERAL_LIMIT = Number(process.env.RATE_LIMIT_GENERAL ?? 300);
 /**
  * Requests per window for routes that spend an upstream quota we pay for and share.
  *
- * Low enough that a loop cannot drain the 1inch key, high enough that a person moving quickly
+ * Low enough that a loop cannot drain the OKX DEX key, high enough that a person moving quickly
  * through the app never meets it — the order ticket re-quotes on every keystroke of the amount.
  */
 const UPSTREAM_LIMIT = Number(process.env.RATE_LIMIT_UPSTREAM ?? 60);
@@ -70,10 +70,8 @@ const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
  */
 const UPSTREAM_PATHS = [
   '/swap', // the quote, and the swap itself
-  '/crosschain/quote', // the Fusion+ quoter — one metered 1inch call per question (PLAN.md 3.16)
-  '/wallet/tokens', // 1inch's Balance and Token APIs on Base (PLAN.md 3.10)
-  '/history', // a paged eth_getLogs scan, and 1inch's History API on Base (PLAN.md 3.14)
-  '/limit-orders', // the list reads the chain on every call; …/:hash/fill simulates and sends through spend() (PLAN.md 3.15)
+  '/wallet/tokens', // a multicall over the registry, and a price per held token (PLAN.md 3.10)
+  '/history', // a paged eth_getLogs scan of the delegation's events (PLAN.md 3.14)
   '/faucet', // reads the node and the holder or faucet key on every call; POST sends a transfer and waits for it (PLAN.md 4.4)
   '/orders',
   '/strategies/', // …/:id/run
