@@ -264,7 +264,7 @@ export default function Network() {
                   EXPLORER
                 </Text>
                 <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s6 }}>
-                  None. A fork's own transactions are on no public explorer.
+                  None. A fork’s own transactions are on no public explorer.
                 </Text>
               </SheetCard>
             ) : null}
