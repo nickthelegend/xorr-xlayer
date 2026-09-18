@@ -38,12 +38,10 @@ const PUBLIC_PATHS = new Set([
    *
    * Public for the same reason the contract is: the whole argument is that you do not have to
    * trust us, and a proof you need our permission to run is not a proof. Every probe behind it is
-   * a read of something already public — the chain, the subgraph, a price feed — and the
+   * a read of something already public — the chain, a price feed — and the
    * wallet-specific ones take an address anyone could paste into an explorer.
    */
   '/verify',
-  /** A name on a public chain is public. Gating it would only make screens slower. */
-  '/basename',
   /** Operational, and read-only. A health check behind a session cannot be used by a load balancer. */
   '/metrics',
   /** A second opinion on a public price is still a public price. */
@@ -59,10 +57,6 @@ const PUBLIC_PATHS = new Set([
   '/market/corporate-action',
   /** A futures venue's public market data — the Futures screens' list. */
   '/market/futures',
-  /** MoonPay dev sandbox public configuration. */
-  '/deposit/moonpay/config',
-  /** MoonPay webhook callbacks from MoonPay servers. */
-  '/deposit/moonpay/webhook',
 ]);
 
 /** Path prefixes that are public. `/perp/:symbol` is a mark price, not user data. */

@@ -15,14 +15,12 @@
     "test:watch": "vitest",
     "test:live": "LIVE=1 vitest run live.test",
     "postinstall": "patch-package",
-    "build:base": "node scripts/build-base.mjs",
-    "deploy:web": "node scripts/build-web.mjs && cd dist-web && vercel link --yes --project xorr-eth && vercel deploy --prod --yes",
+    "deploy:web": "node scripts/build-web.mjs && cd dist-web && vercel link --yes --project xorr-xlayer && vercel deploy --prod --yes",
     "deploy:executor": "node scripts/deploy-executor.mjs"
   },
   "dependencies": {
     "@ethersproject/shims": "^5.8.0",
     "@expo/metro-runtime": "~57.0.15",
-    "@moonpay/moonpay-js": "^0.7.6",
     "@privy-io/expo": "^0.72.0",
     "@privy-io/expo-native-extensions": "^0.0.12",
     "@privy-io/react-auth": "^3.40.0",

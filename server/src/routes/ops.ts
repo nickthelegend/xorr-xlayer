@@ -84,8 +84,8 @@ ops.get('/health', async (c) => {
     // server being broken. It is still the single most likely reason a strategy fails.
     probe('gas', false, async () => {
       const g = await gasStatus();
-      if (!g.enough) throw new Error(`${g.eth.toFixed(4)} ETH, below the ${g.floor} floor`);
-      return `${g.eth.toFixed(4)} ETH`;
+      if (!g.enough) throw new Error(`${g.eth.toFixed(4)} OKB, below the ${g.floor} floor`);
+      return `${g.eth.toFixed(4)} OKB`;
     }),
     // Upstreams the circuit breaker has shut out right now: prices and quotes fail fast while one is open.
     probe('upstreams', false, async () => {

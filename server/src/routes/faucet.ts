@@ -1,7 +1,7 @@
 /**
  * Money in (PLAN.md 4.4, 4.5): what the wallet holds, and the faucet.
  *
- *   GET  /wallet/funds  the wallet's USDC and ETH, read from the chain this executor settles on. The deposit screen polls
+ *   GET  /wallet/funds  the wallet's USDC and OKB, read from the chain this executor settles on. The deposit screen polls
  *                       it every few seconds while it is open, so it is two reads with nothing priced: `/wallet/tokens`
  *                       prices every token and, on Base, asks 1inch's metered API — the wrong thing to ask twelve times a
  *                       minute to see whether a deposit has landed.

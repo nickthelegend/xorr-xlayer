@@ -28,11 +28,12 @@ import type { Address } from 'viem';
 /**
  * What the bot proposes on when the wallet has no strategy to take a hint from.
  *
- * WETH: the deepest book this executor can route and settle on Base. The previous default was
- * `'SOL'`, which has no token on this chain at all.
+ * XBTC: OKX's wrapped bitcoin, which settles on X Layer through the XBTC/USDG pool (~$1.1M, the deepest non-stable
+ * book the executor routes). WETH is not it: no WETH pool on X Layer holds real liquidity against a stablecoin, so a
+ * proposal on it could never be filled. An earlier default, `'SOL'`, had no token on the chain at all.
  */
 /** Exported so a test can assert the price map can actually resolve it. */
-export const DEFAULT_PROPOSAL_SYMBOL = 'WETH';
+export const DEFAULT_PROPOSAL_SYMBOL = 'XBTC';
 
 const COINGECKO = 'https://api.coingecko.com/api/v3';
 /*

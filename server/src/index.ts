@@ -19,7 +19,6 @@ import { historyRoutes } from './routes/history.js';
 import { mirrorRoutes, startMirrorSchedule } from './routes/mirror.js';
 import { faucetRoutes } from './routes/faucet.js';
 import { withdrawalRoutes } from './routes/withdrawals.js';
-import { moonpayRoutes } from './routes/moonpay.js';
 import { businessRoutes } from './routes/business.js';
 import { xstockRoutes } from './routes/xstocks.js';
 import { guardRequests } from './http/guards.js';
@@ -168,7 +167,6 @@ app.route('/', historyRoutes);
 app.route('/', mirrorRoutes);
 app.route('/', faucetRoutes);
 app.route('/', withdrawalRoutes);
-app.route('/', moonpayRoutes);
 app.route('/', businessRoutes);
 app.route('/', xstockRoutes);
 

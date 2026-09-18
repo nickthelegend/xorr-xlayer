@@ -85,7 +85,7 @@ function check(what: string, ok: boolean, detail = ''): void {
 
 const usdcOf = (owner: Address) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: 'balanceOf', args: [owner] });
 const usdc = (raw: bigint) => `${formatUnits(raw, 6)} USDC`;
-const eth = (wei: bigint) => `${formatEther(wei)} ETH`;
+const eth = (wei: bigint) => `${formatEther(wei)} OKB`;
 
 console.log(`fork ${RPC} · ${node} · chain ${await pub.getChainId()} · block ${await pub.getBlockNumber()}`);
 console.log(`executor ${EXECUTOR} · account ${EMAIL}`);

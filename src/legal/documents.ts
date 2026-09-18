@@ -76,7 +76,7 @@ export const LEGAL: Record<string, LegalDoc> = {
         heading: 'What we send elsewhere',
         paragraphs: [
           'Market data requests go to public price APIs and carry no information about you.',
-          'Trades go to 1inch with your wallet address, because that is where the tokens are delivered. So does a cross-chain quote.',
+          'Trades settle on X Layer through public contracts (Uniswap v3), which needs no third-party service. When OKX DEX is enabled, a route request goes to OKX with your wallet address, because that is where the tokens are delivered.',
           'When the bot writes a message, the market context and anything you ask it are sent to a language model. Your wallet address and balances are not.',
         ],
       },

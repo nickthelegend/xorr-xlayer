@@ -8,13 +8,15 @@
  * and "Available Tue, Sep 15" was an invented next business day.
  *
  * What is left is what is true, the way Deposit has it: the address in full, the network named in a
- * chip (money moves here), a code where a code is true, and test funds where this network has them.
+ * chip (money moves here), a code where a code is true, what may be sent (USDC or USDT0 on X Layer),
+ * a link out to OKX where money is real (no card on-ramp in the app: D8), the balances with USDT0
+ * convertible by the person's own signature (D16), and test funds where this network has them.
  */
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { activeChain, chainLabel, depositQrNote, depositQrWorks } from '@/chain';
+import { CHAIN_KEY, activeChain, chainLabel, chainMoney, depositQrNote, depositQrWorks } from '@/chain';
 import { NetworkChip } from '@/networks/NetworkChip';
 import { AddressQR } from '@/ui/AddressQR';
 import { useGoBack } from '@/nav/useGoBack';
@@ -43,8 +45,9 @@ import { useAsync } from '@/data/useAsync';
 import { useIntentKeys } from '@/data/useIntentKeys';
 import { errorText } from '@/data/apiError';
 import { faucetStatus, requestFaucet, type FaucetOutcome } from '@/data/deposit';
-
-import { openMoonPayBuy } from '@/deposit/moonpay';
+import { DepositFunds } from '@/deposit/DepositFunds';
+import { OkxLink } from '@/deposit/OkxLink';
+import { acceptedTokens } from '@/deposit/stablecoins';
 
 const QR_SIZE = 168;
 
@@ -73,8 +76,6 @@ export default function Fund() {
   const now = useNow();
   const [copied, setCopied] = useState(false);
   const [asking, setAsking] = useState(false);
-  const [openingMoonPay, setOpeningMoonPay] = useState(false);
-  const [moonPayError, setMoonPayError] = useState<string>();
   const [outcome, setOutcome] = useState<FaucetOutcome>();
   // One key per claim, kept through a timeout, as Deposit's claim does: a retry asks after the first, never sends twice.
   const keys = useIntentKeys();
@@ -83,19 +84,6 @@ export default function Fund() {
     if (!address) return;
     await Clipboard.setStringAsync(address);
     setCopied(true);
-  }
-
-  async function buyWithMoonPay() {
-    if (!address || openingMoonPay) return;
-    setOpeningMoonPay(true);
-    setMoonPayError(undefined);
-    try {
-      await openMoonPayBuy({ walletAddress: address });
-    } catch (e) {
-      setMoonPayError(errorText(e));
-    } finally {
-      setOpeningMoonPay(false);
-    }
   }
 
   async function ask() {
@@ -134,7 +122,7 @@ export default function Fund() {
         <NetworkChip />
       </View>
       <Text variant="body" color={colors.ink55} style={{ marginTop: space.s10 }}>
-        Send USDC to your address.
+        {`Send ${acceptedTokens(CHAIN_KEY)} to your address on ${chainLabel}.`}
       </Text>
 
       {/*
@@ -153,7 +141,7 @@ export default function Fund() {
             <SignInPrompt text="Sign in to see your address." />
           ) : (
             <SheetCard bordered borderRadius={radius.panel} padding={space.s16}>
-              <Eyebrow small>Send USDC to</Eyebrow>
+              <Eyebrow small>{`Send ${acceptedTokens(CHAIN_KEY)} to`}</Eyebrow>
               {/*
                 A code, because the sending wallet is on the other device.
 
@@ -182,17 +170,6 @@ export default function Fund() {
               {address ? (
                 <View style={{ marginTop: space.s12, gap: space.s10 }}>
                   <Button
-                    label="Buy with Card · MoonPay Sandbox"
-                    variant="secondary"
-                    loading={openingMoonPay}
-                    onPress={buyWithMoonPay}
-                  />
-                  {moonPayError ? (
-                    <Text variant="footnote" color={colors.down} align="center">
-                      {moonPayError}
-                    </Text>
-                  ) : null}
-                  <Button
                     label={copied ? 'Copied' : 'Copy address'}
                     variant="ghost"
                     onPress={copy}
@@ -200,10 +177,17 @@ export default function Fund() {
                 </View>
               ) : null}
               <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s10 }}>
-                {depositQrWorks ? `Send only USDC on ${chainLabel}.` : depositQrNote}
+                {depositQrWorks
+                  ? `Send only ${acceptedTokens(CHAIN_KEY)} on ${chainLabel}. Other tokens or networks will be lost.`
+                  : depositQrNote}
               </Text>
             </SheetCard>
           )}
+
+          {/* Real money only: on a test network or a fork, OKX would send to a chain this build does not read. */}
+          {!signedOut && chainMoney === 'real' && address ? <OkxLink /> : null}
+
+          {signedOut ? null : <DepositFunds address={address} />}
 
           {/* Test funds only where this network has them; elsewhere the section is simply not there. */}
           {signedOut ? null : faucet.error && !status ? (

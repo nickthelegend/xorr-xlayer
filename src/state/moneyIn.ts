@@ -8,18 +8,22 @@
  */
 import { quantity } from '../format';
 
-/** The places Deposit draws each balance to. An arrival is a rise the screen can show, so the two are decided together. */
+/** The places Deposit draws each balance to (USDC's places are USDT0's too). An arrival is a rise the screen can show, so the two are decided together. */
 export const USDC_DIGITS = 2;
 export const ETH_DIGITS = 4;
 
-/** A balance as `/wallet/funds` sends it: its base units exactly, and the amount they make. */
+/** A balance as the wallet read gives it: its base units exactly, and the amount they make. */
 type Balance = { raw: string; amount: number };
 
-/** What of a `/wallet/funds` read an arrival is judged from. */
+/**
+ * What of a wallet read an arrival is judged from (`src/deposit/stablecoins.ts` makes it from `/wallet/tokens`): USDC,
+ * USDT0 where the chain has it, and the gas token — named `eth` from before X Layer, where it is OKB.
+ */
 export type FundsRead = {
   owner: string;
   chain: string;
   usdc: Balance & { address: string };
+  usdt0?: Balance & { address: string };
   eth: Balance;
 };
 
@@ -31,10 +35,11 @@ export type Arrivals = {
   count: number;
   /** Arrivals per balance. Each is a new figure rolling in. */
   usdc: number;
+  usdt0: number;
   eth: number;
 };
 
-export const NO_ARRIVALS: Arrivals = { last: undefined, count: 0, usdc: 0, eth: 0 };
+export const NO_ARRIVALS: Arrivals = { last: undefined, count: 0, usdc: 0, usdt0: 0, eth: 0 };
 
 /**
  * Whether a balance rose, in a way the screen can show.
@@ -60,10 +65,18 @@ export function noteFunds(arrivals: Arrivals, next: FundsRead): Arrivals {
     last.usdc.address.toLowerCase() === next.usdc.address.toLowerCase();
   const usdc = same && rose(last.usdc, next.usdc, USDC_DIGITS);
   const eth = same && rose(last.eth, next.eth, ETH_DIGITS);
+  // USDT0 is its own contract: a read that names another one, or none, is not USDT0 arriving.
+  const usdt0 =
+    same &&
+    last.usdt0 !== undefined &&
+    next.usdt0 !== undefined &&
+    last.usdt0.address.toLowerCase() === next.usdt0.address.toLowerCase() &&
+    rose(last.usdt0, next.usdt0, USDC_DIGITS);
   return {
     last: next,
-    count: arrivals.count + (usdc || eth ? 1 : 0),
+    count: arrivals.count + (usdc || usdt0 || eth ? 1 : 0),
     usdc: arrivals.usdc + (usdc ? 1 : 0),
+    usdt0: arrivals.usdt0 + (usdt0 ? 1 : 0),
     eth: arrivals.eth + (eth ? 1 : 0),
   };
 }

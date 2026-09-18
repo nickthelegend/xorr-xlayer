@@ -6,16 +6,15 @@
  * without triggering a deploy of its own, uploads `server/`, and then waits until `/health` reports
  * that exact SHA — a deploy is not done because the upload finished.
  *
- *   node scripts/deploy-executor.mjs executor
  *   node scripts/deploy-executor.mjs executor-fork
  *
  * `-dirty` is appended when `server/` has uncommitted changes, so a hand-patched deploy says so.
  */
 import { execFileSync } from 'node:child_process';
 
+/** The X Layer executors (Railway project `xorr-xlayer`, backend only — the web app is on Vercel). */
 const SERVICES = {
-  executor: 'https://api.xorr.finance',
-  'executor-fork': 'https://executor-fork-production.up.railway.app',
+  'executor-fork': 'https://executor-fork-production-2db8.up.railway.app',
 };
 
 const service = process.argv[2];
@@ -36,7 +35,7 @@ const stamp = dirty ? `${sha}-dirty` : sha;
  * the path argument and the directory the project is linked from did not agree. Naming the target
  * outright means neither the working directory's link nor a path argument decides where this goes.
  */
-const PROJECT = '7bceeadb-7a50-462a-9554-3282d389ebff';
+const PROJECT = 'a1ba75b2-b0ad-48e8-be0d-cf71ea9e8e52';
 const ENVIRONMENT = 'production';
 const target = ['--project', PROJECT, '--environment', ENVIRONMENT, '--service', service];
 

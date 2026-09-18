@@ -17,13 +17,13 @@
  */
 import { erc20Abi, formatEther, formatUnits, type Address } from 'viem';
 import { publicClient } from '../evm/client.js';
-import { ADDRESSES, CHAIN_KEY, chain, rpcUrl, SETTLEMENT_VENUES } from '../evm/chains.js';
+import { AAVE_V3_POOL_MAINNET, ADDRESSES, CHAIN_KEY, chain, rpcUrl, SETTLEMENT_VENUES } from '../evm/chains.js';
 import { DELEGATION_ADDRESS, delegatePublicKey, readPolicy } from '../evm/delegation.js';
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
 import { agreement, anchoringConfigured } from '../audit/anchor.js';
 import { verify as verifyAudit } from '../audit/log.js';
-import { usdcReserve } from '../market/yield.js';
+import { usdt0Reserve } from '../market/yield.js';
 import { priceOf } from '../market/prices.js';
 import { quote } from '../venues/uniswap.js';
 import { STOCKS, equitiesFunctional } from '../venues/stocks.js';
@@ -440,11 +440,11 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
     },
     {
       id: 'aave',
-      claim: 'The idle-cash rate is currentLiquidityRate read from the Aave v3 Pool on Base.',
-      how: 'getReserveData(USDC) on 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+      claim: 'The idle-cash rate is currentLiquidityRate read from the Aave v3 Pool on X Layer.',
+      how: `getReserveData(USDT0) on ${AAVE_V3_POOL_MAINNET}`,
       run: async () => {
         // Asked now: this check proves the read works, which a cached answer would not.
-        const r = await usdcReserve(0);
+        const r = await usdt0Reserve(0);
         return `${(r.apy * 100).toFixed(2)}% a year, aToken ${r.aToken}`;
       },
     },
@@ -545,12 +545,12 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
     },
     {
       id: 'gas',
-      claim: 'The bot pays its own gas and never touches the user’s ETH.',
+      claim: 'The bot pays its own gas and never touches the user’s OKB.',
       how: `eth_getBalance on the delegate key ${delegatePublicKey}`,
       run: async () => {
         const eth = Number(formatEther(await publicClient.getBalance({ address: delegatePublicKey })));
-        if (eth <= 0) throw new Error('the delegate has no ETH — every run would fail');
-        return `${eth.toFixed(4)} ETH at ${delegatePublicKey}`;
+        if (eth <= 0) throw new Error('the delegate has no OKB — every run would fail');
+        return `${eth.toFixed(4)} OKB at ${delegatePublicKey}`;
       },
     },
     {

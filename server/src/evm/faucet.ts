@@ -56,7 +56,7 @@ const USDC_DECIMALS = 6;
 export const FORK_USDC = 1_000;
 
 /**
- * The ETH a fork wallet is raised to: 0.05.
+ * The OKB a fork wallet is raised to: 0.05.
  *
  * What a wallet spends signing for itself — the approvals, the grant, a withdrawal — is a fraction of a cent each at
  * Base's gas prices, and 0.05 covers thousands of them: twenty-five times the testnet drip (`gasDrip.ts`), which was
@@ -106,7 +106,7 @@ export type Offer = { available: true; from: Address; usdcRaw: bigint; detail: s
 
 export type FaucetOffer = Offer | Refused;
 
-/** What raising a fork wallet's ETH did. It happens after the USDC has arrived, so a failure is reported, not thrown. */
+/** What raising a fork wallet's OKB did. It happens after the USDC has arrived, so a failure is reported, not thrown. */
 export type EthTopUp =
   | { done: true; floorWei: bigint; beforeWei: bigint; addedWei: bigint; afterWei: bigint | null }
   | { done: false; floorWei: bigint; failed: string };
@@ -252,12 +252,12 @@ async function sendFromHolder(offer: Offer & { source: 'fork-holder' }, to: Addr
   if (reserveHeld < offer.usdcRaw) {
     await dealErc20({ rpc: rpcUrl, token: USDC, holder: USDC_HOLDER, amount: RESERVE_REFILL });
   }
-  const holderEth = await readChain('the holder’s ETH', () => publicClient.getBalance({ address: USDC_HOLDER }));
+  const holderEth = await readChain('the holder’s OKB', () => publicClient.getBalance({ address: USDC_HOLDER }));
 
   await anvil(rpcUrl, 'anvil_impersonateAccount', [USDC_HOLDER]);
   let receipt: TransactionReceipt;
   try {
-    // The holder pays for its own transfer, topped up by what it lacks rather than set: the reserve's own ETH stays.
+    // The holder pays for its own transfer, topped up by what it lacks rather than set: the reserve's own OKB stays.
     if (holderEth < HOLDER_GAS) {
       await anvil(rpcUrl, 'anvil_addBalance', [USDC_HOLDER, toHex(HOLDER_GAS - holderEth)]);
     }
@@ -303,7 +303,7 @@ async function sendFromFaucetKey(offer: Offer & { source: 'faucet-key' }, to: Ad
       publicClient.estimateContractGas({ account: faucet, address: USDC, abi: erc20Abi, functionName: 'transfer', args }),
     ),
     readChain('the gas price', () => publicClient.getGasPrice()),
-    readChain('the faucet’s ETH', () => publicClient.getBalance({ address: faucet.address })),
+    readChain('the faucet’s OKB', () => publicClient.getBalance({ address: faucet.address })),
   ]);
   const cost = gas * gasPrice;
   if (faucetEth < cost) {
@@ -358,7 +358,7 @@ async function confirmed(hash: Hex, from: Address, to: Address, value: bigint): 
 }
 
 /**
- * Raise a fork wallet's ETH to `floorWei` by what it lacks.
+ * Raise a fork wallet's OKB to `floorWei` by what it lacks.
  *
  * `anvil_addBalance` adds rather than sets, so a balance is never lowered — not even one that grew between the read and
  * the write. Runs after the USDC has arrived, so it never throws: a top-up that failed is reported beside the transfer

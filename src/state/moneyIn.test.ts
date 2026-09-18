@@ -93,4 +93,13 @@ describe('noteFunds', () => {
     expect(reads(before, { ...after, usdc: { ...after.usdc, raw: '' } })).toMatchObject({ count: 0 });
     expect(reads({ ...before, usdc: { ...before.usdc, raw: '1e6' } }, after)).toMatchObject({ count: 0 });
   });
+
+  it('counts USDT0 arriving, on its own contract only', () => {
+    const USDT0 = '0x779Ded0c9e1022225f8E0630b35a9b54bE713736';
+    const withUsdt0 = (amount: number, address = USDT0) => funds(0, 0.05, { usdt0: { address, raw: units(amount, 6), amount } });
+    expect(reads(withUsdt0(0), withUsdt0(40))).toMatchObject({ count: 1, usdt0: 1, usdc: 0 });
+    expect(reads(withUsdt0(0), withUsdt0(40, '0x000000000000000000000000000000000000dEaD'))).toMatchObject({ count: 0 });
+    // A read without USDT0 beside one with it is not an arrival either way.
+    expect(reads(funds(0, 0.05), withUsdt0(40))).toMatchObject({ count: 0, usdt0: 0 });
+  });
 });
