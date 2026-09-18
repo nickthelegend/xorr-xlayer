@@ -5,10 +5,16 @@ trust boundary. Written against the code as it stands, not against intentions.
 
 ## 1. The delegation primitive — the thing standing between a bug and someone's capital
 
-**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on Base Sepolia at
-`0x6c5528Fd8E74a047A85bAb413856A9239E73540e` (Sourcify exact match) and on the hosted fork. The owner calls
-`grant(delegate, dailyCap, expiresAt, venues)` from their own wallet; the bot's key may then call `spend()` and
-`closePosition()` for that owner, and nothing else.
+**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on the hosted fork of X Layer
+mainnet (`0xf50a4ec95c07e497095ddad99a006cf44ceb7819`, chain 196) and — once the deployer is funded — on X Layer
+testnet (`contracts/deploy-xlayer-testnet.sh` → `contracts/deployments/xlayer-testnet.json`). The owner calls
+`grant(delegate, dailyCap, expiresAt, venues)` from their own wallet; the bot's key may then call `spend()`,
+`spendVia()`, `closePosition()` and `closePositionVia()` for that owner, and nothing else.
+
+**`spendVia` / `closePositionVia`.** OKX DEX's router pulls its input through a separate approval contract, so the
+contract approves `spender` rather than `venue`. Both must be on the owner's allowlist (`VenueNotAllowed` otherwise),
+every other check below applies unchanged, and the approval is set for exactly `amount` and reset to zero in the same
+call (`contracts/test/XorrDelegationVia.t.sol`).
 
 **What the delegate CAN do**
 - Spend the settlement token (USDC) at a venue the owner allowlisted, up to what is left of today's cap, for a
@@ -43,7 +49,7 @@ local anvil copies of both chains; `tools/prove-stop-without-server.ts` for a st
 | Delegate (bot) | `DELEGATE_PRIVATE_KEY` on Railway; locally `server/.keys/delegate.key` (0600, gitignored). | Bounded by §1: trades inside each owner's permission until they revoke. No transfer-out path exists. |
 | Faucet | `FAUCET_PRIVATE_KEY` on Railway. | Test funds. The executor refuses to drip on any chain whose money is real (`server/src/evm/money.ts`). |
 | Privy app secret, authorization key | Railway variables. | The app's server-side Privy calls. The wallet policy is owned by a key quorum, so the app secret alone cannot widen it. |
-| Deployer | `server/.keys`, testnet only. | Testnet ETH. |
+| Deployer | `server/.env.deployer` (mode 600, gitignored), X Layer testnet only. | Test OKB. |
 
 **Before any deployment carrying real value, the delegate key must move to a KMS or an HSM** — a variable on a host
 is adequate for a testnet and a fork and is not adequate beyond that. Recorded as a gap, not as done.
@@ -79,12 +85,12 @@ Append-only via a database trigger (an `UPDATE` or `DELETE` raises). Hash-chaine
 JSON, so a tampered row breaks verification for everything after it. The export carries its own
 verification result, so a recipient does not have to trust the exporter.
 
-The head is also published to Base. `XorrAuditAnchor` (`0xB58cB717867988582DcCB7f3155DeD3fC7A76caf` on Base
-Sepolia) holds each commitment, signed by the delegate key and published on an unattended sweep; a count that goes
-backwards reverts (`CountWentBackwards`), and `/audit/anchor` shows what Base holds beside what the executor holds.
+The head is also published on chain. `XorrAuditAnchor` (`0x9d22e2b3e1d31a6973b6395cbb6d369ef8b6cf12` on the hosted
+X Layer fork; the testnet deployment follows the deployer's funding) holds each commitment, signed by the delegate key and published on an unattended sweep; a count that goes
+backwards reverts (`CountWentBackwards`), and `/audit/anchor` shows what the chain holds beside what the executor holds.
 
 *Known limitation:* a party with database superuser rights could still rewrite the trail and anchor a rewrite of equal
-or greater length going forward. What they cannot do is make the new trail hash to a head Base has held since before
+or greater length going forward. What they cannot do is make the new trail hash to a head the chain has held since before
 the rewrite; the anchor's timestamp and block carry that weight.
 
 ## 6. Biometrics
@@ -117,7 +123,7 @@ Now:
   pushed to the owner's devices under a kind with no mute switch: a cooling-off only helps someone who
   hears about the new address while it runs.
 - Rows are scoped to the chain (`xorr.chain_key`), so an address allowlisted against a fork is not
-  allowlisted on Base, although the two share a chain id.
+  allowlisted on X Layer mainnet, although the two share a chain id.
 
 **Where it is enforced**
 
@@ -153,8 +159,8 @@ Now:
 
 ## 8. Network
 
-- The app talks to one first-party origin, its executor (`EXPO_PUBLIC_API_URL`), plus Privy. Market data, the
-  subgraph and 1inch are read by the executor, not the app.
+- The app talks to one first-party origin, its executor (`EXPO_PUBLIC_API_URL`), plus Privy and the chain's RPC for
+  user-signed transactions. Market data, Uniswap quotes and OKX DEX are read by the executor, not the app.
 - Every route that touches a wallet verifies the caller's Privy access token and answers 401 without one; the endpoint
   QA checks each of them with no token and with a forged one on both executors.
 - Browsers may call the executors only from `ALLOWED_ORIGINS` (`https://app.xorr.finance` on both deployments); a
@@ -172,7 +178,7 @@ Now:
 
 ---
 
-# Addendum — key handling on Base
+# Addendum — key handling (carried over from the Base build)
 
 ## The well-known-key incident
 
@@ -191,8 +197,8 @@ lesson is worth writing down rather than quietly fixing:
 
 ## Delegate key
 
-`0xC38f38f45463f77bD823FebE16b15714Eb98c8A5` signs scheduled trades on both deployments (`/delegation/params`,
-2026-09-15). Its blast radius is bounded by
+On the hosted X Layer fork, `0xB3e9E76E710cEf6cB0B064E58b63e4084AecEC21` signs scheduled trades (its key is a Railway
+variable, generated locally, never printed or committed). Its blast radius is bounded by
 `XorrDelegation`: capped per day, venue-allowlisted, time-boxed, and revocable by the user without
 this server's cooperation. **Before any deployment carrying real value it must move to a KMS or an
 HSM** — a file on a host is adequate for a testnet demo and is not adequate beyond that.
@@ -224,8 +230,8 @@ not by our operational hygiene, which is why the contract is where the enforceme
 1. Move the key to a KMS or HSM — AWS KMS, GCP KMS, or a Turnkey/Fireblocks signer. The executor
    only needs `signTransaction`, so the key never has to be in process memory.
 2. Give it its own IAM principal with signing permission and nothing else.
-3. Alert on any `Spent` or `Closed` event whose transaction the executor did not initiate. The
-   subgraph already indexes both, so this is a query rather than new infrastructure.
+3. Alert on any `Spent` or `Closed` event whose transaction the executor did not initiate. `/history` already scans
+   both from the chain, so this is a query rather than new infrastructure.
 4. Rotate by granting a new delegate and revoking the old one. `grant()` overwrites the delegate
    for that owner, so rotation is one user signature and does not require our cooperation either.
 

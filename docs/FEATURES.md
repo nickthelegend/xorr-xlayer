@@ -1,5 +1,8 @@
 # Features that would help xorr win
 
+
+> **X Layer build (2026-09-19):** this catalogue predates the move from Base. Rows naming 1inch limit orders (#11), Basenames (#48) or a Base fork (#67) describe the Base build; the X Layer equivalents are in `README.md` and `PLAN.md`. Row numbers are kept because code comments cite them.
+
 100 ideas not in the repo today (each grep-checked 2026-09-14), scored impact × feasibility × fit on 1–5 scales, highest first.
 
 | # | Idea | What it is | Bucket | Impact | Feasibility | Fit | Score | Main files |
