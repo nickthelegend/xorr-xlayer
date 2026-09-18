@@ -34,9 +34,12 @@ vi.mock('./wallet-context.js', () => ({
   NoWalletError: class extends Error {},
 }));
 vi.mock('../market/yield.js', () => ({
-  usdcSupplyYield: vi.fn(),
-  usdcReserve: vi.fn(),
+  EARNING_ASSET: 'USDT0',
+  YIELD_ASSETS: ['USDT0', 'USDC'],
+  supplyYield: vi.fn(),
+  reserveOf: vi.fn(),
   aavePoolIsDeployedHere: vi.fn(),
+  noLendingPoolHere: () => 'There is no lending pool on X Layer Testnet, so idle cash cannot be put to work here. Nothing moved.',
 }));
 vi.mock('../market/edgar.js', () => ({ earningsCalendar: vi.fn() }));
 vi.mock('../market/crosscheck.js', () => ({ crossCheck: vi.fn() }));
@@ -61,12 +64,20 @@ app.onError(errorResponse);
 app.route('/', market);
 
 const OWNER = getAddress('0x95a0b368588713011a15f4b1041423f31b08e615');
+/** Aave v3 on X Layer: the USDT0 reserve tier 4 supplies, and the USDC one. The aTokens are never read by the calldata. */
 const RESERVE = {
-  apy: 0.04,
-  pool: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
-  // A stand-in: the aToken is never read by the withdraw calldata, only the pool and the asset.
-  aToken: '0x000000000000000000000000000000000000a70c',
-  // X Layer's USDC, the reserve's asset.
+  symbol: 'USDT0',
+  apy: 0.034,
+  pool: '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116',
+  aToken: '0xF356ae412dB5df43BD3a10746f7ad4e1C4De4297',
+  asset: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736',
+  decimals: 6,
+};
+const USDC_RESERVE = {
+  ...RESERVE,
+  symbol: 'USDC',
+  apy: 0,
+  aToken: '0x7Da9B238CBd6A227ff054704Ec5cF7e700f03414',
   asset: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
 };
 const WITHDRAW = parseAbi(['function withdraw(address asset, uint256 amount, address to) returns (uint256)']);
@@ -167,7 +178,7 @@ describe('GET /market/crosscheck', () => {
 describe('POST /yield/withdraw-calldata', () => {
   beforeEach(() => {
     vi.mocked(pool.aavePoolIsDeployedHere).mockResolvedValue(true);
-    vi.mocked(pool.usdcReserve).mockResolvedValue(RESERVE as never);
+    vi.mocked(pool.reserveOf).mockImplementation(async (symbol) => (symbol === 'USDC' ? USDC_RESERVE : RESERVE) as never);
   });
 
   it('refuses an amount that is not dollars above zero before converting it or reading the chain', async () => {
@@ -175,7 +186,7 @@ describe('POST /yield/withdraw-calldata', () => {
       refused(await call('/yield/withdraw-calldata', { usd }), 400, 'invalid_amount');
     }
     expect(pool.aavePoolIsDeployedHere).not.toHaveBeenCalled();
-    expect(pool.usdcReserve).not.toHaveBeenCalled();
+    expect(pool.reserveOf).not.toHaveBeenCalled();
 
     // Above zero, and less than the smallest unit a pool pays out.
     refused(await call('/yield/withdraw-calldata', { usd: 0.0000001 }), 400, 'invalid_amount');
@@ -184,7 +195,7 @@ describe('POST /yield/withdraw-calldata', () => {
   it('refuses where no pool is deployed, rather than hand the wallet calldata for an address with no code', async () => {
     vi.mocked(pool.aavePoolIsDeployedHere).mockResolvedValue(false);
     refused(await call('/yield/withdraw-calldata', { usd: null }), 409, 'aave_not_deployed');
-    expect(pool.usdcReserve).not.toHaveBeenCalled();
+    expect(pool.reserveOf).not.toHaveBeenCalled();
   });
 
   it('answers a pool check that failed as a failed chain read, never as "no pool"', async () => {
@@ -211,5 +222,54 @@ describe('POST /yield/withdraw-calldata', () => {
       5_000_000n,
       OWNER,
     ]);
+    expect(five.body.asset).toBe('USDT0');
+  });
+
+  it('withdraws USDC when asked for it by name, and refuses an asset the pool is not read for', async () => {
+    const usdc = await call('/yield/withdraw-calldata', { usd: null, asset: 'usdc' });
+    expect(usdc.status).toBe(200);
+    expect(usdc.body).toMatchObject({ to: RESERVE.pool, asset: 'USDC' });
+    expect(decodeFunctionData({ abi: WITHDRAW, data: usdc.body.data as `0x${string}` }).args).toEqual([
+      USDC_RESERVE.asset,
+      maxUint256,
+      OWNER,
+    ]);
+
+    refused(await call('/yield/withdraw-calldata', { usd: null, asset: 'WETH' }), 400, 'invalid_asset');
+  });
+});
+
+describe('GET /yield/position', () => {
+  beforeEach(() => {
+    vi.mocked(currentWallet).mockResolvedValue({ id: 'w1', address: OWNER } as never);
+    vi.mocked(pool.reserveOf).mockResolvedValue(RESERVE as never);
+  });
+
+  it('where there is no pool, says there is no lending pool on this network rather than "0 supplied"', async () => {
+    vi.mocked(pool.aavePoolIsDeployedHere).mockResolvedValue(false);
+    const r = await call('/yield/position');
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ suppliedUsd: 0, available: false, symbol: 'USDT0' });
+    expect(String(r.body.reason)).toMatch(/no lending pool/);
+  });
+
+  it('where there is one, reports the USDT0 reserve and what this wallet has supplied', async () => {
+    vi.mocked(pool.aavePoolIsDeployedHere).mockResolvedValue(true);
+    const { suppliedUsd } = await import('../evm/balances.js');
+    vi.mocked(suppliedUsd).mockResolvedValue(125.5);
+    const r = await call('/yield/position');
+    expect(r.body).toMatchObject({ suppliedUsd: 125.5, available: true, symbol: 'USDT0', pool: RESERVE.pool, aToken: RESERVE.aToken });
+  });
+});
+
+describe('GET /yield/supply', () => {
+  it('passes the rate through, and a failed read is a 503 with a sentence', async () => {
+    vi.mocked(pool.supplyYield).mockResolvedValueOnce({ symbol: 'USDT0', estimatedApy: 0.034 } as never);
+    expect((await call('/yield/supply')).body).toMatchObject({ symbol: 'USDT0', estimatedApy: 0.034 });
+
+    vi.mocked(pool.supplyYield).mockRejectedValueOnce(new Error('rpc down'));
+    const r = await call('/yield/supply');
+    expect(r.status).toBe(503);
+    expect(r.body).toMatchObject({ error: 'rate_unavailable' });
   });
 });

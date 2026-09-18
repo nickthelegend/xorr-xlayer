@@ -28,6 +28,8 @@ export const COINGECKO_IDS: Record<string, string> = {
   // Base-native assets the delegation actually trades.
   WETH: 'weth',
   USDC: 'usd-coin',
+  // Tether's omnichain USD₮0 is USDT, one for one — tier 4 holds it between its swap and its supply (PLAN.md P2.14).
+  USDT0: 'tether',
   CBBTC: 'coinbase-wrapped-btc',
 };
 

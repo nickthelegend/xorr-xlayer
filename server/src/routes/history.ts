@@ -15,7 +15,7 @@ import { Hono } from 'hono';
 import { formatUnits, type Address } from 'viem';
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
-import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, IS_MAINNET_STATE, explorerTx } from '../evm/chains.js';
+import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, explorerTx } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { getLogsPaged } from '../evm/logs.js';
@@ -143,13 +143,13 @@ function dollarsOf(token: HistoryToken | null, amount: bigint): number | null {
 
 /**
  * The name `strategy_runs.venue` records for a contract a fill may go to (`SettlementVenue`), or the address itself for
- * one this chain does not settle on. Aave is named only where its pool exists.
+ * one this chain does not settle on. Aave is named only where its pool exists (`AAVE_V3_POOL` is null on the testnet).
  */
 function venueName(address: string): string {
   const named: [string | undefined, SettlementVenue][] = [
     [ADDRESSES.uniswapRouter ?? undefined, 'uniswap-v3'],
     [OKX_ROUTER, 'okx-dex'],
-    [IS_MAINNET_STATE ? AAVE_V3_POOL : undefined, 'aave'],
+    [AAVE_V3_POOL ?? undefined, 'aave'],
   ];
   return named.find(([a]) => a?.toLowerCase() === address.toLowerCase())?.[1] ?? address;
 }

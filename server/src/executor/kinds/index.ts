@@ -15,13 +15,13 @@ import { daily, history } from '../../backtest/engine.js';
 import { earningsCalendar } from '../../market/edgar.js';
 import { holdings, cashUsd } from '../../evm/balances.js';
 import { sellableUnits } from '../stack.js';
-import { usdcReserve } from '../../market/yield.js';
-import { supplyCalldata, AAVE_POOL } from '../../venues/aave.js';
+import { aavePoolIsDeployedHere, noLendingPoolHere, usdcReserve, usdt0Reserve } from '../../market/yield.js';
+import { supplyCalldata } from '../../venues/aave.js';
 import { publicClient } from '../../evm/client.js';
 import { usdToUnits } from '../../evm/delegation.js';
 import { restingLevels, type MultiplierBasis } from '../resting.js';
-import { ADDRESSES } from '../../evm/chains.js';
-import type { Address, Hex } from 'viem';
+import { AAVE_V3_POOL } from '../../evm/chains.js';
+import { erc20Abi, type Address, type Hex } from 'viem';
 
 /**
  * One leg.
@@ -377,76 +377,109 @@ export async function planGrid(ctx: PlanContext): Promise<TradeIntent | null> {
 }
 
 /**
- * Tier 4 — move idle cash to yield.
+ * A planner's refusal to plan, with the reason a person should read.
  *
- * Idle USDC earns nothing. This supplies it to Aave v3 and the user holds the aToken directly,
- * because `supply()` takes the recipient as an argument — so the delegation is a conduit for one
- * transaction and holds nothing afterwards. That is the only reason this venue belongs inside a
- * non-custodial permission at all.
+ * Distinct from `null` ("nothing to do this run"): this strategy CANNOT run here, and saying "checked, nothing to do" on
+ * every tick would hide that. `run.ts` records it as a blocked run carrying `reason` and the message.
+ */
+export class PlanRefused extends Error {
+  constructor(
+    readonly reason: string,
+    detail: string,
+  ) {
+    super(detail);
+    this.name = 'PlanRefused';
+  }
+}
+
+/**
+ * Tier 4 — move idle cash to yield, on Aave v3 on X Layer (PLAN.md P2.14, D15).
  *
- * Three things must be true before it moves anything, and each of them has stopped a real run:
+ * The pool pays on USDT0 and next to nothing on USDC, so idle USDC takes two runs to put to work — one leg per run, the
+ * same as every tier:
  *
- *  - The reserve has to answer. Aave returns a ZEROED struct for an asset it does not list rather
- *    than reverting, so "0.00% a year" is what a wrong address looks like. Moving cash into a
- *    venue whose rate we could not read is the exact opposite of what this tier is for.
- *  - The pool has to have code on the chain we settle on. Aave v3 is not at this address on Base
- *    Sepolia; without this check the run would reach the chain and die inside `spend()` as an
- *    opaque VenueCallFailed, which reads to a user as "your trade broke" rather than "this
- *    network has no lending pool".
- *  - There has to be genuinely idle cash. `keepCashUsd` is the buffer the user does not want
- *    swept, and it defaults to leaving something behind rather than to zero: a strategy that
- *    empties the spendable balance stops every other strategy the account has.
+ *   a. USDT0 sitting in the owner's wallet is supplied: a DIRECT leg that spends USDT0 through `spend()` (counted
+ *      against the cap in its own 6-decimal units) and calls `supply(USDT0, amount, owner)`, so the aToken lands with the
+ *      owner and the delegation holds nothing afterwards.
+ *   b. Otherwise, USDC beyond `keepCashUsd` is swapped to USDT0 through Uniswap — an ordinary swap leg — but only while
+ *      USDT0's rate beats USDC's. The next run finds the USDT0 and supplies it.
+ *
+ * What must be true before anything moves, each of which has stopped a real run:
+ *
+ *  - There is a pool on this chain. The testnet has none; the run is refused saying so, rather than dying inside
+ *    `spend()` as an opaque VenueCallFailed.
+ *  - The reserve answers. Aave returns a ZEROED struct for an asset it does not list, so "0.00% a year" is what a wrong
+ *    address looks like; `usdt0Reserve` throws on it, and moving cash into a venue whose rate could not be read is the
+ *    opposite of what this tier is for.
+ *  - The cash is genuinely idle. `keepCashUsd` is the USDC buffer the user does not want swept, and it defaults to
+ *    leaving something behind: a strategy that empties the spendable balance stops every other strategy the account has.
  */
 export async function planYieldRotation(ctx: PlanContext): Promise<TradeIntent | null> {
   const keepCashUsd = Number(ctx.params.keepCashUsd ?? 25);
   const minMoveUsd = Math.max(Number(ctx.params.minMoveUsd ?? 25), MIN_TRADE_USD);
 
-  const reserve = await usdcReserve();
+  if (!AAVE_V3_POOL || !(await aavePoolIsDeployedHere())) throw new PlanRefused('no_lending_pool', noLendingPoolHere());
 
-  // Aave's USDC reserve is a mainnet deployment. A fork of mainnet has it; a testnet does not, and
-  // finding that out inside the delegation call would surface as an unexplained venue failure.
-  const code = await publicClient.getCode({ address: AAVE_POOL }).catch(() => undefined);
-  if ((code?.length ?? 0) <= 4) return null;
+  const earn = await usdt0Reserve();
 
-  // Same reason the yield module pins mainnet USDC: supplying the wrong asset to a real pool is
-  // not a failure that reverts cleanly.
-  if (ADDRESSES.usdc.toLowerCase() !== reserve.asset.toLowerCase()) return null;
+  // ── a. USDT0 already in the wallet: supply it. ──
+  const heldRaw = await publicClient.readContract({
+    address: earn.asset,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [ctx.owner],
+  });
+  const supplyUsd = Math.min(Number(heldRaw) / 10 ** earn.decimals, ctx.budgetUsd);
+  if (supplyUsd >= minMoveUsd) {
+    /*
+     * The calldata amount and the amount `spend()` pulls have to be the SAME number.
+     *
+     * `spend()` pulls `usdToUnits(usd)` of the pay token — USDT0 here, 6 decimals like the cap — and approves the pool
+     * for exactly that, so calldata asking for more would exceed the approval and revert, and less would strand dust in
+     * the delegation. Deriving both from one function keeps them equal; `usd` is the round-tripped value.
+     */
+    const amountRaw = usdToUnits(supplyUsd) > heldRaw ? heldRaw : usdToUnits(supplyUsd);
+    const usd = Number(amountRaw) / 1e6;
+    return {
+      inSymbol: earn.symbol,
+      outSymbol: `a${earn.symbol}`,
+      amountIn: usd,
+      usd,
+      because: `${(earn.apy * 100).toFixed(2)}% a year on USDT0 from Aave v3 on X Layer, and this USDT0 was sitting idle.`,
+      direct: {
+        venue: earn.pool,
+        data: supplyCalldata({ asset: earn.asset, amountRaw, owner: ctx.owner }),
+        // A dollar of USDT0 supplied is a dollar of aUSDT0: the yield arrives as the balance growing, not the price.
+        unitPriceUsd: 1,
+        // The aToken, read from the reserve. Aave's ray arithmetic can land a supply a wei short, so the floor leaves a
+        // basis point — nowhere near enough to hide a supply credited elsewhere.
+        tokenOut: earn.aToken,
+        minOut: (amountRaw * 9_999n) / 10_000n,
+      },
+    };
+  }
 
+  // ── b. Idle USDC: swap it to USDT0 when USDT0 earns more. ──
   const cash = await cashUsd(ctx.owner);
   const idle = cash - keepCashUsd;
   if (idle < minMoveUsd) return null;
-
   const size = Math.min(idle, ctx.budgetUsd);
   if (size < minMoveUsd) return null;
 
-  /*
-   * The calldata amount and the amount `spend()` pulls have to be the SAME number.
-   *
-   * `spend()` pulls `usdToUnits(usd)` and approves the venue for exactly that, so calldata asking
-   * for a rounded-up amount would exceed the approval and revert, and a rounded-down one would
-   * strand dust in the delegation contract. Deriving both from one function is what keeps them
-   * equal; `usd` below is deliberately the round-tripped value, not the raw float.
-   */
+  const usdc = await usdcReserve();
+  if (!(earn.apy > usdc.apy)) return null;
+
   const amountRaw = usdToUnits(size);
   const usd = Number(amountRaw) / 1e6;
-
+  const pct = (apy: number) => `${(apy * 100).toFixed(2)}%`;
   return {
     inSymbol: 'USDC',
-    outSymbol: 'aUSDC',
+    outSymbol: earn.symbol,
     amountIn: usd,
+    // The exact figure `spend()` pulls, so the route is built for what the delegation hands it.
+    amountInRaw: amountRaw,
     usd,
-    because: `${(reserve.apy * 100).toFixed(2)}% a year on Aave v3, and this cash was sitting idle.`,
-    direct: {
-      venue: reserve.pool,
-      data: supplyCalldata({ asset: reserve.asset, amountRaw, owner: ctx.owner }),
-      // A dollar of USDC supplied is a dollar of aUSDC. The receipt is 1:1 at supply; the yield
-      // arrives as the balance growing, not as the price moving.
-      unitPriceUsd: 1,
-      // The aToken, read from the reserve. Aave's ray arithmetic can land a supply a wei short, so
-      // the floor leaves a basis point — nowhere near enough to hide a supply credited elsewhere.
-      tokenOut: reserve.aToken,
-      minOut: (amountRaw * 9_999n) / 10_000n,
-    },
+    because: `Aave v3 on X Layer pays ${pct(earn.apy)} a year on USDT0 and ${pct(usdc.apy)} on USDC, so this idle USDC is swapped to USDT0 first; the next run supplies it.`,
   };
 }
 

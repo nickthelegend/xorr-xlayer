@@ -30,7 +30,10 @@ vi.mock('../evm/chains.js', () => ({
   get IS_MAINNET_STATE() {
     return h.chain === 'xlayer' || h.chain === 'xlayer-fork';
   },
-  AAVE_V3_POOL: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+  // Aave v3's X Layer pool where mainnet state is; the testnet has no lending pool, so it is null there.
+  get AAVE_V3_POOL() {
+    return h.chain === 'xlayer' || h.chain === 'xlayer-fork' ? '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116' : null;
+  },
   // Mainnet and its fork settle in mainnet USDC through Uniswap v3; the testnet's USDC is Circle's other deployment,
   // absent from the all-mainnet registry, and it has no Uniswap router.
   get ADDRESSES() {
@@ -75,7 +78,7 @@ const DELEGATE = '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5';
 const ROUTER = '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA';
 /** OKX DEX's router, as a log carries it: lowercase, where the executor checksums it. */
 const OKX = '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf';
-const AAVE = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
+const AAVE = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116';
 const USDC = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
 const TESTNET_USDC = '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3';
 const WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c';

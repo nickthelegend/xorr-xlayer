@@ -21,7 +21,7 @@ import { erc20Abi, formatUnits } from 'viem';
 import { publicClient } from '../evm/client.js';
 import { gasStatus } from '../evm/gas.js';
 import { explorerTx, ADDRESSES } from '../evm/chains.js';
-import { slippageFor, SLIPPAGE, TOKENS } from '../venues/tokens.js';
+import { slippageFor, SLIPPAGE, SETTLEMENT_SYMBOL, TOKENS } from '../venues/tokens.js';
 import { buildSwap, quote } from '../venues/uniswap.js';
 import type { Address } from 'viem';
 import { periodKey, advance, type Cadence } from './schedule.js';
@@ -31,7 +31,7 @@ import { applyFill } from '../positions/index.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { priceOf } from '../market/prices.js';
 import { send } from '../notifications/push.js';
-import { PLANNERS, observationFor, type TradeIntent } from './kinds/index.js';
+import { PLANNERS, PlanRefused, observationFor, type TradeIntent } from './kinds/index.js';
 import { chooseSettlement, type SettlementVenue } from './settle.js';
 import { claimedSellUnits } from './stack.js';
 import { canonicalSymbol, TOKENS as VENUE_TOKENS } from '../venues/tokens.js';
@@ -513,14 +513,21 @@ async function runStrategyInner(
      */
     const claimed = await claimedSellUnits(walletId, strategy.symbol, strategy.id).catch(() => 0);
 
-    const intent: TradeIntent | null = await PLANNERS[strategy.kind]!({
-      owner,
-      budgetUsd: usd,
-      params,
-      symbol: strategy.symbol,
-      claimedSellUnits: claimed,
-      levelSetAt,
-    });
+    let intent: TradeIntent | null;
+    try {
+      intent = await PLANNERS[strategy.kind]!({
+        owner,
+        budgetUsd: usd,
+        params,
+        symbol: strategy.symbol,
+        claimedSellUnits: claimed,
+        levelSetAt,
+      });
+    } catch (e) {
+      // A strategy that cannot run on this chain says why, as a blocked run — not as a failed trade.
+      if (e instanceof PlanRefused) return await finishBlocked(runId, walletId, strategy, e.reason, e.message);
+      throw e;
+    }
 
     // "Nothing to do" is the right answer most of the time for a rebalance that has not drifted or
     // a stop that has not been hit. It is not a failure and must not read as one.
@@ -820,7 +827,26 @@ async function runStrategyInner(
        * A close reduces the position; a buy adds to it. A supply does neither.
        */
       if (intent.direct) {
-        // nothing to book: the aToken balance IS the record, and it is read from the chain.
+        // Nothing to book for the receipt: the aToken balance IS the record, and it is read from the chain. What was
+        // supplied leaves the book, though, when the book holds it — tier 4's USDC→USDT0 swap booked the USDT0 it now
+        // supplies, and left there it would sit in Holdings as a position the wallet no longer has.
+        if (intent.inSymbol !== SETTLEMENT_SYMBOL) {
+          const booked = await client.query<{ units: string }>(
+            `SELECT units FROM positions WHERE wallet_id = $1 AND symbol = $2 AND side = 'long' AND chain = ${THIS_CHAIN}`,
+            [walletId, intent.inSymbol],
+          );
+          const held = Number(booked.rows?.[0]?.units ?? 0);
+          const out = Math.min(held, intent.amountIn);
+          if (out > 0) {
+            await applyFill(client, {
+              walletId,
+              symbol: intent.inSymbol,
+              units: -out,
+              usd: -out * intent.direct.unitPriceUsd,
+              attribution: { source: 'strategy', id: strategy.id, label: strategy.label },
+            });
+          }
+        }
       } else await applyFill(client, {
         walletId,
         symbol: intent.outSymbol === 'USDC' ? intent.inSymbol : intent.outSymbol,
@@ -1191,7 +1217,11 @@ async function watchRun(p: {
   const context = { owner, budgetUsd: usd, params, symbol: strategy.symbol, levelSetAt: strategy.created_at };
   const observed = await observationFor(strategy.kind, context).catch(() => null);
   if (observed) params = { ...params, ...observed };
-  const intent = await planner({ ...context, params });
+  // A strategy that cannot run here would have done nothing, which is what watching it says.
+  const intent = await Promise.resolve(planner({ ...context, params })).catch((e: unknown) => {
+    if (e instanceof PlanRefused) return null;
+    throw e;
+  });
 
   const traded = intent ? (intent.outSymbol === 'USDC' ? intent.inSymbol : intent.outSymbol) : undefined;
   const price = intent && !intent.direct && traded ? await priceOf(traded) : 0;

@@ -80,6 +80,8 @@ export type ChainAddresses = {
   wokb: Address | null;
   /** The sentinel aggregators use for the native token (OKB here). */
   nativeToken: Address;
+  /** Tether's USD₮0, 6 decimals. What tier 4 earns on: Aave v3 on X Layer pays on it, and next to nothing on USDC (D15). */
+  usdt0: Address | null;
   /** Uniswap v3 SwapRouter02 — pulls what it is approved for, pays the recipient in its calldata. */
   uniswapRouter: Address | null;
   /** Uniswap v3 QuoterV2. */
@@ -93,6 +95,7 @@ const XLAYER_MAINNET = {
   btc: '0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f',
   wokb: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
   nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+  usdt0: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736',
   uniswapRouter: '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA',
   uniswapQuoter: '0xD1b797D92d87B688193A2B976eFc8D577D204343',
 } as const satisfies ChainAddresses;
@@ -105,6 +108,7 @@ const XLAYER_TESTNET: ChainAddresses = {
   btc: null,
   wokb: null,
   nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+  usdt0: null,
   uniswapRouter: null,
   uniswapQuoter: null,
 };
@@ -135,17 +139,25 @@ export const IS_MAINNET_STATE = CHAIN_KEY === 'xlayer' || CHAIN_KEY === 'xlayer-
  */
 export const APPROVABLE_TOKENS: readonly { symbol: string; address: Address }[] = [
   { symbol: 'USDC', address: ADDRESSES.usdc },
+  // Tier 4 supplies USDT0 through `spend()`, which pulls it like any other token the grant approves.
+  ...(ADDRESSES.usdt0 ? [{ symbol: 'USDT0', address: ADDRESSES.usdt0 }] : []),
   ...(ADDRESSES.usdg ? [{ symbol: 'USDG', address: ADDRESSES.usdg }] : []),
   ...(ADDRESSES.weth ? [{ symbol: 'WETH', address: ADDRESSES.weth }] : []),
   ...(ADDRESSES.btc ? [{ symbol: 'XBTC', address: ADDRESSES.btc }] : []),
 ];
 
 /**
- * Aave v3's Pool, for the yield strategy (tier 4). Aave's X Layer deployment is not verified, so the address is the Base
- * one the yield code was written against, and it is on no X Layer grant: `SETTLEMENT_VENUES` leaves it out. The yield
- * strategy is replaced or retired in the venue phase.
+ * Aave v3's Pool on X Layer mainnet — tier 4, "move idle cash to yield" (PLAN.md P2.14). Read on chain 2026-09-19: it has
+ * code, `getReservesList` answers, and its USDT0 reserve (aToken 0xF356…4297) is live with ~$73M supplied. The same
+ * address is where the RATE is read from on every build, since a rate is a mainnet question like a price.
  */
-export const AAVE_V3_POOL = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5' as const;
+export const AAVE_V3_POOL_MAINNET = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116' as const;
+
+/**
+ * The pool on the chain this executor settles on: mainnet and its fork have it; the testnet has no lending pool at all,
+ * so there it is `null` and every yield path says so rather than handing out calldata for an address with no code.
+ */
+export const AAVE_V3_POOL: Address | null = IS_MAINNET_STATE ? AAVE_V3_POOL_MAINNET : null;
 
 /**
  * OKX DEX on X Layer: the router a swap's `tx.to` names, and the separate approval contract it pulls the input through
@@ -169,6 +181,8 @@ export const OKX_DEX_APPROVE_SPENDER = okxAddr(process.env.OKX_APPROVE_SPENDER, 
 export const SETTLEMENT_VENUES: readonly `0x${string}`[] = [
   ...(ADDRESSES.uniswapRouter ? [ADDRESSES.uniswapRouter] : []),
   ...(IS_MAINNET_STATE ? [OKX_DEX_ROUTER, OKX_DEX_APPROVE_SPENDER] : []),
+  // Aave's `supply(onBehalfOf)` is called with the owner as the recipient, so the aToken is theirs (tier 4).
+  ...(AAVE_V3_POOL ? [AAVE_V3_POOL] : []),
 ];
 
 /** Where each chain shows a transaction. A record, so a chain added later says where, or does not compile. */

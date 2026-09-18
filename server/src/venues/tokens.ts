@@ -47,7 +47,7 @@ export const TOKENS: Record<string, TokenInfo> = {
   /** Paxos Global Dollar. USDC/USDG 0.01% pool 0xbB9a35F7…0d40 (~$490k each side on 2026-09-19). */
   USDG: { address: QUOTE_ADDRESSES.usdg, decimals: 6, toUsdc: [{ via: 'USDC', fee: 100 }] },
   /** Tether's USD₮0. USDT0/USDC 0.01% pool 0xEEeB3C1F…012D (~$650k). What OKX withdraws on X Layer; Aave's live market. */
-  USDT0: { address: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736', decimals: 6, toUsdc: [{ via: 'USDC', fee: 100 }] },
+  USDT0: { address: QUOTE_ADDRESSES.usdt0, decimals: 6, toUsdc: [{ via: 'USDC', fee: 100 }] },
   /** OKX's wrapped BTC. XBTC/USDG 0.05% pool 0x520F8c07…5b76 (~$1.1M). */
   XBTC: {
     address: QUOTE_ADDRESSES.btc,

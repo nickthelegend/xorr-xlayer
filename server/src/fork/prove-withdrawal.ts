@@ -1,5 +1,5 @@
 /**
- * A withdrawal, proved end to end on a Base fork against the running executor (PLAN.md 4.9).
+ * A withdrawal, proved end to end on a fork of X Layer against the running executor (PLAN.md 4.9, P2.14).
  *
  * What it shows, in order:
  *
@@ -9,20 +9,23 @@
  *   2. An address whose `usable_at` has passed is usable. A day cannot be waited out here, so the address goes back on
  *      through `addAddress` — the same INSERT the route runs — with an 8-second cooling-off instead of 86 400. It is
  *      refused until the DATABASE's clock passes `usable_at`, and then let through. No clock is moved by anyone.
- *   3. "Withdraw everything", in its order: the position sold by the executor under a real grant (`/positions/close`,
- *      signed by the delegate), the Aave position exited with `/yield/withdraw-calldata` signed by the owner, and the
+ *   3. "Withdraw everything", in its order: the TSLAx position sold by the executor under a real grant (`/positions/close`,
+ *      signed by the delegate), the Aave USDT0 position exited with `/yield/withdraw-calldata` signed by the owner, and the
  *      whole USDC balance sent to the allowlisted address with the transfer `prepare-all` built, signed by the owner —
  *      each user-signed transaction read back through `/withdrawals/record`.
  *   4. Removed again, it is refused again; added back, it waits a new 24 hours.
  *
  * The owner is a key generated here, standing in for the user's embedded wallet — Privy custodies that one and would
- * broadcast to real Base. It is registered for the Privy test account with `bindWallet`, the INSERT `/wallet/connect`
+ * broadcast to real X Layer. It is registered for the Privy test account with `bindWallet`, the INSERT `/wallet/connect`
  * runs once Privy has confirmed an address is on the account; that confirmation is the one step skipped, because Privy
  * has never heard of a key made on this machine. Everything after it goes to the executor over HTTP with a real Privy
  * token.
  *
- *   XORR_CHAIN=base-fork FORK_RPC=http://127.0.0.1:8555 DELEGATION_ADDRESS=… XORR_KEY_DIR=… DATABASE_URL=… \
- *   API_URL=http://127.0.0.1:8799 npx tsx src/fork/prove-withdrawal.ts      (from server/)
+ *   cd server && set -a && . ../.env && . ./.env.fork && set +a && API_URL=http://127.0.0.1:8799 \
+ *     npx tsx src/fork/prove-withdrawal.ts
+ *
+ * The fork's only liberty is the owner's starting USDC, from the fork-only reserve (`fork/anvil.ts`). The TSLAx position
+ * and the USDT0 supply are the owner's own: bought through Uniswap v3 and supplied to Aave v3 on the fork.
  *
  * The executor at API_URL must serve the same fork, database and key directory. This refuses any node that is not
  * anvil and any executor that is not on this machine.
@@ -40,13 +43,13 @@ import {
   http,
   maxUint256,
   parseAbi,
-  parseEther,
   parseUnits,
   type Address,
   type Hex,
   type TransactionReceipt,
 } from 'viem';
-import { base } from 'viem/chains';
+import { xLayer } from 'viem/chains';
+import { FORK_USDC_RESERVE, dealErc20 } from './anvil.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 const RPC = process.env.FORK_RPC;
@@ -56,7 +59,7 @@ if (!API || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API)) {
   throw new Error('API_URL is required, and must be an executor on this machine: this proof writes to its database');
 }
 if (process.env.XORR_CHAIN !== 'xlayer-fork') {
-  throw new Error('XORR_CHAIN=base-fork is required, so the executor modules read the fork');
+  throw new Error('XORR_CHAIN=xlayer-fork is required, so the executor modules read the fork');
 }
 
 async function rpc(method: string, params: unknown[] = []): Promise<unknown> {
@@ -78,24 +81,26 @@ if (!node.toLowerCase().startsWith('anvil')) {
 const { DELEGATION_ABI, DELEGATION_ADDRESS, usdToUnits } = await import('../evm/delegation.js');
 const { AAVE_V3_POOL, ADDRESSES, SETTLEMENT_VENUES } = await import('../evm/chains.js');
 const { delegateAccount } = await import('../evm/client.js');
+const { buildSwap } = await import('../venues/uniswap.js');
 const { bindWallet } = await import('../auth/walletBinding.js');
 const { addAddress } = await import('../withdrawals/allowlist.js');
 const { pool, query } = await import('../db/index.js');
 
 if (/^0x0{40}$/.test(DELEGATION_ADDRESS)) throw new Error('DELEGATION_ADDRESS is required: run fork-bootstrap first');
 
-const chain = { ...base, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
+const chain = { ...xLayer, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
 const pub = createPublicClient({ chain, transport: http(RPC), cacheTime: 0 });
 const USDC = ADDRESSES.usdc as Address;
-const WETH = ADDRESSES.weth as Address;
-const POOL = AAVE_V3_POOL as Address;
-/** Aave v3's aUSDC reserve: a real holder of real USDC, impersonated to fund the owner on the fork. */
-const WHALE: Address = '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB';
+const { STOCKS } = await import('../venues/stocks.js');
+/** Wrapped TSLAx: an xStock, priced by the pools that fill it — so the panic preview sees it as a leg to sell. */
+const TSLAX = STOCKS.TSLAx!.address;
+const USDT0 = ADDRESSES.usdt0 as Address;
+if (!AAVE_V3_POOL) throw new Error('AAVE_V3_POOL is null: this chain has no lending pool to exit');
+const POOL = AAVE_V3_POOL;
 const POOL_ABI = parseAbi([
   'function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)',
   'function withdraw(address asset, uint256 amount, address to) returns (uint256)',
 ]);
-const WETH_ABI = parseAbi(['function deposit() payable']);
 
 let failures = 0;
 function check(what: string, ok: boolean, detail = ''): boolean {
@@ -162,17 +167,18 @@ async function main(): Promise<void> {
   const owner = ownerAccount.address;
   const ownerWallet = createWalletClient({ account: ownerAccount, chain, transport: http(RPC) });
   await rpc('anvil_setBalance', [owner, '0x8AC7230489E80000']);
-  await rpc('anvil_impersonateAccount', [WHALE]);
-  await rpc('anvil_setBalance', [WHALE, '0xDE0B6B3A7640000']);
-  const whale = createWalletClient({ account: WHALE, chain, transport: http(RPC) });
-  const fundTx = await whale.writeContract({
+  await dealErc20({ rpc: RPC!, token: USDC, holder: FORK_USDC_RESERVE, amount: parseUnits('1000000', 6) });
+  await rpc('anvil_impersonateAccount', [FORK_USDC_RESERVE]);
+  await rpc('anvil_setBalance', [FORK_USDC_RESERVE, '0xDE0B6B3A7640000']);
+  const reserve = createWalletClient({ account: FORK_USDC_RESERVE, chain, transport: http(RPC) });
+  const fundTx = await reserve.writeContract({
     address: USDC,
     abi: erc20Abi,
     functionName: 'transfer',
     args: [owner, parseUnits('1000', 6)],
   });
   await pub.waitForTransactionReceipt({ hash: fundTx });
-  await rpc('anvil_stopImpersonatingAccount', [WHALE]);
+  await rpc('anvil_stopImpersonatingAccount', [FORK_USDC_RESERVE]);
   console.log(`  owner ${owner} · funded 1000 USDC in ${fundTx}`);
 
   const bound = await bindWallet({ id: randomUUID(), userId: userId!, address: owner, kind: 'embedded', cluster: 'xlayer-fork' });
@@ -191,7 +197,7 @@ async function main(): Promise<void> {
   need('the owner signed a grant to the executor’s delegate', await mined(grantTx), grantTx);
   for (const [symbol, asset] of [
     ['USDC', USDC],
-    ['WETH', WETH],
+    ['TSLAx', TSLAX],
   ] as const) {
     const approveTx = await ownerWallet.writeContract({
       address: asset,
@@ -201,17 +207,28 @@ async function main(): Promise<void> {
     });
     need(`… and let the delegation pull ${symbol}`, await mined(approveTx), approveTx);
   }
-  const wrapTx = await ownerWallet.writeContract({ address: WETH, abi: WETH_ABI, functionName: 'deposit', value: parseEther('0.05') });
-  need('a position to sell: 0.05 ETH wrapped into WETH', await mined(wrapTx), wrapTx);
-  const letPoolTx = await ownerWallet.writeContract({ address: USDC, abi: erc20Abi, functionName: 'approve', args: [POOL, parseUnits('300', 6)] });
-  need('… the Aave pool allowed 300 USDC', await mined(letPoolTx), letPoolTx);
+  // A position to sell, bought by the owner itself through Uniswap v3 on the fork.
+  const buy = await buildSwap({ inSymbol: 'USDC', outSymbol: 'TSLAx', amount: 50, from: owner, receiver: owner, slippagePct: 1 });
+  const letRouterTx = await ownerWallet.writeContract({ address: USDC, abi: erc20Abi, functionName: 'approve', args: [buy.to, parseUnits('50', 6)] });
+  need('… the Uniswap router allowed 50 USDC', await mined(letRouterTx), letRouterTx);
+  const buyTx = await ownerWallet.sendTransaction({ to: buy.to, data: buy.data });
+  need('a position to sell: $50 of TSLAx, bought by the owner', await mined(buyTx) && (await balanceOf(TSLAX, owner)) > 0n, buyTx);
+  // And a supply to exit: $300 of USDC swapped to USDT0 by the owner, and supplied to Aave v3 on X Layer.
+  const toUsdt0 = await buildSwap({ inSymbol: 'USDC', outSymbol: 'USDT0', amount: 300, from: owner, receiver: owner, slippagePct: 0.5 });
+  const letRouter2Tx = await ownerWallet.writeContract({ address: USDC, abi: erc20Abi, functionName: 'approve', args: [toUsdt0.to, parseUnits('300', 6)] });
+  need('… the router allowed 300 USDC', await mined(letRouter2Tx), letRouter2Tx);
+  const toUsdt0Tx = await ownerWallet.sendTransaction({ to: toUsdt0.to, data: toUsdt0.data });
+  need('… swapped to USDT0', await mined(toUsdt0Tx), toUsdt0Tx);
+  const usdt0 = await balanceOf(USDT0, owner);
+  const letPoolTx = await ownerWallet.writeContract({ address: USDT0, abi: erc20Abi, functionName: 'approve', args: [POOL, usdt0] });
+  need(`… the Aave pool allowed ${formatUnits(usdt0, 6)} USDT0`, await mined(letPoolTx), letPoolTx);
   const supplyTx = await ownerWallet.writeContract({
     address: POOL,
     abi: POOL_ABI,
     functionName: 'supply',
-    args: [USDC, parseUnits('300', 6), owner, 0],
+    args: [USDT0, usdt0, owner, 0],
   });
-  need('… and 300 USDC supplied to Aave', await mined(supplyTx), supplyTx);
+  need('… and supplied to Aave on X Layer', await mined(supplyTx), supplyTx);
 
   /* ── 1. The allowlist, on the executor's clock. ── */
   console.log('\n1. An address added over HTTP');
@@ -273,7 +290,7 @@ async function main(): Promise<void> {
       `${closed.body?.units} ${leg.symbol} for $${closed.body?.usd} (measured ${closed.body?.measured}) in ${closed.body?.txHash ?? JSON.stringify(closed.body)}`,
     );
   }
-  check('no WETH left in the wallet', (await balanceOf(WETH, owner)) === 0n);
+  check('no TSLAx left in the wallet', (await balanceOf(TSLAX, owner)) === 0n);
 
   const position = await executor('/yield/position');
   need('an Aave position to exit', position.status === 200 && position.body?.suppliedUsd > 0, `${position.body?.suppliedUsd} USD supplied`);
@@ -281,7 +298,7 @@ async function main(): Promise<void> {
   const exitArgs = decodeFunctionData({ abi: POOL_ABI, data: exit.body.data as Hex }).args as readonly [Address, bigint, Address];
   need(
     'the executor’s calldata withdraws everything, from the pool, to the owner',
-    exit.body.to.toLowerCase() === POOL.toLowerCase() && exitArgs[1] === maxUint256 && exitArgs[2] === owner,
+    exit.body.to.toLowerCase() === POOL.toLowerCase() && exitArgs[0] === USDT0 && exitArgs[1] === maxUint256 && exitArgs[2] === owner,
     `withdraw(${exitArgs[0]}, max, ${exitArgs[2]})`,
   );
   const exitGas = await pub.estimateGas({ account: owner, to: exit.body.to as Address, data: exit.body.data as Hex });
@@ -289,7 +306,11 @@ async function main(): Promise<void> {
   need('the owner signed the Aave exit', await mined(exitTx), exitTx);
   check('the aToken balance is zero, not dust', (await balanceOf(position.body.aToken as Address, owner)) === 0n);
   const exitRecord = await executor('/withdrawals/record', { txHash: exitTx });
-  check('recorded as the exit from Aave', exitRecord.body?.status === 'confirmed' && exitRecord.body?.aave !== null, JSON.stringify(exitRecord.body));
+  check(
+    'recorded as the exit from Aave, in USDT0',
+    exitRecord.body?.status === 'confirmed' && exitRecord.body?.aave?.symbol === 'USDT0',
+    JSON.stringify(exitRecord.body),
+  );
 
   const before = { owner: await balanceOf(USDC, owner), cold: await balanceOf(USDC, cold) };
   const prepared = await executor('/withdrawals/prepare-all', { to: cold, token: 'USDC' });

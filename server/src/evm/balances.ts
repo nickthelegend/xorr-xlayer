@@ -14,7 +14,7 @@ import { publicClient } from './client.js';
 import { ADDRESSES } from './chains.js';
 import { TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { priceOf } from '../market/prices.js';
-import { aavePoolIsDeployedHere, usdcReserve } from '../market/yield.js';
+import { YIELD_ASSETS, aavePoolIsDeployedHere, reserveOf } from '../market/yield.js';
 import { StillFetching, beforeDeadline } from '../http/deadline.js';
 
 export type Holding = {
@@ -198,39 +198,27 @@ export async function chainUnitsOf(owner: Address, symbols: string[]): Promise<M
 }
 
 /**
- * USDC the user has supplied to Aave, in dollars.
+ * What the user has supplied to Aave v3 on X Layer, in dollars — aUSDT0 (what tier 4 earns on) and aUSDC.
  *
- * This is not in `TOKENS` on purpose — `TOKENS` is the registry of things you can SWAP, and an
- * aToken is a receipt, not a market. But it is unmistakably the user's money, and leaving it out
- * of the total made tier 4 look like it deleted cash: the balance dropped by the supplied amount
- * and nothing appeared anywhere to account for it.
+ * This is not in `TOKENS` on purpose — `TOKENS` is the registry of things you can SWAP, and an aToken is a receipt, not
+ * a market. But it is unmistakably the user's money, and leaving it out of the total made tier 4 look like it deleted
+ * cash: the balance dropped by the supplied amount and nothing appeared anywhere to account for it.
  *
- * aUSDC is rebasing — the balance itself grows with the interest — so the balance IS the value,
- * at 1:1 with USDC. There is no price to look up.
+ * aTokens rebase — the balance itself grows with the interest — so the balance IS the value, at 1:1 with the dollar
+ * stablecoin behind it. There is no price to look up.
  *
- * Returns 0 where there is no Aave deployment to read, which is the true answer on a chain that
- * has none. A read that FAILS throws, so the caller can tell "nothing supplied" from "could not
- * ask" instead of showing both as zero.
+ * Returns 0 where there is no lending pool (the testnet), without asking anything. A read that FAILS throws, so the
+ * caller can tell "nothing supplied" from "could not ask" instead of showing both as zero.
  */
 export async function suppliedUsd(owner: Address): Promise<number> {
-  /*
-   * Where there is no pool, say so before asking mainnet about one (PLAN.md 2.4).
-   *
-   * The reserve comes from Base mainnet over the free public endpoint, and it was asked first — so on
-   * Sepolia every balance paid that round trip, and whatever back-off the endpoint's throttle imposed,
-   * only to find the aToken has no code here and answer 0.
-   */
   if (!(await aavePoolIsDeployedHere())) return 0;
-  const reserve = await usdcReserve();
-  const code = await publicClient.getCode({ address: reserve.aToken }).catch(() => undefined);
-  if ((code?.length ?? 0) <= 4) return 0;
-  const raw = await publicClient.readContract({
-    address: reserve.aToken,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [owner],
-  });
-  return Number(formatUnits(raw, 6));
+  const reserves = await Promise.all(YIELD_ASSETS.map((s) => reserveOf(s)));
+  const raws = await Promise.all(
+    reserves.map((r) =>
+      publicClient.readContract({ address: r.aToken, abi: erc20Abi, functionName: 'balanceOf', args: [owner] }),
+    ),
+  );
+  return reserves.reduce((sum, r, i) => sum + Number(formatUnits(raws[i] as bigint, r.decimals)), 0);
 }
 
 /**

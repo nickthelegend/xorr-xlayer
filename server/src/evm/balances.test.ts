@@ -1,5 +1,5 @@
 /**
- * USDC supplied to Aave, as part of the balance (PLAN.md 2.4).
+ * What is supplied to Aave v3 on X Layer — aUSDT0 and aUSDC — as part of the balance (PLAN.md 2.4, P2.14).
  *
  * The reserve was read from mainnet before anything asked whether this chain has a pool, so
  * every testnet balance paid a throttled public read to learn the answer was 0.
@@ -11,11 +11,15 @@ const h = vi.hoisted(() => ({
   readContract: vi.fn(),
   multicall: vi.fn(),
   poolHere: vi.fn(),
-  usdcReserve: vi.fn(),
+  reserveOf: vi.fn(),
 }));
 
 vi.mock('./client.js', () => ({ publicClient: { getCode: h.getCode, readContract: h.readContract, multicall: h.multicall } }));
-vi.mock('../market/yield.js', () => ({ aavePoolIsDeployedHere: h.poolHere, usdcReserve: h.usdcReserve }));
+vi.mock('../market/yield.js', () => ({
+  aavePoolIsDeployedHere: h.poolHere,
+  reserveOf: h.reserveOf,
+  YIELD_ASSETS: ['USDT0', 'USDC'],
+}));
 vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
 vi.mock('../venues/tokens.js', () => ({
   // X Layer mainnet: wrapped OKB, OKX's wrapped BTC, the NVDAx xStock and Circle's USDC.
@@ -113,25 +117,31 @@ describe('the total, for keeping (PLAN.md 2.10)', () => {
   });
 });
 
-describe('supplied USDC', () => {
-  it('is 0 on a chain with no pool, without asking mainnet for the reserve', async () => {
+describe('supplied to Aave', () => {
+  it('is 0 on a chain with no pool, without asking for the reserve', async () => {
     h.poolHere.mockResolvedValue(false);
     expect(await suppliedUsd(OWNER)).toBe(0);
-    expect(h.usdcReserve).not.toHaveBeenCalled();
+    expect(h.reserveOf).not.toHaveBeenCalled();
     expect(h.readContract).not.toHaveBeenCalled();
   });
 
-  it('is the aToken balance where there is a pool', async () => {
+  it('is the aUSDT0 and aUSDC balances together where there is a pool', async () => {
+    const A_USDT0 = '0xF356ae412dB5df43BD3a10746f7ad4e1C4De4297';
+    const A_USDC = '0x7Da9B238CBd6A227ff054704Ec5cF7e700f03414';
     h.poolHere.mockResolvedValue(true);
-    h.usdcReserve.mockResolvedValue({
-      apy: 0.04,
-      aToken: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB',
-      asset: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
-      pool: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
-    });
-    h.getCode.mockResolvedValue('0x6080604052');
-    h.readContract.mockResolvedValue(1_234_560_000n);
+    h.reserveOf.mockImplementation(async (symbol: string) => ({
+      symbol,
+      apy: symbol === 'USDT0' ? 0.034 : 0,
+      aToken: symbol === 'USDT0' ? A_USDT0 : A_USDC,
+      asset: symbol === 'USDT0' ? '0x779Ded0c9e1022225f8E0630b35a9b54bE713736' : '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+      pool: '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116',
+      decimals: 6,
+    }));
+    h.readContract.mockImplementation(async ({ address }: { address: string }) =>
+      address === A_USDT0 ? 1_000_000_000n : 234_560_000n,
+    );
     expect(await suppliedUsd(OWNER)).toBe(1234.56);
+    expect(h.reserveOf.mock.calls.map((c) => c[0])).toEqual(['USDT0', 'USDC']);
   });
 
   it('a pool check that fails is an error, not "nothing supplied"', async () => {
@@ -159,7 +169,7 @@ describe('a screen’s patience (http/patience.ts)', () => {
   it('an Aave reserve that does not answer in time is nothing supplied, as one that fails is — unless the value is kept', async () => {
     h.multicall.mockResolvedValue([ok(0n), ok(0n), ok(0n)]);
     h.poolHere.mockResolvedValue(true);
-    h.usdcReserve.mockImplementation(() => new Promise(() => {}));
+    h.reserveOf.mockImplementation(() => new Promise(() => {}));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const started = Date.now();

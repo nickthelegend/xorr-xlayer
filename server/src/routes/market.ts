@@ -22,11 +22,10 @@ import { CAN_SETTLE, TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { quote } from '../venues/uniswap.js';
 import { STOCKS, equitiesFunctional, isStock, observedHistory } from '../venues/stocks.js';
 import { classificationFor, earningsCalendar } from '../market/edgar.js';
-import { aavePoolIsDeployedHere, usdcSupplyYield, usdcReserve } from '../market/yield.js';
+import { EARNING_ASSET, YIELD_ASSETS, aavePoolIsDeployedHere, noLendingPoolHere, reserveOf, supplyYield, type YieldAsset } from '../market/yield.js';
 import { logosFor, warmLogos } from '../market/logos.js';
 import { withdrawCalldata } from '../venues/aave.js';
 import { suppliedUsd } from '../evm/balances.js';
-import { publicClient } from '../evm/client.js';
 import { ADDRESSES } from '../evm/chains.js';
 import { currentWallet } from './wallet-context.js';
 import { isAddress, type Address } from 'viem';
@@ -522,7 +521,7 @@ for (const [symbol, address] of [
 }
 
 /**
- * GET /yield/supply — the real USDC supply rate on Aave v3, Base.
+ * GET /yield/supply — the real USDT0 supply rate on Aave v3 on X Layer, with USDC's beside it.
  *
  * Public: it is a published on-chain rate, identical for every visitor, and the home screen shows
  * it before a user has a wallet.
@@ -530,9 +529,9 @@ for (const [symbol, address] of [
 /**
  * The Aave supply rate, or a reason there isn't one — never a bare 500.
  *
- * This was `c.json(await usdcSupplyYield())` with no catch, and `usdcReserve` throws for two real
- * reasons: the Base mainnet RPC did not answer, and the rate it returned was implausible
- * (`apy <= 0 || apy > 1`), which is a deliberate refusal to publish a nonsense number. Either one
+ * This was `c.json(await usdcSupplyYield())` with no catch, and the reserve read throws for two real
+ * reasons: the X Layer RPC did not answer, and the rate it returned was implausible
+ * (`apy < 0 || apy > 1`), which is a deliberate refusal to publish a nonsense number. Either one
  * reached the client as an empty 500 — caught by the screen sweep, which recorded
  * `500 /yield/supply` and a console error on a screen whose UI looked fine.
  *
@@ -542,7 +541,7 @@ for (const [symbol, address] of [
  */
 market.get('/yield/supply', async (c) => {
   try {
-    return c.json(await usdcSupplyYield());
+    return c.json(await supplyYield());
   } catch (e) {
     c.header('retry-after', '5');
     return c.json(
@@ -840,15 +839,15 @@ market.get('/yield/position', async (c) => {
   const w = await currentWalletFor(c);
   if (!w) return c.json({ suppliedUsd: 0, available: false, reason: 'no_wallet' });
   try {
-    const reserve = await usdcReserve();
-    const code = await publicClient.getCode({ address: reserve.pool }).catch(() => undefined);
-    if ((code?.length ?? 0) <= 4) {
+    const reserve = await reserveOf(EARNING_ASSET);
+    if (!(await aavePoolIsDeployedHere())) {
       return c.json({
         suppliedUsd: 0,
         apy: reserve.apy,
         available: false,
         // Named, because "0 supplied" and "no lending pool on this chain" look identical otherwise.
-        reason: `Aave v3 is not deployed at ${reserve.pool} on this network.`,
+        reason: noLendingPoolHere(),
+        symbol: reserve.symbol,
         pool: reserve.pool,
         aToken: reserve.aToken,
         asset: reserve.asset,
@@ -857,6 +856,7 @@ market.get('/yield/position', async (c) => {
     return c.json({
       suppliedUsd: await suppliedUsd(w.address as Address),
       apy: reserve.apy,
+      symbol: reserve.symbol,
       pool: reserve.pool,
       aToken: reserve.aToken,
       asset: reserve.asset,
@@ -871,7 +871,8 @@ market.get('/yield/position', async (c) => {
  * The exact transaction the USER signs to withdraw. Encoded here, not in the client.
  *
  * The asset address comes from the reserve rather than a constant, so a client cannot end up
- * withdrawing the wrong token if Aave migrates one. `usd: null` means everything — Aave takes
+ * withdrawing the wrong token if Aave migrates one. `asset` is `USDT0` (what tier 4 supplies, and the
+ * default) or `USDC`. `usd: null` means everything — Aave takes
  * `type(uint256).max` for that, and it is the only way to actually empty a rebasing position
  * instead of leaving a few seconds' interest behind.
  */
@@ -891,23 +892,26 @@ market.post('/yield/withdraw-calldata', async (c) => {
   const invalidAmount = { error: 'invalid_amount', detail: 'usd is a dollar amount above zero, or null for all of it.' };
   const asked = typeof usd === 'number' || typeof usd === 'string' ? Number(usd) : NaN;
   if (!all && !(Number.isFinite(asked) && asked > 0)) return c.json(invalidAmount, 400);
+  const assetAsked = body?.asset === undefined || body?.asset === null ? EARNING_ASSET : String(body.asset).toUpperCase();
+  if (!YIELD_ASSETS.includes(assetAsked as YieldAsset)) {
+    return c.json({ error: 'invalid_asset', detail: `asset is one of ${YIELD_ASSETS.join(', ')}, or left out for ${EARNING_ASSET}.` }, 400);
+  }
 
   /*
    * No pool on this chain, no calldata for one.
    *
-   * The pool address is Base mainnet's, and this built `withdraw()` against it wherever the executor ran — so on a
-   * chain with no pool at that address the wallet was handed a transaction to an account with no code, while
-   * `/yield/position` on the same executor already said `available: false`. 409: nothing about the request is wrong,
-   * and nothing on this chain can make it right.
+   * Built against a pool wherever the executor ran, the wallet on a chain with none (the X Layer testnet) was handed a
+   * transaction to an account with no code, while `/yield/position` already said `available: false`. 409: nothing
+   * about the request is wrong, and nothing on this chain can make it right.
    */
   if (!(await readChain('the lending pool', () => aavePoolIsDeployedHere()))) {
     return c.json(
-      { error: 'aave_not_deployed', detail: 'No lending pool is deployed on this network, so there is nothing to withdraw.' },
+      { error: 'aave_not_deployed', detail: 'There is no lending pool on this network, so there is nothing to withdraw.' },
       409,
     );
   }
 
-  const reserve = await usdcReserve();
+  const reserve = await reserveOf(assetAsked as YieldAsset);
   const amountRaw = all ? MAX_UINT256 : BigInt(Math.floor(asked * 1e6));
   // Above zero and still less than a millionth of a dollar: nothing a pool can pay out.
   if (amountRaw <= 0n) return c.json(invalidAmount, 400);
@@ -923,6 +927,7 @@ market.post('/yield/withdraw-calldata', async (c) => {
     }),
     /** So the screen can say "all of it" rather than a number that is already slightly stale. */
     isMax: amountRaw === MAX_UINT256,
+    asset: reserve.symbol,
   });
 });
 

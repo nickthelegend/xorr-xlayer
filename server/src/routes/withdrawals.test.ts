@@ -31,7 +31,9 @@ const h = vi.hoisted(() => ({
   USDC: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
   WETH: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c',
   NATIVE: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-  POOL: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+  /** X Layer mainnet's USDT0 and Aave v3 pool. */
+  USDT0: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736',
+  POOL: '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116',
 }));
 
 vi.mock('../auth/privy.js', () => ({
@@ -66,7 +68,7 @@ vi.mock('../audit/log.js', () => ({ append: vi.fn(async () => undefined) }));
 vi.mock('../evm/client.js', () => ({ publicClient: { readContract: vi.fn(), getTransactionReceipt: vi.fn() } }));
 vi.mock('../evm/chains.js', () => ({
   AAVE_V3_POOL: h.POOL,
-  ADDRESSES: { usdc: h.USDC, weth: h.WETH, nativeToken: h.NATIVE },
+  ADDRESSES: { usdc: h.USDC, usdt0: h.USDT0, weth: h.WETH, nativeToken: h.NATIVE },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
 vi.mock('../evm/delegation.js', () => ({ waitForTx: vi.fn() }));
@@ -405,7 +407,7 @@ describe('recording a withdrawal the owner signed', () => {
     expect((await call('/withdrawals/record', { txHash: HASH })).body).toMatchObject({
       status: 'confirmed',
       transfers: [],
-      aave: { amount: '100.5', amountRaw: '100500000' },
+      aave: { symbol: 'USDC', amount: '100.5', amountRaw: '100500000' },
     });
     expect(book.destinationStatus).not.toHaveBeenCalled();
     expect(append).toHaveBeenCalledTimes(1);
@@ -413,6 +415,36 @@ describe('recording a withdrawal the owner signed', () => {
       expect.objectContaining({ kind: 'yield', action: 'Withdrew 100.5 USDC from Aave' }),
       expect.anything(),
     );
+  });
+
+  it('records the exit of USDT0 — what tier 4 supplies on X Layer — naming USDT0', async () => {
+    const A_USDT0 = getAddress('0x000000000000000000000000000000000000a070');
+    vi.mocked(waitForTx).mockResolvedValue(true);
+    vi.mocked(publicClient.getTransactionReceipt).mockResolvedValue(
+      receipt({
+        to: h.POOL,
+        logs: [transferLog(A_USDT0, OWNER, zeroAddress, 75_250_000n), transferLog(h.USDT0, A_USDT0, OWNER, 75_250_000n)],
+      }) as never,
+    );
+
+    expect((await call('/withdrawals/record', { txHash: HASH })).body).toMatchObject({
+      status: 'confirmed',
+      transfers: [],
+      aave: { symbol: 'USDT0', amount: '75.25', amountRaw: '75250000' },
+    });
+    expect(append).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'yield', action: 'Withdrew 75.25 USDT0 from Aave' }),
+      expect.anything(),
+    );
+  });
+
+  it('does not call USDT0 arriving from anywhere but the pool an exit from Aave', async () => {
+    vi.mocked(waitForTx).mockResolvedValue(true);
+    vi.mocked(publicClient.getTransactionReceipt).mockResolvedValue(
+      receipt({ to: STRANGER, logs: [transferLog(h.USDT0, STRANGER, OWNER, 75_250_000n)] }) as never,
+    );
+
+    expect((await call('/withdrawals/record', { txHash: HASH })).body).toMatchObject({ status: 'confirmed', aave: null });
   });
 
   it('reads only ERC-20 transfers out of a receipt', () => {

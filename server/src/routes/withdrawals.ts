@@ -262,7 +262,7 @@ async function appendOnce(walletId: string, hash: Hex, entries: AuditEntry[]): P
  * allowlist when it was recorded. One that went somewhere the list does not clear is written as a risk: this app will
  * not ask for that signature, so it was made somewhere else, and that is the row a person reading their trail needs.
  *
- * USDC paid back by Aave, in a transaction sent to the pool, is the exit from yield and is recorded as one.
+ * USDT0 or USDC paid back by Aave, in a transaction sent to the lending pool, is the exit from yield and is recorded as one.
  */
 export async function recordWithdrawal(w: WalletRow, hash: Hex): Promise<WithdrawalResponse> {
   const mined = await waitForTx(hash).catch(() => undefined);
@@ -321,13 +321,26 @@ export async function recordWithdrawal(w: WalletRow, hash: Hex): Promise<Withdra
       }),
   );
 
-  const repaid =
-    receipt.to && isAddressEqual(receipt.to, AAVE_V3_POOL)
-      ? moved
-          .filter((t) => isAddressEqual(t.to, owner) && isAddressEqual(t.token, ADDRESSES.usdc))
-          .reduce((sum, t) => sum + t.value, 0n)
-      : 0n;
-  const aave = repaid > 0n ? { amount: formatUnits(repaid, 6), amountRaw: repaid.toString() } : null;
+  /*
+   * Which of Aave's reserves paid back. Tier 4 supplies USDT0 on X Layer (D15), and a USDC supply made elsewhere is exited
+   * the same way; both are 6 decimals. No pool on this chain (the testnet) means no exit from one.
+   */
+  const reserveAssets = [
+    ...(ADDRESSES.usdt0 ? [{ symbol: 'USDT0', address: ADDRESSES.usdt0 }] : []),
+    { symbol: 'USDC', address: ADDRESSES.usdc },
+  ];
+  const fromPool = !!AAVE_V3_POOL && !!receipt.to && isAddressEqual(receipt.to, AAVE_V3_POOL);
+  const paid = fromPool
+    ? reserveAssets
+        .map((a) => ({
+          ...a,
+          raw: moved
+            .filter((t) => isAddressEqual(t.to, owner) && isAddressEqual(t.token, a.address))
+            .reduce((sum, t) => sum + t.value, 0n),
+        }))
+        .find((a) => a.raw > 0n)
+    : undefined;
+  const aave = paid ? { symbol: paid.symbol, amount: formatUnits(paid.raw, 6), amountRaw: paid.raw.toString() } : null;
 
   const entries: AuditEntry[] = transfers.map((s) => {
     const what = `${s.amount ?? `${s.amountRaw} base units`} ${s.symbol ?? `of ${s.token}`}`;
@@ -356,11 +369,11 @@ export async function recordWithdrawal(w: WalletRow, hash: Hex): Promise<Withdra
     entries.push({
       walletId: w.id,
       agent: 'You',
-      action: `Withdrew ${aave.amount} USDC from Aave`,
-      detail: `Aave paid ${aave.amount} USDC back into this wallet. You signed the withdrawal; the bot never held the receipt token.`,
+      action: `Withdrew ${aave.amount} ${aave.symbol} from Aave`,
+      detail: `Aave paid ${aave.amount} ${aave.symbol} back into this wallet. You signed the withdrawal; the bot never held the receipt token.`,
       kind: 'yield',
       signature: hash,
-      payload: { withdrawal: true, aave: true, amountRaw: aave.amountRaw, explorer },
+      payload: { withdrawal: true, aave: true, symbol: aave.symbol, amountRaw: aave.amountRaw, explorer },
     });
   }
 

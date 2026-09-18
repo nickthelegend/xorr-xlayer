@@ -13,12 +13,13 @@ import type { OkxRoute } from '../venues/okxdex.js';
 import type { TradeIntent } from './kinds/index.js';
 import type { SettlementSend } from './settle.js';
 
-/** X Layer mainnet: Circle's USDC and wrapped OKB (`evm/chains.ts`). */
+/** X Layer mainnet: Circle's USDC, wrapped OKB and Tether's USDT0 (`evm/chains.ts`). */
 const TOKENS = vi.hoisted(
   () =>
     ({
       USDC: { address: '0xB6CEceAB302E2E4948951eE7843FC24E92933061', decimals: 6 },
       WOKB: { address: '0xe538905cf8410324e03A5A23C1c177a474D59b2b', decimals: 18 },
+      USDT0: { address: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736', decimals: 6 },
     }) as const,
 );
 
@@ -47,9 +48,11 @@ const ROUTER = '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA';
 /** OKX DEX's router and the approval contract it pulls through, on X Layer. */
 const OKX_ROUTER = '0x7c5bEE2a8091C3EF39072f64F18fAc913060AEAf';
 const OKX_SPENDER = '0x8b773D83bc66Be128c60e07E17C8901f7a64F000';
-const AAVE_POOL = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
-/** The receipt token a USDC supply mints. */
-const A_USDC = '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB';
+/** Aave v3's Pool on X Layer. */
+const AAVE_POOL = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116';
+const USDT0 = TOKENS.USDT0.address;
+/** The receipt token a USDT0 supply mints. */
+const A_USDT0 = '0xF356ae412dB5df43BD3a10746f7ad4e1C4De4297';
 
 /** A scheduled buy: $100 of WOKB, paid in USDC. */
 const buy = (over: Partial<TradeIntent> = {}): TradeIntent => ({
@@ -200,28 +203,29 @@ describe('the legs around it', () => {
     await expect(settle(buy())).rejects.toThrow('WETH has no pool with liquidity');
   });
 
-  it('sends a direct leg to its own venue at its own floor, and asks no quote and no venue', async () => {
-    // Supplying $100 of idle USDC to Aave: the calldata is the whole trade, and the aToken is what the owner receives.
+  it('sends a direct leg to its own venue at its own floor, paying in its own in-token, and asks no quote and no venue', async () => {
+    // Supplying $100 of idle USDT0 to Aave on X Layer: the calldata is the whole trade, and the aToken is what the owner
+    // receives. The token `spend()` pulls is the intent's in-token — USDT0 — not the settlement token.
     const direct: NonNullable<TradeIntent['direct']> = {
       venue: AAVE_POOL,
       data: encodeFunctionData({
         abi: parseAbi(['function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)']),
         functionName: 'supply',
-        args: [USDC, 100_000_000n, OWNER, 0],
+        args: [USDT0, 100_000_000n, OWNER, 0],
       }),
       unitPriceUsd: 1,
-      tokenOut: A_USDC,
+      tokenOut: A_USDT0,
       minOut: 99_990_000n,
     };
     vi.mocked(okxConfigured).mockReturnValue(true);
 
-    const s = await settle(buy({ outSymbol: 'aUSDC', direct }));
+    const s = await settle(buy({ inSymbol: 'USDT0', outSymbol: 'aUSDT0', direct }));
 
     expect(s).toEqual({
-      payToken: { address: USDC, decimals: 6 },
+      payToken: { address: USDT0, decimals: 6 },
       swap: { to: AAVE_POOL, data: direct.data },
       venue: 'aave',
-      floor: { tokenOut: A_USDC, minOut: 99_990_000n },
+      floor: { tokenOut: A_USDT0, minOut: 99_990_000n },
     });
     expect(quote).not.toHaveBeenCalled();
     expect(buildSwap).not.toHaveBeenCalled();

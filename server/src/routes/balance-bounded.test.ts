@@ -17,7 +17,7 @@ const h = vi.hoisted(() => ({
   getJson: vi.fn(),
   staleValue: vi.fn(),
   poolHere: vi.fn(),
-  usdcReserve: vi.fn(),
+  reserveOf: vi.fn(),
 }));
 
 vi.mock('../db/index.js', () => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn(), pool: { query: vi.fn() } }));
@@ -47,7 +47,7 @@ vi.mock('../http/get.js', async (importOriginal) => ({
 vi.mock('../market/yield.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../market/yield.js')>()),
   aavePoolIsDeployedHere: h.poolHere,
-  usdcReserve: h.usdcReserve,
+  reserveOf: h.reserveOf,
 }));
 
 const { currentWallet } = await import('./wallet-context.js');
@@ -166,7 +166,7 @@ describe('GET /wallet/balance, bounded', () => {
     h.getJson.mockResolvedValue(PRICES);
     h.staleValue.mockReturnValue(undefined);
     h.poolHere.mockResolvedValue(true);
-    h.usdcReserve.mockImplementation(never);
+    h.reserveOf.mockImplementation(never);
 
     const r = await balance();
     expect(r.status).toBe(200);

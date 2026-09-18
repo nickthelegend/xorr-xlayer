@@ -3,7 +3,7 @@
  *
  * `SETTLEMENT_VENUES` is what the app asks the user to sign and what the safety screen shows: every contract the
  * delegation may call on this chain, and nothing without code behind it. On X Layer that is Uniswap v3's router and, where
- * mainnet state is, OKX DEX's router and the approval contract it pulls through (`spendVia`).
+ * mainnet state is, OKX DEX's router and the approval contract it pulls through (`spendVia`), and Aave v3's pool.
  *
  * And the chain it starts on: one it knows, and real money only by a deliberate decision.
  */
@@ -14,6 +14,8 @@ const UNISWAP_ROUTER = '0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca';
 /** OKX DEX's router on X Layer, and its approval contract. */
 const OKX_ROUTER = '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf';
 const OKX_SPENDER = '0x8b773d83bc66be128c60e07e17c8901f7a64f000';
+/** Aave v3's Pool on X Layer, which tier 4 supplies USDT0 to (PLAN.md P2.14). */
+const AAVE_POOL = '0xe3f3caefdd7180f884c01e57f65df979af84f116';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -23,11 +25,11 @@ afterEach(() => {
 const venues = async () => (await import('./chains.js')).SETTLEMENT_VENUES.map((v) => v.toLowerCase());
 
 describe('the venues a grant names', () => {
-  it("on mainnet's state, are the Uniswap router first, then OKX DEX's router and approval contract", async () => {
+  it("on mainnet's state, are the Uniswap router first, then OKX DEX's router and approval contract, then Aave's pool", async () => {
     vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
     vi.stubEnv('OKX_DEX_ROUTER', '');
     vi.stubEnv('OKX_APPROVE_SPENDER', '');
-    expect(await venues()).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER]);
+    expect(await venues()).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER, AAVE_POOL]);
   });
 
   it('on the testnet, which has no DEX, are none — never an address with no code there', async () => {
@@ -40,7 +42,7 @@ describe('the venues a grant names', () => {
     vi.stubEnv('OKX_DEX_ROUTER', 'not-an-address');
     vi.stubEnv('OKX_APPROVE_SPENDER', '0x1234');
     const list = await venues();
-    expect(list).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER]);
+    expect(list).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER, AAVE_POOL]);
     expect(list.some((v) => v === 'not-an-address')).toBe(false);
   });
 });
