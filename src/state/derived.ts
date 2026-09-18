@@ -18,15 +18,15 @@ import type { ChainStanding } from '@/wallet/delegationChain';
  * a "Trade Autonomously" switch that nothing signed, sent or read. See app/bot/[id]/settings.tsx.
  */
 export const RUN_FOR = ['1 Day', '3 Days', '7 Days', '30 Days'] as const;
-export const CAP_MIN = 200;
+export const CAP_MIN = 50;
 export const CAP_MAX = 5000;
-export const CAP_STEP = 200;
+export const CAP_STEP = 50;
 
 export function capLabel(cap: number): string {
   return `${money(cap, { fractionDigits: 0 })}/day`;
 }
 
-/** Marker position along the $200–$5,000 risk rail, as a 0–100 percentage. */
+/** Marker position along the $50–$5,000 risk rail, as a 0–100 percentage. */
 export function capMarkerPct(cap: number): number {
   return ((cap - CAP_MIN) / (CAP_MAX - CAP_MIN)) * 100;
 }

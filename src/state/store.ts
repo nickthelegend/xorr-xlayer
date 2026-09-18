@@ -227,8 +227,9 @@ export const useStore = create<Store>()(
   persist(
     (set, get, api) => ({
       // ── agent config — state.md defaults ──
-      runFor: 1,
-      cap: 1600,
+      // $100 a day for 7 days (`agentControls.runFor[2]`): the demo's limits (PLAN.md D19) and a small first permission.
+      runFor: 2,
+      cap: 100,
       stocksPaused: false,
       cycleRunFor: () => set((s) => ({ runFor: (s.runFor + 1) % 4 })),
       bumpCap: (dir) => set((s) => ({ cap: clamp(s.cap + dir * CAP_STEP, CAP_MIN, CAP_MAX) })),

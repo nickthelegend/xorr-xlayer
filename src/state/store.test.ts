@@ -51,7 +51,7 @@ describe('forgetAccount', () => {
     expect(after.killed).toBe(false);
     expect(after.hired).toEqual({});
     expect(after.riskQ).toBe(1);
-    expect(after.cap).toBe(1600);
+    expect(after.cap).toBe(100);
     expect(after.approved).toBe(false);
   });
 

@@ -14,8 +14,8 @@ describe('agent controls — screen 4', () => {
   it('capLabel and the marker position', () => {
     expect(d.capLabel(1600)).toBe('$1,600/day');
     // state.md: capMarker = (cap - 200) / 4800 * 100
-    expect(d.capMarkerPct(1600)).toBeCloseTo(29.1667, 3);
-    expect(d.capMarkerPct(200)).toBe(0);
+    expect(d.capMarkerPct(1600)).toBeCloseTo(((1600 - 50) / (5000 - 50)) * 100, 6);
+    expect(d.capMarkerPct(50)).toBe(0);
     expect(d.capMarkerPct(5000)).toBe(100);
   });
 

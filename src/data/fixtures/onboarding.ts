@@ -81,9 +81,9 @@ export const agentControls = {
     "High"
   ],
   "spendCap": {
-    "min": 200,
+    "min": 50,
     "max": 5000,
-    "step": 200,
-    "default": 1600
+    "step": 50,
+    "default": 100
   }
 } as const;
