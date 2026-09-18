@@ -10,7 +10,7 @@
  * fail: a lowercase `c` normalised away by something upstream.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 import { describe, expect, it } from 'vitest';
 

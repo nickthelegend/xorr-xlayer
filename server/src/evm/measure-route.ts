@@ -17,7 +17,7 @@ import { delegateAccount, publicClient } from './client.js';
 import { DELEGATION_ABI, DELEGATION_ADDRESS } from './delegation.js';
 
 /** Where 1inch's prices and the chain's pools can disagree: a fork of Base, not Base. */
-export const PRICES_DRIFT = CHAIN_KEY === 'base-fork' || CHAIN_KEY === 'localnet';
+export const PRICES_DRIFT = CHAIN_KEY === 'xlayer-fork' || CHAIN_KEY === 'localnet';
 
 export type RouteLeg = {
   owner: Address;

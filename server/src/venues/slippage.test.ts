@@ -7,7 +7,7 @@
  * price its own quote had already predicted.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 import { describe, expect, it } from 'vitest';
 

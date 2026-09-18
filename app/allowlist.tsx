@@ -32,7 +32,6 @@ import {
   space,
   typeScale,
 } from '@/ui';
-import { isSolana } from '@/chain';
 import { errorText } from '@/data/apiError';
 import {
   isValidAddress,
@@ -79,9 +78,7 @@ export default function Allowlist() {
       ? 'That address is already on the list.'
       : isValidAddress(trimmed)
         ? undefined
-        : isSolana
-          ? 'Not a valid address: Solana addresses are base58 public keys.'
-          : 'Not a valid address: it starts with 0x and has 42 characters.';
+        : 'Not a valid address: it starts with 0x and has 42 characters.';
 
   // The number is the executor's. Until it has answered, the sentence does without one rather than guess.
   const wait = coolingOffHours === undefined ? 'after a cooling-off period' : `${coolingOffHours} hours after you add it`;

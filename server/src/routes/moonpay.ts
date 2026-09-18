@@ -63,7 +63,7 @@ export function buildMoonPayUrl(params: {
 }
 
 const MoonPayUrlInput = z.object({
-  walletAddress: z.string().trim().refine((addr) => isValidAddress(addr, 'solana-fork') || isValidAddress(addr), {
+  walletAddress: z.string().trim().refine((addr) => isValidAddress(addr), {
     message: 'Must be a valid Solana base58 or EVM address',
   }),
   currencyCode: z.string().optional().default('usdc_sol'),

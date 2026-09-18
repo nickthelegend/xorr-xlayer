@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { oneinchApi } from '../venues/oneinch.js';
-import { QUOTE_ADDRESSES } from './chains.js';
+import { QUOTE_ADDRESSES, ONEINCH_ROUTER } from './chains.js';
 import { routerAllowance } from './allowances.js';
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
@@ -17,11 +17,11 @@ const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
 describe("1inch's Approve API on Base", () => {
   it('names the router the executor routes through as the spender', async () => {
     const r = await oneinchApi<{ address: string }>('/swap/v6.0/8453/approve/spender');
-    expect(r.address.toLowerCase()).toBe(QUOTE_ADDRESSES.oneInchRouter.toLowerCase());
+    expect(r.address.toLowerCase()).toBe(ONEINCH_ROUTER.toLowerCase());
   }, 30_000);
 
   it("reads a wallet's allowance to it as an exact amount", async () => {
-    const allowance = await routerAllowance(QUOTE_ADDRESSES.usdcBase, OWNER, '1inch', QUOTE_ADDRESSES.oneInchRouter);
+    const allowance = await routerAllowance(QUOTE_ADDRESSES.usdc, OWNER, '1inch', ONEINCH_ROUTER);
     expect(typeof allowance).toBe('bigint');
     expect(allowance! >= 0n).toBe(true);
   }, 30_000);

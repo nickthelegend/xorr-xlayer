@@ -55,7 +55,7 @@ export type ReadOptions = {
 /** Spendable USDC, in dollars. */
 export async function cashUsd(owner: Address): Promise<number> {
   const raw = await publicClient.readContract({
-    address: ADDRESSES.usdcBase,
+    address: ADDRESSES.usdc,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [owner],

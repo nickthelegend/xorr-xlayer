@@ -43,10 +43,10 @@ import {
   type Hex,
 } from 'viem';
 import { publicClient } from '../evm/client.js';
-import { ADDRESSES } from '../evm/chains.js';
+import { ADDRESSES, ONEINCH_ROUTER } from '../evm/chains.js';
 
 /** The AggregationRouterV6, which carries Limit Order Protocol v4. It is already on every grant's venue list. */
-export const LOP_ROUTER: Address = ADDRESSES.oneInchRouter;
+export const LOP_ROUTER: Address = ONEINCH_ROUTER;
 
 /** The router's EIP-712 domain, exactly as its `eip712Domain()` answers on Base. */
 export function limitOrderDomain(chainId: number) {

@@ -25,7 +25,7 @@ const OWNER_EMAIL = process.env.E2E_PRIVY_EMAIL ?? 'test-8958@privy.io';
 const SIZES = [400, 150, 50, 20];
 
 const health = (await (await fetch(`${BASE}/health`)).json().catch(() => ({}))) as { chain?: string };
-const FORK = health.chain === 'base-fork';
+const FORK = health.chain === 'xlayer-fork';
 
 let token = '';
 async function call(method: string, path: string, body?: unknown) {

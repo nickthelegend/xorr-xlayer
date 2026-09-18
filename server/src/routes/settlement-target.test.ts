@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 // the registry is pulled in dynamically, after the environment it checks for exists. Same shape
 // as symbols.test.ts, for the same reason.
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 const { SETTLEMENT_SYMBOL, TOKENS, canonicalSymbol } = await import('../venues/oneinch.js');
 
 /**

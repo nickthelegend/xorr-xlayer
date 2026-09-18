@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 vi.mock('../db/index.js', () => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn(), pool: { query: vi.fn() } }));
 vi.mock('../evm/client.js', () => ({

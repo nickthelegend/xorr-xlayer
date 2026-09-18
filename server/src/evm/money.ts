@@ -1,7 +1,7 @@
 /**
  * What money on each chain is: the one fact every guard that must never hand out real value reads.
  *
- * Those guards compared chain keys. The mainnet guard and the faucet named `base`, and the gas drip Base's own state, so a
+ * Those guards compared chain keys. The mainnet guard and the faucet named one chain key, and the gas drip one chain's own state, so a
  * mainnet added under any other key would have started without ALLOW_MAINNET and, with a faucet key set, been sent real
  * ETH from it. A chain says what its money is here, where it is added, and a key this list does not have is real: nothing
  * is handed out on a guess.
@@ -15,10 +15,10 @@
 export type Money = 'real' | 'test' | 'copy';
 
 const FACTS = {
-  base: { money: 'real', name: 'Base mainnet' },
-  'base-sepolia': { money: 'test', name: 'Base Sepolia' },
-  'base-fork': { money: 'copy', name: 'a fork of Base mainnet' },
-  localnet: { money: 'copy', name: 'a local fork of Base Sepolia' },
+  xlayer: { money: 'real', name: 'X Layer mainnet' },
+  'xlayer-testnet': { money: 'test', name: 'X Layer testnet' },
+  'xlayer-fork': { money: 'copy', name: 'a fork of X Layer mainnet' },
+  localnet: { money: 'copy', name: 'a local copy of X Layer testnet' },
 } as const satisfies Record<string, { money: Money; name: string }>;
 
 /** Every chain this executor knows. */

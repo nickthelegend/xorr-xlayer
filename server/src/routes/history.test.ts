@@ -11,7 +11,7 @@ import { getAddress, keccak256, toEventSelector, toHex } from 'viem';
 import type { WalletRow } from './wallet-context.js';
 
 const h = vi.hoisted(() => ({
-  chain: 'base-fork',
+  chain: 'xlayer-fork',
   delegation: '0x6c5528Fd8E74a047A85bAb413856A9239E73540e',
   getBlockNumber: vi.fn(),
   getLogs: vi.fn(),
@@ -26,14 +26,14 @@ vi.mock('../evm/chains.js', () => ({
   get CHAIN_KEY() {
     return h.chain;
   },
-  get IS_BASE_MAINNET_STATE() {
-    return h.chain === 'base' || h.chain === 'base-fork';
+  get IS_MAINNET_STATE() {
+    return h.chain === 'xlayer' || h.chain === 'xlayer-fork';
   },
   AAVE_V3_POOL: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
   // This chain's settlement USDC is Base Sepolia's: Circle's other deployment, absent from the all-mainnet registry.
   ADDRESSES: {
     oneInchRouter: '0x111111125421cA6dc452d289314280a0f8842A65',
-    usdcBase: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
   },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
@@ -164,7 +164,7 @@ async function get(path = '/history'): Promise<{ status: number; body: Body }> {
 }
 
 beforeEach(() => {
-  h.chain = 'base-fork';
+  h.chain = 'xlayer-fork';
   h.delegation = '0x6c5528Fd8E74a047A85bAb413856A9239E73540e';
   h.getBlockNumber.mockReset().mockResolvedValue(HEAD);
   h.getLogs.mockReset();
@@ -205,7 +205,7 @@ describe('what it reads', () => {
     // An empty history says which window it is empty in, and since when.
     expect(body).toEqual({
       owner: OWNER,
-      chain: 'base-fork',
+      chain: 'xlayer-fork',
       source: 'chain',
       window: { fromBlock: Number(HEAD - 9_000n), toBlock: Number(HEAD), since: iso(HEAD - 9_000n) },
       unavailable: null,
@@ -465,7 +465,7 @@ const movement = (token: string, from: string, to: string, amount: string) => ({
 
 describe('on Base mainnet', () => {
   beforeEach(() => {
-    h.chain = 'base';
+    h.chain = 'xlayer';
   });
 
   it("adds 1inch's history beside the chain's: its own rows, no second copy of a settlement, nothing that did not go through", async () => {

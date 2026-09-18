@@ -27,7 +27,7 @@ export type NamedTargets = {
  * database must both be named on purpose.
  */
 export async function assertBaseFork(env: NamedTargets, rpc: (method: string) => Promise<unknown>): Promise<void> {
-  if (env.XORR_CHAIN !== 'base-fork') {
+  if (env.XORR_CHAIN !== 'xlayer-fork') {
     throw new Error(
       `XORR_CHAIN=${env.XORR_CHAIN ?? '(unset)'}: this reconciles a base-fork executor only, and refuses every other chain.`,
     );

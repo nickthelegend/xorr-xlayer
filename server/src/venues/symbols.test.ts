@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 // The venue module refuses to load unconfigured, and ESM hoists imports above assignments — so
 // the registry is pulled in dynamically, after the environment it checks for exists.
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 const { canonicalSymbol, TOKENS } = await import('./oneinch.js');
 
 describe('a symbol resolves to the registry spelling, whatever the caller sent', () => {

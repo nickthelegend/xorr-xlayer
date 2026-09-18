@@ -11,7 +11,7 @@
  * **The last event for a hash decides.** A book can be shipped, docked and shipped again.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 process.env.SWAPVM_BOOK_ADDRESS ??= '0x6cc8379b893d0239392720368f901b56c0f51e53';
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';

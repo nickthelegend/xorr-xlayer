@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import { decodeFunctionData, getAddress, maxUint256, parseAbi } from 'viem';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 vi.mock('../http/get.js', () => ({
   getJson: vi.fn(),

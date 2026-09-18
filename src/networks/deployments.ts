@@ -17,7 +17,7 @@ export type Deployment = {
   key: string;
   /** How the network is named to a person. */
   name: string;
-  /** What the chain answers `eth_chainId` with. A fork of Base answers Base's own id. */
+  /** What the chain answers `eth_chainId` with. A fork of X Layer answers X Layer's own id, 196. */
   chainId: number;
   /** The executor that serves it. */
   api: string;
@@ -27,24 +27,11 @@ export type Deployment = {
   test: boolean;
 };
 
-export const DEPLOYMENTS: readonly Deployment[] = [
-  {
-    key: 'base-fork',
-    name: 'Base fork',
-    chainId: 8453,
-    api: 'https://executor-fork-production.up.railway.app',
-    explorer: null,
-    test: true,
-  },
-  {
-    key: 'base-sepolia',
-    name: 'Base Sepolia',
-    chainId: 84532,
-    api: 'https://api.xorr.finance',
-    explorer: 'https://sepolia.basescan.org',
-    test: true,
-  },
-];
+/**
+ * None yet (2026-09-18): the X Layer executors — testnet (1952) and a fork of mainnet (196) — are added here as each is
+ * deployed, with the address it actually answers at. The Base rows this list carried named another product's servers.
+ */
+export const DEPLOYMENTS: readonly Deployment[] = [];
 
 const bare = (url: string) => url.replace(/\/+$/, '');
 

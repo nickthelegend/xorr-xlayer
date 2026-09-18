@@ -55,7 +55,7 @@ if (!RPC) throw new Error('FORK_RPC is required: the anvil fork to prove on');
 if (!API || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(API)) {
   throw new Error('API_URL is required, and must be an executor on this machine: this proof writes to its database');
 }
-if (process.env.XORR_CHAIN !== 'base-fork') {
+if (process.env.XORR_CHAIN !== 'xlayer-fork') {
   throw new Error('XORR_CHAIN=base-fork is required, so the executor modules read the fork');
 }
 
@@ -86,8 +86,8 @@ if (/^0x0{40}$/.test(DELEGATION_ADDRESS)) throw new Error('DELEGATION_ADDRESS is
 
 const chain = { ...base, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
 const pub = createPublicClient({ chain, transport: http(RPC), cacheTime: 0 });
-const USDC = ADDRESSES.usdcBase as Address;
-const WETH = ADDRESSES.wethBase as Address;
+const USDC = ADDRESSES.usdc as Address;
+const WETH = ADDRESSES.weth as Address;
 const POOL = AAVE_V3_POOL as Address;
 /** Aave v3's aUSDC reserve: a real holder of real USDC, impersonated to fund the owner on the fork. */
 const WHALE: Address = '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB';
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
   await rpc('anvil_stopImpersonatingAccount', [WHALE]);
   console.log(`  owner ${owner} · funded 1000 USDC in ${fundTx}`);
 
-  const bound = await bindWallet({ id: randomUUID(), userId: userId!, address: owner, kind: 'embedded', cluster: 'base-fork' });
+  const bound = await bindWallet({ id: randomUUID(), userId: userId!, address: owner, kind: 'embedded', cluster: 'xlayer-fork' });
   need('registered as the Privy test account’s wallet', bound.status === 'bound');
   const walletId = bound.status === 'bound' ? bound.row.id : '';
   const me = await executor('/wallet');

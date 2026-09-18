@@ -226,7 +226,7 @@ panic.post('/panic/flatten', async (c) => {
         amount: h.raw,
         data: swap.data,
         // The proceeds are the owner's cash, at no less than the router's own floor (PLAN.md 1.4).
-        tokenOut: ADDRESSES.usdcBase,
+        tokenOut: ADDRESSES.usdc,
         minOut: swap.minOut,
       });
 
@@ -461,7 +461,7 @@ export async function closeHolding(params: {
       venue: swap.to as Address,
       amount: raw,
       data: swap.data,
-      tokenOut: ADDRESSES.usdcBase,
+      tokenOut: ADDRESSES.usdc,
       minOut: swap.minOut,
     });
 

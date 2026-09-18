@@ -62,7 +62,7 @@ async function load(chain: ChainKey) {
   vi.stubEnv('ONEINCH_API_KEY', 'test-key');
   vi.stubEnv('XORR_CHAIN', chain);
   // `chains.ts` refuses real Base without a deliberate opt-in.
-  vi.stubEnv('ALLOW_MAINNET', chain === 'base' ? 'yes' : '');
+  vi.stubEnv('ALLOW_MAINNET', chain === 'xlayer' ? 'yes' : '');
   return import('./oneinch.js');
 }
 
@@ -106,7 +106,7 @@ afterEach(() => {
 
 describe('what a quote asks 1inch', () => {
   it('names both tokens by address, sends the amount in base units, and asks for the route and its gas', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('40000000000000000'));
 
     await quote({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, skipPriceImpact: true });
@@ -121,7 +121,7 @@ describe('what a quote asks 1inch', () => {
   });
 
   it('scales the amount by the decimals of the token being spent', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('2500000000'));
     const cases = [
       { inSymbol: 'WETH', amount: 1.5, src: WETH, raw: '1500000000000000000' },
@@ -139,7 +139,7 @@ describe('what a quote asks 1inch', () => {
   });
 
   it("resolves the caller's casing at the boundary and reports the registry spelling", async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('138504155'));
 
     const q = await quote({ inSymbol: 'usdc', outSymbol: 'NVDAC', amount: 250, skipPriceImpact: true });
@@ -154,7 +154,7 @@ describe('what a quote asks 1inch', () => {
   });
 
   it('refuses a symbol with no registry entry before asking anything', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     await expect(quote({ inSymbol: 'USDC', outSymbol: 'DOGE', amount: 1 })).rejects.toThrow('No route for USDC -> DOGE');
     expect(h.getJson).not.toHaveBeenCalled();
   });
@@ -162,7 +162,7 @@ describe('what a quote asks 1inch', () => {
 
 describe('what a quote returns', () => {
   it("reads dstAmount in the output token's decimals and shows the floor at the default 0.3%", async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('39600000000000000'));
 
     expect(await quote({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, skipPriceImpact: true })).toEqual({
@@ -180,7 +180,7 @@ describe('what a quote returns', () => {
   });
 
   it('applies the slippage the caller passes to the floor it shows', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('2480000000'));
 
     const q = await quote({ inSymbol: 'WETH', outSymbol: 'USDC', amount: 1, slippagePct: 1, skipPriceImpact: true });
@@ -191,7 +191,7 @@ describe('what a quote returns', () => {
   });
 
   it('names a single venue, calls an empty route "Direct", and leaves a missing or zero gas estimate undefined', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson
       .mockResolvedValueOnce({
         dstAmount: '40000000000000000',
@@ -213,7 +213,7 @@ describe('what a quote returns', () => {
 
 describe('price impact on a quote', () => {
   it('is measured against the price feed mid for both legs, under a four-second deadline', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('39600000000000000'));
     h.priceOf.mockImplementation(async (symbol: string) => MID[symbol]);
 
@@ -228,7 +228,7 @@ describe('price impact on a quote', () => {
   });
 
   it('is zero, not negative, when the route beats the mid', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('40400000000000000'));
     h.priceOf.mockImplementation(async (symbol: string) => MID[symbol]);
 
@@ -236,7 +236,7 @@ describe('price impact on a quote', () => {
   });
 
   it('is null — not zero — when either leg has no usable price', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('39600000000000000'));
 
     h.priceOf.mockImplementation(async (symbol: string) => {
@@ -250,7 +250,7 @@ describe('price impact on a quote', () => {
   });
 
   it('is not measured when the caller is establishing the price itself', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('39600000000000000'));
     h.priceOf.mockImplementation(async (symbol: string) => MID[symbol]);
 
@@ -259,7 +259,7 @@ describe('price impact on a quote', () => {
   });
 
   it('is not measured when the route delivers nothing', async () => {
-    const { quote } = await load('base');
+    const { quote } = await load('xlayer');
     h.getJson.mockResolvedValue(quoteResponse('0'));
     h.priceOf.mockImplementation(async (symbol: string) => MID[symbol]);
 
@@ -273,7 +273,7 @@ describe('price impact on a quote', () => {
 
 describe('the AMM-only restriction', () => {
   it('restricts a fork quote to one unsplit route through the named AMMs', async () => {
-    const { quote } = await load('base-fork');
+    const { quote } = await load('xlayer-fork');
     h.getJson.mockResolvedValue(quoteResponse('40000000000000000'));
 
     await quote({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, skipPriceImpact: true });
@@ -286,7 +286,7 @@ describe('the AMM-only restriction', () => {
   });
 
   it('restricts a fork fill exactly as its quote, so the price shown is the price attempted', async () => {
-    const { buildSwap } = await load('base-fork');
+    const { buildSwap } = await load('xlayer-fork');
     h.getJson.mockResolvedValue(swapResponse('40000000000000000'));
 
     await buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, ...PARTIES });
@@ -302,7 +302,7 @@ describe('the AMM-only restriction', () => {
   });
 
   it('asks real Base for the unrestricted route, on the quote and on the fill', async () => {
-    const { quote, buildSwap } = await load('base');
+    const { quote, buildSwap } = await load('xlayer');
     h.getJson
       .mockResolvedValueOnce(quoteResponse('40000000000000000'))
       .mockResolvedValueOnce(swapResponse('40000000000000000'));
@@ -322,7 +322,7 @@ describe('the AMM-only restriction', () => {
   it('restricts quotes on the local Sepolia fork too, and not on Base Sepolia', async () => {
     for (const [chain, restricted] of [
       ['localnet', true],
-      ['base-sepolia', false],
+      ['xlayer-testnet', false],
     ] as const) {
       const { quote } = await load(chain);
       h.getJson.mockReset().mockResolvedValue(quoteResponse('40000000000000000'));
@@ -339,14 +339,14 @@ describe('the API key', () => {
   it('is required to load the client at all — there is no offline fallback to route through', async () => {
     vi.resetModules();
     vi.stubEnv('ONEINCH_API_KEY', '');
-    vi.stubEnv('XORR_CHAIN', 'base-fork');
+    vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
     await expect(import('./oneinch.js')).rejects.toThrow('ONEINCH_API_KEY is required');
   });
 });
 
 describe('what a fill asks 1inch', () => {
   it('is sent from the delegation, delivered to the owner, at the slippage it was given, with the key', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     h.getJson.mockResolvedValue(swapResponse('40000000000000000'));
 
     await buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, slippagePct: 1.2, ...PARTIES });
@@ -362,7 +362,7 @@ describe('what a fill asks 1inch', () => {
   });
 
   it('sends amountRaw verbatim instead of rescaling the float', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     h.getJson.mockResolvedValue(swapResponse('308641975'));
     // A whole-position close: the chain's own wei figure, which the float cannot represent.
     const amount = 0.123456789012345678;
@@ -375,7 +375,7 @@ describe('what a fill asks 1inch', () => {
   });
 
   it("resolves an equity's casing at the boundary and scales by its eight decimals", async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     h.getJson.mockResolvedValue(swapResponse('90250000'));
 
     await buildSwap({ inSymbol: 'nvdac', outSymbol: 'usdc', amount: 0.5, ...PARTIES });
@@ -386,7 +386,7 @@ describe('what a fill asks 1inch', () => {
   });
 
   it('refuses a symbol with no registry entry before asking anything', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     await expect(buildSwap({ inSymbol: 'USDC', outSymbol: 'DOGE', amount: 1, ...PARTIES })).rejects.toThrow(
       'No route for USDC -> DOGE',
     );
@@ -396,7 +396,7 @@ describe('what a fill asks 1inch', () => {
 
 describe('what a fill returns', () => {
   it('is the router call, with a floor of dstAmount less the slippage in raw output units', async () => {
-    const { buildSwap } = await load('base-fork');
+    const { buildSwap } = await load('xlayer-fork');
     h.getJson.mockResolvedValue(swapResponse('40000000000000000'));
 
     const tx = await buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, ...PARTIES });
@@ -406,7 +406,7 @@ describe('what a fill returns', () => {
   });
 
   it('on a fork, asks the router for the widest slippage 1inch accepts and still holds the floor to the tolerance given (PLAN.md X77)', async () => {
-    const { buildSwap, FORK_ROUTER_SLIPPAGE_PCT } = await load('base-fork');
+    const { buildSwap, FORK_ROUTER_SLIPPAGE_PCT } = await load('xlayer-fork');
     h.getJson.mockResolvedValue(swapResponse('40000000000000000'));
 
     const tx = await buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, slippagePct: 1.2, ...PARTIES });
@@ -418,7 +418,7 @@ describe('what a fill returns', () => {
   });
 
   it('lowers the floor by exactly the wider tolerance it was given', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     h.getJson.mockResolvedValue(swapResponse('40000000000000000'));
 
     const tx = await buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, slippagePct: 1.2, ...PARTIES });
@@ -427,7 +427,7 @@ describe('what a fill returns', () => {
   });
 
   it('rounds the floor down to a whole raw unit', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     h.getJson.mockResolvedValue(swapResponse('2481234567'));
 
     const tx = await buildSwap({ inSymbol: 'WETH', outSymbol: 'USDC', amount: 1, ...PARTIES });
@@ -437,7 +437,7 @@ describe('what a fill returns', () => {
   });
 
   it('refuses an answer with no usable dstAmount, before anything is signed', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     for (const dstAmount of [undefined, '', '4e16', '-1', '0x8e1bc9bf040000']) {
       h.getJson.mockResolvedValueOnce(swapResponse(dstAmount));
       await expect(
@@ -448,7 +448,7 @@ describe('what a fill returns', () => {
   });
 
   it('refuses a route that delivers nothing once the slippage is taken', async () => {
-    const { buildSwap } = await load('base');
+    const { buildSwap } = await load('xlayer');
     for (const dstAmount of ['0', '1']) {
       h.getJson.mockResolvedValueOnce(swapResponse(dstAmount));
       await expect(
@@ -461,7 +461,7 @@ describe('what a fill returns', () => {
 
 describe('a chain where nothing settles', () => {
   it('refuses a fill on Base Sepolia before any request is made, and says what would work', async () => {
-    const { buildSwap, CAN_SETTLE } = await load('base-sepolia');
+    const { buildSwap, CAN_SETTLE } = await load('xlayer-testnet');
     expect(CAN_SETTLE).toBe(false);
 
     await expect(buildSwap({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100, ...PARTIES })).rejects.toThrow(
@@ -481,14 +481,14 @@ describe('a chain where nothing settles', () => {
 
   it('settles only on Base and its mainnet fork', async () => {
     const settles: Record<string, boolean> = {};
-    for (const chain of ['localnet', 'base-sepolia', 'base-fork', 'base'] as const) {
+    for (const chain of ['localnet', 'xlayer-testnet', 'xlayer-fork', 'xlayer'] as const) {
       settles[chain] = (await load(chain)).CAN_SETTLE;
     }
-    expect(settles).toEqual({ localnet: false, 'base-sepolia': false, 'base-fork': true, base: true });
+    expect(settles).toEqual({ localnet: false, 'xlayer-testnet': false, 'xlayer-fork': true, base: true });
   });
 
   it('still quotes against Base mainnet tokens there — prices are real even where settlement is not', async () => {
-    const { quote, TOKENS } = await load('base-sepolia');
+    const { quote, TOKENS } = await load('xlayer-testnet');
     h.getJson.mockResolvedValue(quoteResponse('40000000000000000'));
 
     // Mainnet USDC, not Circle's Sepolia deployment: 1inch is only ever asked about chain 8453.
@@ -502,7 +502,7 @@ describe('a chain where nothing settles', () => {
 
 describe('the pure helpers', () => {
   it('canonicalSymbol resolves casing and whitespace to the registry spelling, and leaves the unknown alone', async () => {
-    const { canonicalSymbol } = await load('base');
+    const { canonicalSymbol } = await load('xlayer');
     expect(canonicalSymbol(' cbbtc ')).toBe('CBBTC');
     expect(canonicalSymbol('msftC')).toBe('MSFTc');
     expect(canonicalSymbol('Eth')).toBe('ETH');
@@ -511,7 +511,7 @@ describe('the pure helpers', () => {
   });
 
   it('TOKENS carries each venue token with the decimals its amounts are scaled by', async () => {
-    const { TOKENS, SETTLEMENT_SYMBOL } = await load('base');
+    const { TOKENS, SETTLEMENT_SYMBOL } = await load('xlayer');
     expect(TOKENS.ETH).toEqual({ address: ETH, decimals: 18 });
     expect(TOKENS.WETH).toEqual({ address: WETH, decimals: 18 });
     expect(TOKENS.USDC).toEqual({ address: USDC, decimals: 6 });
@@ -521,7 +521,7 @@ describe('the pure helpers', () => {
   });
 
   it('venuesFrom flattens routes, hops and parts into distinct readable names', async () => {
-    const { venuesFrom } = await load('base');
+    const { venuesFrom } = await load('xlayer');
     expect(
       venuesFrom([
         [[{ name: 'BASE_UNISWAP_V3' }, { name: 'BASE_AERODROME_SLIPSTREAM' }], [{ name: 'BASE_CURVE' }]],
@@ -533,7 +533,7 @@ describe('the pure helpers', () => {
   });
 
   it('prettyVenue drops the chain prefix and keeps version tags upper-case', async () => {
-    const { prettyVenue } = await load('base');
+    const { prettyVenue } = await load('xlayer');
     expect(prettyVenue('BASE_UNISWAP_V4')).toBe('Uniswap V4');
     expect(prettyVenue('BASE_PANCAKESWAP_V3')).toBe('Pancakeswap V3');
     expect(prettyVenue('BASE_BALANCER_V2')).toBe('Balancer V2');
@@ -541,14 +541,14 @@ describe('the pure helpers', () => {
   });
 
   it('routeLabel names one venue, counts several, and calls none "Direct"', async () => {
-    const { routeLabel } = await load('base');
+    const { routeLabel } = await load('xlayer');
     expect(routeLabel([])).toBe('Direct');
     expect(routeLabel(['Curve'])).toBe('Curve');
     expect(routeLabel(['Uniswap V3', 'Curve', 'Balancer V2'])).toBe('Best of 3 venues');
   });
 
   it('slippageFor settles binary noise before rounding up, and stops at 3%', async () => {
-    const { slippageFor, SLIPPAGE, DEFAULT_SLIPPAGE_PCT } = await load('base');
+    const { slippageFor, SLIPPAGE, DEFAULT_SLIPPAGE_PCT } = await load('xlayer');
     expect(SLIPPAGE).toEqual({ scheduled: 0.3, stop: 1, panic: 2 });
     expect(DEFAULT_SLIPPAGE_PCT).toBe(SLIPPAGE.scheduled);
 

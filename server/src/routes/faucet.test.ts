@@ -15,7 +15,7 @@ import { encodeAbiParameters, encodeEventTopics, erc20Abi, parseEther, parseUnit
 import { privateKeyToAccount } from 'viem/accounts';
 
 const h = vi.hoisted(() => ({
-  chainKey: 'base-fork',
+  chainKey: 'xlayer-fork',
   locked: true,
   statements: [] as { text: string; params: unknown[] }[],
   walletClients: [] as { account: unknown }[],
@@ -52,10 +52,10 @@ vi.mock('../evm/chains.js', () => ({
   get CHAIN_KEY() {
     return h.chainKey;
   },
-  get IS_BASE_MAINNET_STATE() {
-    return h.chainKey === 'base' || h.chainKey === 'base-fork';
+  get IS_MAINNET_STATE() {
+    return h.chainKey === 'xlayer' || h.chainKey === 'xlayer-fork';
   },
-  ADDRESSES: { usdcBase: h.USDC },
+  ADDRESSES: { usdc: h.USDC },
   chain: { id: 8453 },
   rpcUrl: 'http://127.0.0.1:1',
   explorerTx: (hash: string) => `fork:${hash}`,
@@ -141,7 +141,7 @@ function receiptsFrom(from: string) {
 
 /** A fork node: anvil, USDC deployed, the holder funded, and these successive reads of the wallet's balances. */
 function fork(opts: { node?: string; holderUsdc?: bigint; holderEth?: bigint; walletUsdc?: bigint[]; walletEth?: bigint[] } = {}) {
-  h.chainKey = 'base-fork';
+  h.chainKey = 'xlayer-fork';
   h.anvil.mockImplementation(async (_rpc: string, method: string) =>
     method === 'web3_clientVersion' ? (opts.node ?? 'anvil/v1.7.1') : null,
   );
@@ -162,7 +162,7 @@ function fork(opts: { node?: string; holderUsdc?: bigint; holderEth?: bigint; wa
 
 /** Base Sepolia, with a faucet key holding `usdc` and `eth`. */
 function sepolia(usdc: bigint, eth = parseEther('0.018')) {
-  h.chainKey = 'base-sepolia';
+  h.chainKey = 'xlayer-testnet';
   process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
   h.readContract.mockImplementation(async ({ args }: { args: [string] }) => (args[0] === FAUCET ? usdc : 0n));
   h.getBalance.mockResolvedValue(eth);
@@ -179,7 +179,7 @@ beforeEach(() => {
   }
   vi.mocked(one).mockReset();
   vi.mocked(one).mockResolvedValue(undefined);
-  h.chainKey = 'base-fork';
+  h.chainKey = 'xlayer-fork';
   h.locked = true;
   h.statements.length = 0;
   h.walletClients.length = 0;
@@ -202,7 +202,7 @@ describe('POST /faucet on a fork of Base', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       status: 'sent',
-      chain: 'base-fork',
+      chain: 'xlayer-fork',
       source: 'fork-holder',
       from: h.HOLDER,
       to: WALLET,
@@ -437,7 +437,7 @@ describe('POST /faucet on Base Sepolia and Base', () => {
   });
 
   it('says so when the deployment has no faucet key, without reading the chain', async () => {
-    h.chainKey = 'base-sepolia';
+    h.chainKey = 'xlayer-testnet';
     expect(await (await post()).json()).toMatchObject({ status: 'blocked', reason: 'no_faucet_key' });
     expect(h.readContract).not.toHaveBeenCalled();
   });
@@ -475,7 +475,7 @@ describe('POST /faucet on Base Sepolia and Base', () => {
   });
 
   it('refuses on Base mainnet before reading the chain or the database', async () => {
-    h.chainKey = 'base';
+    h.chainKey = 'xlayer';
 
     const res = await post();
 
@@ -509,7 +509,7 @@ describe('GET /faucet', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      chain: 'base-fork',
+      chain: 'xlayer-fork',
       available: true,
       reason: null,
       detail: expect.stringMatching(/^1,000 USDC moved from Aave’s USDC reserve on this fork of Base/),
@@ -541,7 +541,7 @@ describe('GET /faucet', () => {
   });
 
   it('on Base mainnet, reads nothing on chain', async () => {
-    h.chainKey = 'base';
+    h.chainKey = 'xlayer';
     expect(await (await get()).json()).toMatchObject({ available: false, reason: 'real_money', wallet: { canAsk: false } });
     expect(h.readContract).not.toHaveBeenCalled();
     expect(h.anvil).not.toHaveBeenCalled();
@@ -570,7 +570,7 @@ describe('GET /wallet/funds', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       owner: WALLET,
-      chain: 'base-fork',
+      chain: 'xlayer-fork',
       usdc: { address: h.USDC, raw: '1000000000', amount: 1000 },
       eth: { raw: '50000000000000000', amount: 0.05 },
     });

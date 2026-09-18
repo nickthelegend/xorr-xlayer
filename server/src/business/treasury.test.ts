@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeFunctionData, erc20Abi, getAddress, maxUint256, parseUnits, type Abi, type Hex } from 'viem';
 
 const h = vi.hoisted(() => ({
-  chainKey: 'base-fork',
+  chainKey: 'xlayer-fork',
   locked: true,
   statements: [] as { text: string; params: unknown[] }[],
   DELEGATION: '0xc32dD8AeED3035D46C7c82A351fC5522c9D463f4',
@@ -53,7 +53,7 @@ vi.mock('../evm/chains.js', () => ({
   get CHAIN_KEY() {
     return h.chainKey;
   },
-  ADDRESSES: { usdcBase: h.USDC },
+  ADDRESSES: { usdc: h.USDC },
   APPROVABLE_TOKENS: [
     { symbol: 'USDC', address: h.USDC },
     { symbol: 'WETH', address: h.WETH },
@@ -160,7 +160,7 @@ const signedFor = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.chainKey = 'base-fork';
+  h.chainKey = 'xlayer-fork';
   h.locked = true;
   h.statements.length = 0;
   vi.mocked(one).mockResolvedValue(row as never);
@@ -210,7 +210,7 @@ describe('creating a treasury', () => {
     expect(out.status, JSON.stringify(out.body)).toBe(200);
     const wallet = h.statements.find((s) => s.text.includes('INSERT INTO wallets'))!;
     expect(wallet.text).toContain("'treasury'");
-    expect(wallet.params).toEqual([expect.any(String), `treasury:${OPERATOR}`, TREASURY, 'base-fork']);
+    expect(wallet.params).toEqual([expect.any(String), `treasury:${OPERATOR}`, TREASURY, 'xlayer-fork']);
     const treasury = h.statements.find((s) => s.text.includes('INSERT INTO business_treasuries'))!;
     expect(treasury.params).toEqual([expect.any(String), OPERATOR, wallet.params[0], 'privy-w', 'Acme']);
     expect(append).toHaveBeenCalledWith(
@@ -243,7 +243,7 @@ describe('creating a treasury', () => {
   });
 
   it('refuses where money is real, before Privy is asked anything', async () => {
-    h.chainKey = 'base';
+    h.chainKey = 'xlayer';
 
     const out = await T.createTreasury(OPERATOR, 'Acme');
 

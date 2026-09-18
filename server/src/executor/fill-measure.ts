@@ -75,7 +75,7 @@ export async function estimateOutUnits(
  */
 export async function usdcRawOf(owner: Address): Promise<bigint | undefined> {
   return publicClient
-    .readContract({ address: ADDRESSES.usdcBase, abi: erc20Abi, functionName: 'balanceOf', args: [owner] })
+    .readContract({ address: ADDRESSES.usdc, abi: erc20Abi, functionName: 'balanceOf', args: [owner] })
     .catch(() => undefined);
 }
 

@@ -1,21 +1,24 @@
 /**
- * Chain configuration.
+ * Chain configuration — X Layer (2026-09-18).
  *
- * Base is the target: 1inch routes there, and the same deployment is what goes to Base Build Camp.
- * `localnet` is an anvil fork of Base Sepolia — a real EVM running real contracts, so enforcement
- * is genuinely proven without waiting on a faucet.
+ * X Layer is OKX's EVM chain (OP Stack since 2025-10), gas paid in OKB. The executor runs on one of:
  *
- * `base-fork` is an anvil fork of Base MAINNET. It is the only environment where the whole thesis
- * can actually run end to end: the real 1inch router, real USDC, real Aave, and the real Ondo
- * tokenized equities all exist there with real liquidity, and none of them exist on Sepolia. Fills
- * are genuine EVM execution against genuine pool state — the only thing that is not real is that
- * the chain is a local copy.
+ *   xlayer          — mainnet, chain 196. Real money; starting on it needs ALLOW_MAINNET=yes.
+ *   xlayer-testnet  — the public testnet, chain 1952. Contracts and wallet flows are proven here; nothing trades, because
+ *                     no DEX routes on it.
+ *   xlayer-fork     — an anvil fork of MAINNET (`anvil --fork-url https://rpc.xlayer.tech`). The only environment where the
+ *                     whole thesis runs end to end with no real money: Circle's USDC, the wrapped xStocks and the Uniswap
+ *                     v3 pools they trade in all exist there with their real state, and a fill is genuine EVM execution
+ *                     against genuine pool state. Only the chain is a local copy.
+ *   localnet        — an anvil copy of the testnet on this machine.
+ *
+ * Every address below was read on chain against X Layer's own RPC and matched to its issuer's documents (Circle for USDC,
+ * OKX's token list, Uniswap's deployments page, Backed's xStocks API) on 2026-09-18. None is borrowed from another chain.
  */
-import { base, baseSepolia, foundry } from 'viem/chains';
-import type { Chain } from 'viem';
+import { xLayer, xLayerTestnet } from 'viem/chains';
+import type { Address, Chain } from 'viem';
 import 'dotenv/config';
 import { KNOWN_CHAINS, isKnownChain, moneyOn, networkName, type KnownChain } from './money.js';
-import { isSolanaCluster } from '../solana/clusters.js';
 
 /** Every chain this executor knows. A chain is added in `evm/money.ts` first, saying what its money is. */
 export type ChainKey = KnownChain;
@@ -24,19 +27,13 @@ export type ChainKey = KnownChain;
 // flag, which makes every cast/forge command in this repo fail with a confusing parse error.
 const ASKED = process.env.XORR_CHAIN ?? 'localnet';
 
-/*
- * When XORR_CHAIN is a Solana cluster (PLAN.md §0.2), EVM chains are inactive.
- * For any unknown chain outside of Solana, refuse start.
- */
-if (isSolanaCluster(ASKED)) {
-  // Active chain is Solana. EVM chain definitions fall back to localnet as a stub.
-} else if (!isKnownChain(ASKED)) {
+if (!isKnownChain(ASKED)) {
   throw new Error(
     `XORR_CHAIN=${ASKED} is not a chain this executor knows (${KNOWN_CHAINS.join(', ')}). ` +
       'Add it to server/src/evm/money.ts, saying what its money is, then give it an RPC and a chain in server/src/evm/chains.ts.',
   );
 }
-export const CHAIN_KEY: ChainKey = isKnownChain(ASKED) ? ASKED : 'localnet';
+export const CHAIN_KEY: ChainKey = ASKED;
 
 /** Guardrail: real money needs a deliberate, reviewed decision, never a default. */
 if (moneyOn(CHAIN_KEY) === 'real' && process.env.ALLOW_MAINNET !== 'yes') {
@@ -47,156 +44,147 @@ if (moneyOn(CHAIN_KEY) === 'real' && process.env.ALLOW_MAINNET !== 'yes') {
 
 const RPCS: Record<ChainKey, string> = {
   localnet: process.env.LOCAL_RPC ?? 'http://127.0.0.1:8545',
-  'base-fork': process.env.FORK_RPC ?? 'http://127.0.0.1:8545',
-  'base-sepolia': process.env.BASE_SEPOLIA_RPC ?? 'https://sepolia.base.org',
-  base: process.env.BASE_RPC ?? 'https://mainnet.base.org',
+  'xlayer-fork': process.env.FORK_RPC ?? 'http://127.0.0.1:8545',
+  'xlayer-testnet': process.env.XLAYER_TESTNET_RPC ?? 'https://testrpc.xlayer.tech',
+  xlayer: process.env.XLAYER_RPC ?? 'https://rpc.xlayer.tech',
 };
 
+/**
+ * A fork of X Layer IS X Layer — same chain id, same deployed contracts, same everything but the node. Built from anything
+ * else, viem believes the chain has no Multicall3 and refuses to batch: every balance read came back zero through a
+ * `.catch`, and a funded wallet showed $0.00. So each copy takes its chain wholesale and changes only the name.
+ */
 const CHAINS: Record<ChainKey, Chain> = {
-  localnet: { ...foundry, id: baseSepolia.id, name: 'Base Sepolia (local fork)' },
-  /*
-   * A fork of Base IS Base — same chain id, same deployed contracts, same everything but the
-   * node. Spreading `foundry` first and only overriding the id kept foundry's empty `contracts`,
-   * so viem believed the chain had no Multicall3 and refused to batch. The whole balance read came
-   * back as zero through a `.catch`, and the home screen showed $0.00 for a funded wallet.
-   *
-   * So: take Base wholesale and change only the RPC.
-   */
-  'base-fork': { ...base, name: 'Base (local mainnet fork)' },
-  'base-sepolia': baseSepolia,
-  base,
+  localnet: { ...xLayerTestnet, name: 'X Layer testnet (local copy)' },
+  'xlayer-fork': { ...xLayer, name: 'X Layer (local mainnet fork)' },
+  'xlayer-testnet': xLayerTestnet,
+  xlayer: xLayer,
 };
 
 export const chain = CHAINS[CHAIN_KEY];
 export const rpcUrl = RPCS[CHAIN_KEY];
 
-/** The chain id 1inch is asked about. A local fork of Base Sepolia still quotes against Base. */
+/**
+ * The chain id the 1inch modules still ask about (limit orders, Fusion+, cross-checks, logos, history).
+ *
+ * 1inch does not run on X Layer. Those modules are replaced by the X Layer venues (OKX DEX, Uniswap v3); until then they
+ * keep asking about Base, and nothing they answer reaches a trade — no 1inch contract is on any X Layer grant.
+ */
 export const ONEINCH_CHAIN_ID = 8453;
 
-/**
- * Canonical addresses, per chain.
- *
- * These used to be a single flat object of Base MAINNET addresses used on every network. On Base
- * Sepolia that meant the app asked for the balance of a USDC contract that does not exist there,
- * got back `0x`, and the whole delegation flow died on a decode error before the user could sign
- * anything. A token address is a property of a chain, not of a product.
- *
- * Circle deploys USDC to a different address on Sepolia; WETH is at the same predeploy on both.
- * cbBTC and the tokenized equities are mainnet-only, and are absent here rather than pointed at an
- * address with no code — code that reads them must handle absence, not discover it at runtime.
- */
-const BASE_MAINNET_ADDRESSES = {
-  /** 1inch Aggregation Router v6 — the same address across every chain it supports. */
-  oneInchRouter: '0x111111125421cA6dc452d289314280a0f8842A65',
-  usdcBase: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  wethBase: '0x4200000000000000000000000000000000000006',
-  /** Coinbase Wrapped BTC on Base — 8 decimals, the Base-native way to hold BTC exposure. */
-  cbbtcBase: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
-  /** 1inch's sentinel for native ETH. */
-  nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-} as const;
-
-const BASE_SEPOLIA_ADDRESSES = {
-  // 1inch does not run on Sepolia. The address is kept so the venue allowlist has a stable shape;
-  // nothing routes there on a testnet, and the executor's own tests use the fork for real fills.
-  oneInchRouter: '0x111111125421cA6dc452d289314280a0f8842A65',
-  /** Circle's USDC on Base Sepolia — a different deployment from mainnet. */
-  usdcBase: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-  /** WETH is the same predeploy on every OP-stack chain. */
-  wethBase: '0x4200000000000000000000000000000000000006',
-  cbbtcBase: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
-  nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-} as const;
+/** 1inch Aggregation Router v6. Only the 1inch modules above use it; it is never a venue on X Layer. */
+export const ONEINCH_ROUTER: Address = '0x111111125421cA6dc452d289314280a0f8842A65';
 
 /**
- * Addresses for the chain the executor SETTLES on. Follows XORR_CHAIN.
- *
- * A record rather than "Sepolia's, else mainnet's": that fallback would have handed a chain added later Base mainnet's
- * token addresses, where they have no code. A chain added in `evm/money.ts` does not compile until it has a row here.
+ * Canonical addresses, per chain. A token address is a property of a chain, not of a product: where a chain does not
+ * have one, it is `null` here rather than another chain's address with no code behind it.
  */
-const ADDRESSES_BY_CHAIN: Record<ChainKey, typeof BASE_MAINNET_ADDRESSES | typeof BASE_SEPOLIA_ADDRESSES> = {
-  base: BASE_MAINNET_ADDRESSES,
-  'base-fork': BASE_MAINNET_ADDRESSES,
-  'base-sepolia': BASE_SEPOLIA_ADDRESSES,
-  // What it read before this was a record: only Base Sepolia had a table of its own.
-  localnet: BASE_MAINNET_ADDRESSES,
+export type ChainAddresses = {
+  /** Circle's native USDC — the settlement token. Not USDC.e, the bridged one OKX's own token list calls "USDC". */
+  usdc: Address;
+  /** Global Dollar (Paxos). Several wrapped xStocks are pooled against it rather than USDC. */
+  usdg: Address | null;
+  weth: Address | null;
+  /** OKX's wrapped BTC on X Layer, 8 decimals. */
+  btc: Address | null;
+  /** Wrapped OKB, the native gas token as an ERC-20. */
+  wokb: Address | null;
+  /** The sentinel aggregators use for the native token (OKB here). */
+  nativeToken: Address;
+  /** Uniswap v3 SwapRouter02 — pulls what it is approved for, pays the recipient in its calldata. */
+  uniswapRouter: Address | null;
+  /** Uniswap v3 QuoterV2. */
+  uniswapQuoter: Address | null;
+};
+
+const XLAYER_MAINNET = {
+  usdc: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+  usdg: '0x4ae46a509F6b1D9056937BA4500cb143933D2dc8',
+  weth: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c',
+  btc: '0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f',
+  wokb: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
+  nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+  uniswapRouter: '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA',
+  uniswapQuoter: '0xD1b797D92d87B688193A2B976eFc8D577D204343',
+} as const satisfies ChainAddresses;
+
+/** The testnet has Circle's USDC and no DEX: nothing else here was found with code behind it. */
+const XLAYER_TESTNET: ChainAddresses = {
+  usdc: '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3',
+  usdg: null,
+  weth: null,
+  btc: null,
+  wokb: null,
+  nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+  uniswapRouter: null,
+  uniswapQuoter: null,
+};
+
+/** A record, so a chain added in `evm/money.ts` does not compile until it says what its addresses are. */
+const ADDRESSES_BY_CHAIN: Record<ChainKey, ChainAddresses> = {
+  xlayer: XLAYER_MAINNET,
+  'xlayer-fork': XLAYER_MAINNET,
+  'xlayer-testnet': XLAYER_TESTNET,
+  localnet: XLAYER_TESTNET,
 };
 
 export const ADDRESSES = ADDRESSES_BY_CHAIN[CHAIN_KEY];
 
 /**
- * The tokens a grant approves for the delegation to pull, before any equities: the one it spends and every one it may
- * have to sell. `/delegation/params` hands the app's grant this list, kept to what has code on the chain, and the fork's
- * grant script approves the same one. That script had a shorter list of its own, so a demo wallet a swap had bought into
- * cbBTC could not be sold out of it: the panic flatten's cbBTC leg reverted with SafeTransferFromFailed (2026-09-15).
+ * Addresses for the chain prices are ASKED about, which is always mainnet: a quote is a question about real liquidity, and
+ * the testnet has none. On the testnet prices are real mainnet prices and settlement is not possible — the fork is where
+ * both halves are real at once.
  */
-export const APPROVABLE_TOKENS: readonly { symbol: string; address: `0x${string}` }[] = [
-  { symbol: 'USDC', address: ADDRESSES.usdcBase },
-  { symbol: 'WETH', address: ADDRESSES.wethBase },
-  { symbol: 'CBBTC', address: ADDRESSES.cbbtcBase },
+export const QUOTE_ADDRESSES = XLAYER_MAINNET;
+
+/** True where the real tokens, the xStocks and their pools exist: mainnet and its fork. */
+export const IS_MAINNET_STATE = CHAIN_KEY === 'xlayer' || CHAIN_KEY === 'xlayer-fork';
+
+/**
+ * The tokens a grant approves for the delegation to pull, before any equities: the one it spends and every one it may
+ * have to sell. Kept to what has code on this chain, so a grant never approves an address with nothing behind it.
+ */
+export const APPROVABLE_TOKENS: readonly { symbol: string; address: Address }[] = [
+  { symbol: 'USDC', address: ADDRESSES.usdc },
+  ...(ADDRESSES.usdg ? [{ symbol: 'USDG', address: ADDRESSES.usdg }] : []),
+  ...(ADDRESSES.weth ? [{ symbol: 'WETH', address: ADDRESSES.weth }] : []),
+  ...(ADDRESSES.btc ? [{ symbol: 'XBTC', address: ADDRESSES.btc }] : []),
 ];
 
 /**
- * Addresses for the chain 1inch is ASKED about, which is always Base mainnet.
- *
- * These are two different things and conflating them is a real bug: 1inch has no deployment or
- * liquidity on Sepolia, so `ONEINCH_CHAIN_ID` is pinned to 8453 and every quote is a mainnet
- * question. Handing it a Sepolia token address makes it 400 on a token that chain has never heard
- * of — which is exactly what happened when the routing registry started following XORR_CHAIN.
- *
- * On a testnet the consequence is honest and worth stating: prices are real mainnet prices, and
- * settlement is not possible. The fork is where both halves are real at once.
+ * Aave v3's Pool, for the yield strategy (tier 4). Aave's X Layer deployment is not verified, so the address is the Base
+ * one the yield code was written against, and it is on no X Layer grant: `SETTLEMENT_VENUES` leaves it out. The yield
+ * strategy is replaced or retired in the venue phase.
  */
-export const QUOTE_ADDRESSES = BASE_MAINNET_ADDRESSES;
-
-/** True where the tokenized equities and Aqua actually exist. */
-export const IS_BASE_MAINNET_STATE = CHAIN_KEY === 'base' || CHAIN_KEY === 'base-fork';
-
-/** Aave v3 Pool on Base. Not deployed at this address on Base Sepolia. */
 export const AAVE_V3_POOL = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5' as const;
 
 /**
- * Every contract the delegation is allowed to call, for this chain.
- *
- * One list, read by the grant the user signs AND by the screen that shows them what they granted.
- * They were separate literals, both spelling out the 1inch router, which was fine only for as long
- * as there was exactly one venue: the moment tier 4 needed the Aave Pool, a grant that included it
- * and a safety screen that did not would have disagreed about what the user had actually allowed.
- *
- * Aave is left out where it has no deployment rather than granted against an address with no code.
- * Permission to call nothing is not dangerous, but it is a claim on the safety screen that is not
- * true, and this screen is the one that has to be exactly true.
- */
-/**
- * Our Aqua book, when one is deployed. A venue the bot may fill against has to be on the list the
- * user signed, or `spend()` refuses it — which is the contract doing its job, and was going to be
- * the first thing an Aqua fill hit.
+ * Our Aqua and SwapVM books, when deployed. A venue the bot may fill against has to be on the list the user signed, or
+ * `spend()` refuses it — the contract doing its job.
  */
 const AQUA_BOOK = process.env.AQUA_BOOK_ADDRESS;
-/**
- * Our SwapVM book, when one is deployed (PLAN.md 3.1).
- *
- * Settlement already tries it ahead of the aggregator, and `spend()` refuses any venue the user did not
- * sign for — so a grant made through the app, which is built from this list, could never reach it. The only
- * grant that ever named the book was the hand-written one in `live-swapvm.ts`.
- */
 const SWAPVM_BOOK = process.env.SWAPVM_BOOK_ADDRESS;
 const isAddress = (a: string | undefined): a is `0x${string}` => !!a && /^0x[0-9a-fA-F]{40}$/.test(a);
 
+/**
+ * Every contract the delegation is allowed to call, for this chain — one list, read by the grant the user signs AND by
+ * the screen that shows them what they granted. The aggregator first. A venue a chain does not have is left out rather
+ * than granted against an address with no code: permission to call nothing is harmless, but it is a claim on the safety
+ * screen that is not true, and that screen has to be exactly true.
+ */
 export const SETTLEMENT_VENUES: readonly `0x${string}`[] = [
-  ADDRESSES.oneInchRouter,
-  ...(IS_BASE_MAINNET_STATE ? [AAVE_V3_POOL] : []),
+  ...(ADDRESSES.uniswapRouter ? [ADDRESSES.uniswapRouter] : []),
   ...(isAddress(AQUA_BOOK) ? [AQUA_BOOK] : []),
   ...(isAddress(SWAPVM_BOOK) ? [SWAPVM_BOOK] : []),
 ];
 
 /** Where each chain shows a transaction. A record, so a chain added later says where, or does not compile. */
 const EXPLORER_TX: Record<ChainKey, (hash: string) => string> = {
-  // A fork shares mainnet's history up to the fork block, so an explorer link is right for a
-  // pre-fork tx and wrong for one we just mined. Label it rather than link to a 404.
-  'base-fork': (hash) => `fork:${hash}`,
-  base: (hash) => `https://basescan.org/tx/${hash}`,
-  'base-sepolia': (hash) => `https://sepolia.basescan.org/tx/${hash}`,
+  // A fork shares mainnet's history up to the fork block, so an explorer link is right for a pre-fork tx and wrong for one
+  // we just mined. Label it rather than link to a page that does not exist.
+  'xlayer-fork': (hash) => `fork:${hash}`,
+  xlayer: (hash) => `https://www.oklink.com/xlayer/tx/${hash}`,
+  'xlayer-testnet': (hash) => `https://www.oklink.com/xlayer-test/tx/${hash}`,
   localnet: (hash) => `local:${hash}`,
 };
 

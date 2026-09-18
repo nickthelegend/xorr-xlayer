@@ -19,7 +19,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 // The module graph reaches the venue and chain modules, which refuse to load unconfigured. This
 // test is about a cache, so give them the shape they check for and nothing more.
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 process.env.DELEGATE_PRIVATE_KEY ??=
   '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
 

@@ -11,7 +11,7 @@ const WETH = '0x4200000000000000000000000000000000000006';
 const ROUTER = '0x111111125421cA6dc452d289314280a0f8842A65';
 const DELEGATION = '0xc32dd8aeed3035d46c7c82a351fc5522c9d463f4';
 
-const h = vi.hoisted(() => ({ chain: 'base-fork', simulateContract: vi.fn() }));
+const h = vi.hoisted(() => ({ chain: 'xlayer-fork', simulateContract: vi.fn() }));
 vi.mock('./chains.js', () => ({
   get CHAIN_KEY() {
     return h.chain;
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('what a route delivers on this chain', () => {
   it('dry-runs spend() for a buy, with the leg as it will be sent and a floor of one, and reads the first word', async () => {
-    const { deliveredOnChain } = await load('base-fork');
+    const { deliveredOnChain } = await load('xlayer-fork');
     // The router's `swap` answers (returnAmount, spentAmount).
     h.simulateContract.mockResolvedValue({
       result: encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [DELIVERED, 15_000_000n]),
@@ -56,7 +56,7 @@ describe('what a route delivers on this chain', () => {
   });
 
   it('dry-runs closePosition() for a sale, in the sold token’s own units', async () => {
-    const { deliveredOnChain } = await load('base-fork');
+    const { deliveredOnChain } = await load('xlayer-fork');
     h.simulateContract.mockResolvedValue({ result: encodeAbiParameters([{ type: 'uint256' }], [50_297_581n]) });
     const sale = { ...BUY, via: 'closePosition', token: WETH, amount: 20_000_000_000_000_000n, tokenOut: USDC } as const;
 
@@ -67,13 +67,13 @@ describe('what a route delivers on this chain', () => {
   });
 
   it('refuses an answer too short to hold an amount, rather than reading nothing as zero', async () => {
-    const { deliveredOnChain } = await load('base-fork');
+    const { deliveredOnChain } = await load('xlayer-fork');
     h.simulateContract.mockResolvedValue({ result: '0x' });
     await expect(deliveredOnChain(BUY)).rejects.toThrow('The route answered without saying what it delivered.');
   });
 
   it("lets the chain's own refusal through", async () => {
-    const { deliveredOnChain } = await load('base-fork');
+    const { deliveredOnChain } = await load('xlayer-fork');
     h.simulateContract.mockRejectedValue(new Error('execution reverted: DailyCapExceeded'));
     await expect(deliveredOnChain(BUY)).rejects.toThrow('DailyCapExceeded');
   });
@@ -82,10 +82,10 @@ describe('what a route delivers on this chain', () => {
 describe('where prices drift', () => {
   it('is a fork of Base — not Base, and not Base Sepolia', async () => {
     for (const [chain, drift] of [
-      ['base-fork', true],
+      ['xlayer-fork', true],
       ['localnet', true],
-      ['base', false],
-      ['base-sepolia', false],
+      ['xlayer', false],
+      ['xlayer-testnet', false],
     ] as const) {
       expect((await load(chain)).PRICES_DRIFT, chain).toBe(drift);
     }

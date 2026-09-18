@@ -8,7 +8,7 @@
  * just lived inside a route handler where only the UI could reach it.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 

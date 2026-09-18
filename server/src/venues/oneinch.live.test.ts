@@ -12,7 +12,7 @@ import {
   routeLabel,
   venuesFrom,
 } from './oneinch.js';
-import { ADDRESSES, CHAIN_KEY } from '../evm/chains.js';
+import { ADDRESSES, CHAIN_KEY, ONEINCH_ROUTER } from '../evm/chains.js';
 
 describe('1inch swap routing', () => {
   it('quotes ETH -> USDC across real Base venues', async () => {
@@ -61,7 +61,7 @@ describe('1inch swap routing', () => {
       // product custodial.
       receiver: '0x364d7Bbc139541e0e37450D527ae154B5C292581',
     });
-    expect(tx.to.toLowerCase()).toBe(ADDRESSES.oneInchRouter.toLowerCase());
+    expect(tx.to.toLowerCase()).toBe(ONEINCH_ROUTER.toLowerCase());
     expect(tx.data).toMatch(/^0x[0-9a-f]{8,}$/i);
     expect(tx.data.length).toBeGreaterThan(100);
   }, 60_000);

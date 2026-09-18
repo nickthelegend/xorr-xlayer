@@ -75,8 +75,8 @@ const failed = (error: string, status = 502): LimitOrderResponse => ({ status, b
  * The one pair listed. USDC is what `spend()` pulls and what the daily cap counts, so it is the only thing an owner can
  * pay with; WETH is what the fill is proven to deliver on the fork (`fork/prove-limit-order.ts`).
  */
-const SELLS = { symbol: 'WETH', address: ADDRESSES.wethBase, decimals: 18 } as const;
-const PAYS = { symbol: 'USDC', address: ADDRESSES.usdcBase, decimals: 6 } as const;
+const SELLS = { symbol: 'WETH', address: ADDRESSES.weth, decimals: 18 } as const;
+const PAYS = { symbol: 'USDC', address: ADDRESSES.usdc, decimals: 6 } as const;
 
 const nothingSettles = (what: string) =>
   `Nothing settles on ${CHAIN_KEY} — 1inch has no deployment here — so ${what}.`;
@@ -115,7 +115,7 @@ export const PublishInput = z.object({
 const LOW_80_BITS = (1n << 80n) - 1n;
 
 export async function publishLimitOrder(input: z.infer<typeof PublishInput>): Promise<LimitOrderResponse> {
-  if (!CAN_SETTLE) return blocked('not_settleable_here', nothingSettles('no limit order can be listed'));
+  if (!CAN_SETTLE || !SELLS.address) return blocked('not_settleable_here', nothingSettles('no limit order can be listed'));
   const order: LimitOrder = input.order;
 
   if (!isAddressEqual(order.makerAsset, SELLS.address) || !isAddressEqual(order.takerAsset, PAYS.address)) {

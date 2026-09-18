@@ -341,7 +341,7 @@ export async function grantBot(t: TreasuryRow, dailyCapUsd: number, days: number
     try {
       // Approvals first and the grant last: stopped half way, the bot can pull nothing.
       for (const token of await tokensHere()) {
-        const settlement = token.address.toLowerCase() === ADDRESSES.usdcBase.toLowerCase();
+        const settlement = token.address.toLowerCase() === ADDRESSES.usdc.toLowerCase();
         const wanted = settlement ? cap * SETTLEMENT_APPROVAL_DAYS : maxUint256;
         const has = await chainAllowance(token.address, owner, DELEGATION_ADDRESS);
         if (has !== undefined && has >= (settlement ? wanted : UNLIMITED)) {
@@ -486,7 +486,7 @@ export async function proveRefusal(t: TreasuryRow, to: Address): Promise<Treasur
       method: 'eth_signTransaction',
       params: {
         transaction: {
-          to: ADDRESSES.usdcBase,
+          to: ADDRESSES.usdc,
           data: encodeFunctionData({ abi: erc20Abi, functionName: 'transfer', args: [to, amount] }),
           value: '0x0',
           chain_id: chain.id,

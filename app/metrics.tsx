@@ -217,7 +217,7 @@ export default function Metrics() {
                   An empty section that explains itself beats an invisible one — with the reason that
                   is true on THIS build.
 
-                  On Base Sepolia there are no fills to measure at all: no aggregator is deployed
+                  On X Layer testnet there are no fills to measure at all: no aggregator routes
                   there, which `/network` already says. This said so on every build, fork and mainnet
                   included, where "cannot settle here" was false.
                 */}
@@ -225,7 +225,7 @@ export default function Metrics() {
                   <Text variant="secondarySm" color={colors.ink55} style={{ marginTop: space.s8 }}>
                     {data.fillQuality.unmeasurable > 0
                       ? `Nothing to compare: ${data.fillQuality.unmeasurable === 1 ? 'the one fill predates' : `all ${data.fillQuality.unmeasurable} fills predate`} this measure.`
-                      : CHAIN_KEY === 'base-sepolia'
+                      : CHAIN_KEY === 'xlayer-testnet'
                         ? 'No fills to measure. Swaps cannot fill on this network.'
                         : 'No fills to measure yet.'}
                   </Text>

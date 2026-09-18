@@ -46,7 +46,7 @@ tokenRoutes.get('/wallet/tokens', async (c) => {
   const w = await requireWallet(c);
   const owner = getAddress(w.address);
 
-  if (CHAIN_KEY === 'base') {
+  if (CHAIN_KEY === 'xlayer') {
     let held: BaseHoldings;
     try {
       held = await holdingsOnBase(owner);
@@ -107,7 +107,7 @@ async function chainHoldings(owner: Address): Promise<Omit<HeldToken, 'logo'>[]>
   if (wei > 0n) {
     rows.push({
       symbol: 'ETH',
-      address: ADDRESSES.nativeEth,
+      address: ADDRESSES.nativeToken,
       decimals: 18,
       units: Number(formatUnits(wei, 18)),
       native: true,
@@ -115,7 +115,7 @@ async function chainHoldings(owner: Address): Promise<Omit<HeldToken, 'logo'>[]>
     });
   }
   // `cashUsd` answers in USDC's own units, read at its six decimals.
-  if (usdc > 0) rows.push({ symbol: 'USDC', address: ADDRESSES.usdcBase, decimals: 6, units: usdc, feed: 'USDC' });
+  if (usdc > 0) rows.push({ symbol: 'USDC', address: ADDRESSES.usdc, decimals: 6, units: usdc, feed: 'USDC' });
   for (const h of registered) {
     const token = TOKENS[h.symbol];
     if (token) {

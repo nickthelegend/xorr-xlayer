@@ -510,12 +510,16 @@ export async function functioningHere(): Promise<{ symbol: string; address: stri
  * ERC-20s, `equitiesFunctional()` filters them out entirely on a chain where they do not work, so
  * anywhere they survive this filter the registry address IS the settlement address.
  */
-const SETTLEMENT_ADDRESS: Record<string, string> = {
-  ETH: ADDRESSES.nativeEth,
-  WETH: ADDRESSES.wethBase,
-  USDC: ADDRESSES.usdcBase,
-  CBBTC: ADDRESSES.cbbtcBase,
-};
+const SETTLEMENT_ADDRESS: Record<string, string> = {};
+// Only what the chain has: the testnet has no WETH or BTC, and an address with no code is not a settlement address.
+for (const [symbol, address] of [
+  ['ETH', ADDRESSES.nativeToken],
+  ['WETH', ADDRESSES.weth],
+  ['USDC', ADDRESSES.usdc],
+  ['CBBTC', ADDRESSES.btc],
+] as const) {
+  if (address) SETTLEMENT_ADDRESS[symbol] = address;
+}
 
 /**
  * GET /yield/supply — the real USDC supply rate on Aave v3, Base.

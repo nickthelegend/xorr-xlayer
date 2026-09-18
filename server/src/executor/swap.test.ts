@@ -34,7 +34,7 @@ vi.mock('../venues/oneinch.js', () => ({
   canonicalSymbol: (s: string) => (s.toLowerCase() === 'nvdac' ? 'NVDAc' : s.toUpperCase()),
 }));
 vi.mock('../venues/stocks.js', () => ({ isStock: (s: string) => s === 'NVDAc', equitiesFunctional: vi.fn(async () => false) }));
-vi.mock('../evm/chains.js', () => ({ CHAIN_KEY: 'base-fork', explorerTx: (hash: string) => `fork:${hash}` }));
+vi.mock('../evm/chains.js', () => ({ CHAIN_KEY: 'xlayer-fork', explorerTx: (hash: string) => `fork:${hash}` }));
 vi.mock('../evm/delegation.js', () => ({
   readPolicy: vi.fn(),
   closeAsDelegate: vi.fn(),

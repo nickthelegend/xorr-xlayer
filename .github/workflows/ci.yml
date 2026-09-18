@@ -1,11 +1,10 @@
 # What can be checked without a chain, a key or a paid API — on every push — and, on demand, what cannot.
 #
 # `checks` and `contracts` are hermetic and run on every push and pull request. The interesting proofs in
-# this repo need a Base mainnet fork, a 1inch key, or a Solana validator with mainnet programs cloned into
-# it, and a job that skipped them silently would report green for a suite it never ran, which is worse than
-# not having CI. So those run only when asked for (Actions → ci → Run workflow), with the repository's
-# `ONEINCH_API_KEY`, `BASE_RPC` and `MAINNET_RPC` secrets, and they fail loudly when a secret is missing
-# rather than skipping (PLAN.md 3.19).
+# this repo need a Base mainnet fork and a 1inch key, and a job that skipped them silently would report
+# green for a suite it never ran, which is worse than not having CI. So those run only when asked for
+# (Actions → ci → Run workflow), with the repository's `ONEINCH_API_KEY` and `BASE_RPC` secrets, and they
+# fail loudly when a secret is missing rather than skipping (PLAN.md 3.19).
 name: ci
 
 on:
@@ -148,47 +147,3 @@ jobs:
       - name: 1inch — quotes, calldata, the venue comparison, the tokenized equities
         run: npx vitest run src/venues/oneinch.live.test.ts src/venues/compare.live.test.ts src/venues/stocks.live.test.ts
         working-directory: server
-
-  # On demand: the Solana chain proofs, against a real solana-test-validator that clones the live Jupiter
-  # program and the xStocks mints out of mainnet through MAINNET_RPC. `checks` cannot host these — it is
-  # hermetic, and the validator needs an upstream RPC that the public endpoint rate-limits from CI. The
-  # suite skips itself where the toolchain is absent, so the version step below is what stops this job
-  # reporting green for a suite that never ran (PLAN.md §14).
-  solana-fork:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    env:
-      MAINNET_RPC: ${{ secrets.MAINNET_RPC }}
-      # No FORK_RPC: the suite starts its own validator on free ports, as it does on a dev machine.
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            server/package-lock.json
-
-      - name: Require the secret
-        run: test -n "$MAINNET_RPC" || { echo "::error::MAINNET_RPC is not set as a repository secret"; exit 1; }
-
-      # There is no published setup action for the Anza toolchain, so the official installer it is.
-      - name: Install the Solana toolchain
-        run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
-
-      # If the install above silently failed, the suite would skip itself and this job would pass having
-      # proved nothing. Fail here instead.
-      - name: Require the validator
-        run: solana-test-validator --version
-
-      - name: Install
-        run: |
-          npm ci --ignore-scripts
-          (cd server && npm ci --ignore-scripts)
-
-      - name: Solana fork chain proofs
-        run: npx vitest run server/src/solana/fork.chain.test.ts

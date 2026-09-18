@@ -17,7 +17,7 @@ export type GasPrice = { wei: bigint; source: '1inch' | 'chain' };
 type OneInchGasPrice = { baseFee: string; medium: { maxPriorityFeePerGas: string; maxFeePerGas: string } };
 
 export async function gasPrice(): Promise<GasPrice> {
-  if (CHAIN_KEY === 'base') {
+  if (CHAIN_KEY === 'xlayer') {
     const r = await oneinchApi<OneInchGasPrice>('/gas-price/v1.6/8453');
     // What a transaction sent now at normal priority is prepared to pay per unit of gas.
     return { wei: BigInt(r.medium.maxFeePerGas), source: '1inch' };

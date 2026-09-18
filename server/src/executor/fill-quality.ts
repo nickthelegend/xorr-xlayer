@@ -119,7 +119,7 @@ export async function fillQuality(): Promise<FillQuality> {
     venues,
     measured: venues.reduce((n, v) => n + v.fills, 0),
     unmeasurable,
-    basis: CHAIN_KEY === 'base' ? 'same-chain' : 'forked',
+    basis: CHAIN_KEY === 'xlayer' ? 'same-chain' : 'forked',
   };
 }
 

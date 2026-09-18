@@ -63,7 +63,7 @@ function record(name: string, ok: boolean, detail: string, blocking = true) {
 async function main() {
   console.log(`\n  Base readiness — chain "${CHAIN_KEY}" via ${rpcUrl}\n`);
 
-  if (CHAIN_KEY !== 'base') {
+  if (CHAIN_KEY !== 'xlayer') {
     console.log(
       `  This is pointed at "${CHAIN_KEY}", not Base mainnet. Re-run with XORR_CHAIN=base` +
         ' ALLOW_MAINNET=yes to check the real thing.\n',
@@ -194,7 +194,7 @@ async function main() {
     'explorer links',
     sample.startsWith('https://'),
     sample.startsWith('https://') ? sample.slice(0, 46) + '…' : `labelled "${sample.split(':')[0]}" — no public explorer`,
-    CHAIN_KEY === 'base',
+    CHAIN_KEY === 'xlayer',
   );
 
   /*

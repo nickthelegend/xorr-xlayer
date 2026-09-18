@@ -10,14 +10,14 @@ import { Hono } from 'hono';
 import { getAddress } from 'viem';
 
 const h = vi.hoisted(() => ({
-  chain: 'base',
+  chain: 'xlayer',
   getBalance: vi.fn(),
   MAINNET: {
-    usdcBase: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
   },
   SEPOLIA: {
-    usdcBase: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
   },
   NoWalletError: class extends Error {
@@ -37,7 +37,7 @@ vi.mock('../evm/chains.js', () => ({
     return h.chain;
   },
   get ADDRESSES() {
-    return h.chain === 'base-sepolia' ? h.SEPOLIA : h.MAINNET;
+    return h.chain === 'xlayer-testnet' ? h.SEPOLIA : h.MAINNET;
   },
 }));
 vi.mock('../evm/client.js', () => ({ publicClient: { getBalance: h.getBalance } }));
@@ -91,7 +91,7 @@ async function get(): Promise<{ status: number; body: Record<string, unknown> }>
 }
 
 beforeEach(() => {
-  h.chain = 'base';
+  h.chain = 'xlayer';
   vi.clearAllMocks();
   vi.mocked(requireWallet).mockResolvedValue(WALLET as never);
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -115,7 +115,7 @@ describe("on Base, 1inch's word", () => {
     expect(status).toBe(200);
     expect(body).toEqual({
       owner: OWNER,
-      chain: 'base',
+      chain: 'xlayer',
       source: '1inch',
       tokens: [
         { symbol: 'ETH', name: 'Ether', address: NATIVE, decimals: 18, units: 0.5, logo: 'https://tokens.1inch.io/eth.png', native: true, usd: 2_000 },
@@ -186,11 +186,11 @@ describe("on Base, 1inch's word", () => {
 });
 
 describe("on a fork or a testnet, the chain's word", () => {
-  it.each(['base-fork', 'base-sepolia', 'localnet'])(
+  it.each(['xlayer-fork', 'xlayer-testnet', 'localnet'])(
     "on %s, reads the registry, USDC and native ETH at this chain's addresses",
     async (chain) => {
       h.chain = chain;
-      const addresses = chain === 'base-sepolia' ? h.SEPOLIA : h.MAINNET;
+      const addresses = chain === 'xlayer-testnet' ? h.SEPOLIA : h.MAINNET;
       vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 0.25, usd: 1_000, raw: 250_000_000_000_000_000n }]);
       vi.mocked(cashUsd).mockResolvedValue(42.5);
       h.getBalance.mockResolvedValue(2_000_000_000_000_000n);
@@ -210,7 +210,7 @@ describe("on a fork or a testnet, the chain's word", () => {
         source: 'chain',
         tokens: [
           { symbol: 'WETH', address: WETH, decimals: 18, units: 0.25, logo: null, usd: 1_000 },
-          { symbol: 'USDC', address: addresses.usdcBase, decimals: 6, units: 42.5, logo: null, usd: 42.5 },
+          { symbol: 'USDC', address: addresses.usdc, decimals: 6, units: 42.5, logo: null, usd: 42.5 },
           { symbol: 'ETH', address: addresses.nativeEth, decimals: 18, units: 0.002, logo: 'https://tokens.1inch.io/eth.png', native: true, usd: 8 },
         ],
         undescribed: [],
@@ -224,7 +224,7 @@ describe("on a fork or a testnet, the chain's word", () => {
   );
 
   it('nothing held is an empty list: an answer, not an error', async () => {
-    h.chain = 'base-fork';
+    h.chain = 'xlayer-fork';
     vi.mocked(holdings).mockResolvedValue([]);
     vi.mocked(cashUsd).mockResolvedValue(0);
     h.getBalance.mockResolvedValue(0n);
@@ -241,7 +241,7 @@ describe("on a fork or a testnet, the chain's word", () => {
     ['USDC', () => vi.mocked(cashUsd).mockRejectedValue(new Error('The request took too long to respond.'))],
     ['native ETH', () => h.getBalance.mockRejectedValue(new Error('HTTP request failed.'))],
   ])('a failed read of %s is a 502 saying what could not be read, never an empty list', async (_read, fail) => {
-    h.chain = 'base-fork';
+    h.chain = 'xlayer-fork';
     vi.mocked(holdings).mockResolvedValue([]);
     vi.mocked(cashUsd).mockResolvedValue(10);
     h.getBalance.mockResolvedValue(10n ** 18n);

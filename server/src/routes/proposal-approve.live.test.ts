@@ -89,7 +89,7 @@ describe('approving a proposal', () => {
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     const body = res.body as Decision;
 
-    if (chain === 'base-sepolia') {
+    if (chain === 'xlayer-testnet') {
       // 1inch does not settle on Base Sepolia, so the honest answer is a refusal — never a fill.
       expect(body.status, body.message).not.toBe('filled');
       expect(body.message).not.toMatch(/^(Filled|Bought)/);

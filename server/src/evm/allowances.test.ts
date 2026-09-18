@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ chain: 'base-fork', readContract: vi.fn() }));
+const h = vi.hoisted(() => ({ chain: 'xlayer-fork', readContract: vi.fn() }));
 vi.mock('./chains.js', () => ({
   get CHAIN_KEY() {
     return h.chain;
@@ -23,7 +23,7 @@ const ROUTER = '0x111111125421cA6dc452d289314280a0f8842A65';
 const MAX = (1n << 256n) - 1n;
 
 beforeEach(() => {
-  h.chain = 'base-fork';
+  h.chain = 'xlayer-fork';
   h.readContract.mockReset();
   vi.mocked(oneinchApi).mockReset();
 });
@@ -67,7 +67,7 @@ describe('reading an allowance from the chain', () => {
 
 describe('the 1inch router', () => {
   it("on Base, is the spender 1inch's Approve API names, and its allowances come from that API", async () => {
-    h.chain = 'base';
+    h.chain = 'xlayer';
     vi.mocked(oneinchApi).mockResolvedValueOnce({ address: ROUTER.toLowerCase() });
     expect(await routerSpender()).toEqual({ address: ROUTER.toLowerCase(), source: '1inch' });
     expect(oneinchApi).toHaveBeenCalledWith('/swap/v6.0/8453/approve/spender', 3_600_000);

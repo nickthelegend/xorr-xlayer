@@ -729,7 +729,7 @@ extra.get('/graph/decision', async (c) => {
       await decide({
         owner: w.address,
         wantUsd,
-        token: ADDRESSES.usdcBase,
+        token: ADDRESSES.usdc,
         aquaApp: process.env.AQUA_BOOK_ADDRESS,
         tokenOut: outToken?.address,
         /*

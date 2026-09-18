@@ -39,9 +39,6 @@ import {
   type Offer,
 } from '../evm/faucet.js';
 
-import { isSolanaCluster, getClusterConfig } from '../solana/clusters.js';
-import { readSolanaBalances } from '../solana/balances.js';
-
 export const faucetRoutes = new Hono();
 
 export type FaucetResponse = { status: 200 | 409 | 502; body: Record<string, unknown>; retryAfterSec?: number };
@@ -70,19 +67,6 @@ const ethAdded = (topUp: EthTopUp | null) => (topUp !== null && topUp.done ? top
 
 faucetRoutes.get('/wallet/funds', async (c) => {
   const w = await requireWallet(c);
-  if (isSolanaCluster(process.env.XORR_CHAIN ?? '') || !w.address.startsWith('0x')) {
-    const balances = await readSolanaBalances(w.address);
-    const config = getClusterConfig();
-    return c.json({
-      owner: w.address,
-      chain: config.key,
-      usdc: { address: config.usdcMint, raw: balances.usdc.raw.toString(), amount: balances.usdc.amount },
-      eth: { raw: balances.sol.lamports.toString(), amount: balances.sol.amount },
-      sol: { raw: balances.sol.lamports.toString(), amount: balances.sol.amount },
-      readAt: Date.now(),
-    });
-  }
-
   const owner = getAddress(w.address);
   // Both or neither: a balance that could not be read is a 502 naming it, never a zero beside one that could.
   const [usdcRaw, wei] = await readChain('your balances', () =>
@@ -91,7 +75,7 @@ faucetRoutes.get('/wallet/funds', async (c) => {
   return c.json({
     owner,
     chain: CHAIN_KEY,
-    usdc: { address: ADDRESSES.usdcBase, raw: usdcRaw.toString(), amount: usdc(usdcRaw) },
+    usdc: { address: ADDRESSES.usdc, raw: usdcRaw.toString(), amount: usdc(usdcRaw) },
     eth: { raw: wei.toString(), amount: ether(wei) },
     readAt: Date.now(),
   });

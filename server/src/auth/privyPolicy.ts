@@ -23,7 +23,7 @@
  * rather than pretending the engineering was the only motive.)
  */
 import type { Address } from 'viem';
-import { ADDRESSES, CHAIN_KEY, IS_BASE_MAINNET_STATE } from '../evm/chains.js';
+import { APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE } from '../evm/chains.js';
 import { DELEGATION_ADDRESS, delegatePublicKey } from '../evm/delegation.js';
 import { STOCKS } from '../venues/stocks.js';
 import { one, query } from '../db/index.js';
@@ -205,12 +205,9 @@ const REVOKE_ABI = [{ type: 'function', name: 'revoke', stateMutability: 'nonpay
  * same change — and a token that is not tradable never is.
  */
 function approvableTokens(): { symbol: string; address: string }[] {
-  const out: { symbol: string; address: string }[] = [
-    { symbol: 'USDC', address: ADDRESSES.usdcBase },
-    { symbol: 'WETH', address: ADDRESSES.wethBase },
-    { symbol: 'cbBTC', address: ADDRESSES.cbbtcBase },
-  ];
-  if (IS_BASE_MAINNET_STATE) {
+  // The chain's own list, kept to tokens with code on it (`evm/chains.ts`).
+  const out: { symbol: string; address: string }[] = APPROVABLE_TOKENS.map((t) => ({ ...t }));
+  if (IS_MAINNET_STATE) {
     for (const s of Object.values(STOCKS)) out.push({ symbol: s.symbol, address: s.address });
   }
   return out;

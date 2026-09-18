@@ -290,7 +290,7 @@ const bal = (t: Address, who: Address) =>
  * static one would be evaluated before the first statement of the module body and defeat this.
  */
 process.env.AQUA_ADDRESS = AQUA;
-process.env.XORR_CHAIN = 'base-fork';
+process.env.XORR_CHAIN = 'xlayer-fork';
 
 async function main() {
   console.log(`fork ${RPC}\nbook ${BOOK}\ndelegation ${DELEGATION}\n`);

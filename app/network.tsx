@@ -45,13 +45,13 @@ import { networkStatus } from '@/networks/status';
 /**
  * What each chain key means for what the app can actually do, in one line each.
  *
- * Sepolia cannot fill a swap because no aggregator is deployed there; a fork fills against copied liquidity that no
+ * The testnet cannot fill a swap because no aggregator routes there; a fork fills against copied mainnet liquidity that no
  * public explorer has seen. The reasons live here, not on the screen.
  */
 const CHAIN_NOTE: Record<string, string> = {
-  base: 'Base mainnet. Real money, real fills.',
-  'base-sepolia': 'A test network. Transactions settle; swaps cannot fill.',
-  'base-fork': 'A fork of Base. Fills are real here and nowhere else.',
+  xlayer: 'X Layer mainnet. Real money, real fills.',
+  'xlayer-testnet': 'X Layer testnet. Transactions settle; swaps cannot fill.',
+  'xlayer-fork': 'A fork of X Layer. Fills are real here and nowhere else.',
   localnet: 'A local chain. Nothing leaves this machine.',
 };
 

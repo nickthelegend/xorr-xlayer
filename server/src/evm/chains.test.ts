@@ -19,18 +19,19 @@ afterEach(() => {
 const venues = async () => (await import('./chains.js')).SETTLEMENT_VENUES.map((v) => v.toLowerCase());
 
 describe('the venues a grant names', () => {
-  it('include both books when this deployment has them, after the aggregator', async () => {
-    vi.stubEnv('XORR_CHAIN', 'base-fork');
+  it('include both books when this deployment has them, after the DEX router', async () => {
+    vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
     vi.stubEnv('AQUA_BOOK_ADDRESS', BOOK);
     vi.stubEnv('SWAPVM_BOOK_ADDRESS', PROGRAMS);
     const list = await venues();
     expect(list).toContain(BOOK);
     expect(list).toContain(PROGRAMS);
-    expect(list[0]).toBe('0x111111125421ca6dc452d289314280a0f8842a65');
+    // Uniswap v3's SwapRouter02 on X Layer (developers.uniswap.org/deployments), where the wrapped xStocks pool.
+    expect(list[0]).toBe('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca');
   });
 
   it('leave out a book that is not configured, or not an address', async () => {
-    vi.stubEnv('XORR_CHAIN', 'base-fork');
+    vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
     vi.stubEnv('AQUA_BOOK_ADDRESS', '');
     vi.stubEnv('SWAPVM_BOOK_ADDRESS', 'not-an-address');
     const list = await venues();
@@ -43,31 +44,32 @@ describe('the chain this executor starts on', () => {
   it('is refused when the executor does not know it, naming the chains it does', async () => {
     vi.stubEnv('XORR_CHAIN', 'arbitrum');
     await expect(import('./chains.js')).rejects.toThrow(
-      'XORR_CHAIN=arbitrum is not a chain this executor knows (base, base-sepolia, base-fork, localnet).',
+      'XORR_CHAIN=arbitrum is not a chain this executor knows (xlayer, xlayer-testnet, xlayer-fork, localnet).',
     );
   });
 
   it('is refused where its money is real, unless ALLOW_MAINNET=yes says that was decided', async () => {
-    vi.stubEnv('XORR_CHAIN', 'base');
+    vi.stubEnv('XORR_CHAIN', 'xlayer');
     vi.stubEnv('ALLOW_MAINNET', '');
     await expect(import('./chains.js')).rejects.toThrow(
-      'Refusing to start against Base mainnet. Set ALLOW_MAINNET=yes only with a deliberate decision.',
+      'Refusing to start against X Layer mainnet. Set ALLOW_MAINNET=yes only with a deliberate decision.',
     );
     vi.resetModules();
     vi.stubEnv('ALLOW_MAINNET', 'yes');
-    expect((await import('./chains.js')).CHAIN_KEY).toBe('base');
+    expect((await import('./chains.js')).CHAIN_KEY).toBe('xlayer');
   });
 
   it.each([
-    ['base', '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', 'https://basescan.org/tx/0xabc'],
-    ['base-fork', '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', 'fork:0xabc'],
-    ['base-sepolia', '0x036CbD53842c5426634e7929541eC2318f3dCF7e', 'https://sepolia.basescan.org/tx/0xabc'],
-    ['localnet', '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', 'local:0xabc'],
+    // Circle's native USDC on X Layer and on its testnet (developers.circle.com), never the bridged USDC.e.
+    ['xlayer', '0xB6CEceAB302E2E4948951eE7843FC24E92933061', 'https://www.oklink.com/xlayer/tx/0xabc'],
+    ['xlayer-fork', '0xB6CEceAB302E2E4948951eE7843FC24E92933061', 'fork:0xabc'],
+    ['xlayer-testnet', '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3', 'https://www.oklink.com/xlayer-test/tx/0xabc'],
+    ['localnet', '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3', 'local:0xabc'],
   ])('on %s, settles in its own USDC and shows a transaction where that chain shows it', async (key, usdc, link) => {
     vi.stubEnv('XORR_CHAIN', key);
-    vi.stubEnv('ALLOW_MAINNET', key === 'base' ? 'yes' : '');
+    vi.stubEnv('ALLOW_MAINNET', key === 'xlayer' ? 'yes' : '');
     const chains = await import('./chains.js');
-    expect(chains.ADDRESSES.usdcBase).toBe(usdc);
+    expect(chains.ADDRESSES.usdc).toBe(usdc);
     expect(chains.explorerTx('0xabc')).toBe(link);
   });
 });

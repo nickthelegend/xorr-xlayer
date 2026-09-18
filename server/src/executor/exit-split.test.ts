@@ -7,7 +7,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 const MARK = vi.hoisted(() => ({ priceOf: vi.fn() }));
 vi.mock('../market/prices.js', () => MARK);

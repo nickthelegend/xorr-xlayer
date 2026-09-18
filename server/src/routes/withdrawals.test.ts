@@ -64,7 +64,7 @@ vi.mock('../audit/log.js', () => ({ append: vi.fn(async () => undefined) }));
 vi.mock('../evm/client.js', () => ({ publicClient: { readContract: vi.fn(), getTransactionReceipt: vi.fn() } }));
 vi.mock('../evm/chains.js', () => ({
   AAVE_V3_POOL: h.POOL,
-  ADDRESSES: { usdcBase: h.USDC, wethBase: h.WETH },
+  ADDRESSES: { usdc: h.USDC, weth: h.WETH },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
 vi.mock('../evm/delegation.js', () => ({ waitForTx: vi.fn() }));

@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../evm/chains.js', () => ({ CHAIN_KEY: 'base-fork' }));
+vi.mock('../evm/chains.js', () => ({ CHAIN_KEY: 'xlayer-fork' }));
 vi.mock('../db/index.js', () => ({ query: vi.fn() }));
 
 const { query } = await import('../db/index.js');

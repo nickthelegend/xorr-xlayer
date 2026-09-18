@@ -9,7 +9,7 @@
  */
 import { erc20Abi, formatUnits, type Address } from 'viem';
 import { publicClient } from './client.js';
-import { ADDRESSES, CHAIN_KEY } from './chains.js';
+import { ADDRESSES, CHAIN_KEY, ONEINCH_ROUTER } from './chains.js';
 import { oneinchApi } from '../venues/oneinch.js';
 
 /**
@@ -57,11 +57,11 @@ export async function chainAllowance(token: Address, owner: Address, spender: Ad
 
 /** The 1inch router, and where its allowances are read from on this chain. */
 export async function routerSpender(): Promise<{ address: Address; source: '1inch' | 'chain' }> {
-  if (CHAIN_KEY === 'base') {
+  if (CHAIN_KEY === 'xlayer') {
     const r = await oneinchApi<{ address: string }>('/swap/v6.0/8453/approve/spender', 3_600_000);
     return { address: r.address as Address, source: '1inch' };
   }
-  return { address: ADDRESSES.oneInchRouter, source: 'chain' };
+  return { address: ONEINCH_ROUTER, source: 'chain' };
 }
 
 /** The wallet's allowance to the router — from 1inch's Approve API or the chain, as `routerSpender` said. */

@@ -7,7 +7,7 @@
  * already past — because a flatten that only works when the calendar is right is not a flatten.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 /*
  * base-sepolia is a persistent chain, so the executor refuses to invent a delegate key there. This
  * passed only on machines that happened to have one on disk. Anvil's public development key #0 — it

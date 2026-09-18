@@ -17,7 +17,7 @@ const TOKEN_SCRIPT = fileURLToPath(new URL('../e2e-token.ts', import.meta.url));
 const OWNER_EMAIL = process.env.E2E_PRIVY_EMAIL ?? 'test-8958@privy.io';
 
 const health = (await (await fetch(`${BASE}/health`)).json().catch(() => ({}))) as { chain?: string };
-const FORK = health.chain === 'base-fork';
+const FORK = health.chain === 'xlayer-fork';
 
 let token = '';
 async function call(method: string, path: string, body?: unknown) {

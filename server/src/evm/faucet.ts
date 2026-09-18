@@ -42,7 +42,7 @@ import { readChain } from '../http/chain-read.js';
 import { markBroadcast } from '../http/request-id.js';
 import { WHALE as USDC_HOLDER, anvil } from '../fork/makers.js';
 
-const USDC = ADDRESSES.usdcBase;
+const USDC = ADDRESSES.usdc;
 const USDC_DECIMALS = 6;
 
 /**
@@ -162,7 +162,7 @@ export function refusedOutright(): Refused | undefined {
 export async function readFaucetOffer(): Promise<FaucetOffer> {
   const outright = refusedOutright();
   if (outright) return outright;
-  return CHAIN_KEY === 'base-sepolia' ? sepoliaOffer() : forkOffer();
+  return CHAIN_KEY === 'xlayer-testnet' ? sepoliaOffer() : forkOffer();
 }
 
 async function forkOffer(): Promise<FaucetOffer> {

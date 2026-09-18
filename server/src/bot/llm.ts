@@ -98,7 +98,7 @@ const REPAIR_HINT: Record<VoiceViolation, string> = {
  * error than describing a market that does not exist here at all.
  */
 const VENUE: Venue = {
-  chain: CHAIN_KEY === 'base-sepolia' ? 'Base Sepolia' : 'Base',
+  chain: CHAIN_KEY === 'xlayer-testnet' ? 'Base Sepolia' : 'Base',
   tradable: Object.keys(TOKENS),
 };
 

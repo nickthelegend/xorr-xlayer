@@ -410,7 +410,7 @@ export async function planYieldRotation(ctx: PlanContext): Promise<TradeIntent |
 
   // Same reason the yield module pins mainnet USDC: supplying the wrong asset to a real pool is
   // not a failure that reverts cleanly.
-  if (ADDRESSES.usdcBase.toLowerCase() !== reserve.asset.toLowerCase()) return null;
+  if (ADDRESSES.usdc.toLowerCase() !== reserve.asset.toLowerCase()) return null;
 
   const cash = await cashUsd(ctx.owner);
   const idle = cash - keepCashUsd;

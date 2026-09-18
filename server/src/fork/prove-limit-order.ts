@@ -39,7 +39,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 const RPC = process.env.FORK_RPC;
 if (!RPC) throw new Error('FORK_RPC is required: the anvil fork to prove on');
-if (process.env.XORR_CHAIN !== 'base-fork') {
+if (process.env.XORR_CHAIN !== 'xlayer-fork') {
   throw new Error('XORR_CHAIN=base-fork is required, so the executor modules send to the fork');
 }
 

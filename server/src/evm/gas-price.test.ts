@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StillFetching } from '../http/deadline.js';
 
-const h = vi.hoisted(() => ({ chain: 'base-fork' }));
+const h = vi.hoisted(() => ({ chain: 'xlayer-fork' }));
 vi.mock('./chains.js', () => ({
   get CHAIN_KEY() {
     return h.chain;
@@ -21,7 +21,7 @@ const { priceOf } = await import('../market/prices.js');
 const { gasPrice, networkCost } = await import('./gas-price.js');
 
 beforeEach(() => {
-  h.chain = 'base-fork';
+  h.chain = 'xlayer-fork';
   // 2 gwei.
   vi.mocked(publicClient.getGasPrice).mockReset().mockResolvedValue(2_000_000_000n);
   vi.mocked(oneinchApi)
@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('the gas price', () => {
   it("on Base, is 1inch's normal-priority max fee, from the Gas Price API", async () => {
-    h.chain = 'base';
+    h.chain = 'xlayer';
     expect(await gasPrice()).toEqual({ wei: 7_500_000n, source: '1inch' });
     expect(oneinchApi).toHaveBeenCalledWith('/gas-price/v1.6/8453');
     expect(publicClient.getGasPrice).not.toHaveBeenCalled();

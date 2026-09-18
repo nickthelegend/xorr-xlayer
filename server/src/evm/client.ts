@@ -35,7 +35,7 @@ const KEY_DIR = process.env.XORR_KEY_DIR ?? path.join(import.meta.dirname, '../.
  * the message costs one deploy; one that boots with the wrong identity costs every trade until
  * someone works out why nothing is filling.
  */
-const EPHEMERAL_KEY_OK = CHAIN_KEY === 'localnet' || CHAIN_KEY === 'base-fork';
+const EPHEMERAL_KEY_OK = CHAIN_KEY === 'localnet' || CHAIN_KEY === 'xlayer-fork';
 
 function loadOrCreateKey(name: string): Hex {
   fs.mkdirSync(KEY_DIR, { recursive: true });

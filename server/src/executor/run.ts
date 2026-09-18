@@ -434,7 +434,7 @@ async function runStrategyInner(
     const graphCall = await decide({
       owner,
       wantUsd: usd,
-      token: ADDRESSES.usdcBase,
+      token: ADDRESSES.usdc,
       // The second index needs to know which app's books to look in and how much of the bought
       // token has to come out of one for it to be a candidate.
       aquaApp: AQUA_BOOK_ADDRESS,

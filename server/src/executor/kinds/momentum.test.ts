@@ -6,7 +6,7 @@
  * expensive shape in this ladder, so the stop is not optional and the tests treat it that way.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 import { describe, expect, it, vi } from 'vitest';
 

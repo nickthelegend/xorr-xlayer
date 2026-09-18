@@ -14,12 +14,12 @@ vi.mock('../evm/delegation.js', () => ({
 }));
 vi.mock('../evm/chains.js', () => ({
   ADDRESSES: {
-    usdcBase: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    wethBase: '0x4200000000000000000000000000000000000006',
-    cbbtcBase: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    weth: '0x4200000000000000000000000000000000000006',
+    btc: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
   },
-  CHAIN_KEY: 'base-fork',
-  IS_BASE_MAINNET_STATE: true,
+  CHAIN_KEY: 'xlayer-fork',
+  IS_MAINNET_STATE: true,
 }));
 vi.mock('../db/index.js', () => ({ one: vi.fn(), query: vi.fn() }));
 

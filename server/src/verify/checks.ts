@@ -301,7 +301,7 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       run: async () => {
         const walletId = await privyDemoWalletId();
         if (!walletId) skip('No policy-bound wallet on this deployment.');
-        const chainId = CHAIN_KEY === 'base-sepolia' ? 84532 : 8453;
+        const chainId = CHAIN_KEY === 'xlayer-testnet' ? 84532 : 8453;
         // Marked before it is tried: getting through is the failure this check exists to catch, and it would be a real send.
         await markBroadcast();
         try {
@@ -568,13 +568,19 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       claim: 'The delegation contract never holds funds between trades.',
       how: 'balanceOf(delegation) for USDC and WETH',
       run: async () => {
-        const [usdc, weth] = await publicClient.multicall({
+        // WETH only where the chain has it: the testnet does not.
+        const wethAddress = ADDRESSES.weth;
+        const held = await publicClient.multicall({
           allowFailure: false,
           contracts: [
-            { address: ADDRESSES.usdcBase, abi: erc20Abi, functionName: 'balanceOf' as const, args: [DELEGATION_ADDRESS] as const },
-            { address: ADDRESSES.wethBase, abi: erc20Abi, functionName: 'balanceOf' as const, args: [DELEGATION_ADDRESS] as const },
+            { address: ADDRESSES.usdc, abi: erc20Abi, functionName: 'balanceOf' as const, args: [DELEGATION_ADDRESS] as const },
+            ...(wethAddress
+              ? [{ address: wethAddress, abi: erc20Abi, functionName: 'balanceOf' as const, args: [DELEGATION_ADDRESS] as const }]
+              : []),
           ],
         });
+        const usdc = held[0] ?? 0n;
+        const weth = held[1] ?? 0n;
         if (usdc > 0n || weth > 0n) {
           throw new Error(
             `the contract is holding ${formatUnits(usdc, 6)} USDC and ${formatUnits(weth, 18)} WETH`,

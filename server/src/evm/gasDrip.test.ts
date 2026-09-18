@@ -12,9 +12,9 @@ const getBalance = vi.fn();
 const sendTransaction = vi.fn(async () => '0xdrip');
 
 vi.mock('./client.js', () => ({ publicClient: { getBalance: (...a: unknown[]) => getBalance(...a) } }));
-const h = vi.hoisted(() => ({ chain: 'base-sepolia', baseState: false }));
+const h = vi.hoisted(() => ({ chain: 'xlayer-testnet', baseState: false }));
 vi.mock('./chains.js', () => ({
-  get IS_BASE_MAINNET_STATE() {
+  get IS_MAINNET_STATE() {
     return h.baseState;
   },
   get CHAIN_KEY() {
@@ -40,7 +40,7 @@ beforeEach(() => {
   getBalance.mockReset();
   sendTransaction.mockClear();
   delete process.env.FAUCET_PRIVATE_KEY;
-  h.chain = 'base-sepolia';
+  h.chain = 'xlayer-testnet';
   h.baseState = false;
 });
 afterEach(() => {

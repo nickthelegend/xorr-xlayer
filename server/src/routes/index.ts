@@ -36,7 +36,7 @@ import { backingDetail } from '../venues/backing-detail.js';
 import { dividendYield } from '../venues/dividend-yield.js';
 import { checkEligibility } from '../solana/eligibility.js';
 import { XSTOCKS, xStockKey } from '../venues/xstocks.js';
-import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_BASE_MAINNET_STATE, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
+import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
 import { allowanceView, chainAllowance, routerAllowance, routerSpender } from '../evm/allowances.js';
 import { delegateAccount } from '../evm/client.js';
 import { basenameOf } from '../evm/basename.js';
@@ -89,7 +89,7 @@ routes.get('/wallet', async (c) => {
    * `cluster` is where the wallet was CREATED. `chain` is where the executor is settling now.
    *
    * They are different facts and the screen was showing the first while meaning the second — so a
-   * wallet created on Sepolia and now trading a Base fork reported "base-sepolia" underneath live
+   * wallet created on Sepolia and now trading a Base fork reported "xlayer-testnet" underneath live
    * Base balances. The stored value is history and stays; the live one is what a user is asking
    * about when they look at this line.
    */
@@ -547,13 +547,13 @@ async function approvableTokens(): Promise<{ symbol: string; address: Address }[
    * The user would then have granted a permission that could never pull the token it spends.
    *
    * `ADDRESSES` follows `XORR_CHAIN`, so this is what the delegation will actually be asked to
-   * move. The equities are added only where they function. `IS_BASE_MAINNET_STATE` is true on a
+   * move. The equities are added only where they function. `IS_MAINNET_STATE` is true on a
    * fork too, and `getCode` cannot tell a fork's equities from Base's: each carries one byte of
    * code, and on a fork every call to it fails `OpcodeNotFound`. So a fork build's grant asked for
    * eight approvals that could never execute, and stopped at the first (found proving PLAN.md 4.7).
    * The test is the one `/market/tradable` and `/verify` already use.
    */
-  const equities = IS_BASE_MAINNET_STATE && (await equitiesFunctional());
+  const equities = IS_MAINNET_STATE && (await equitiesFunctional());
   const settlement: [string, Address][] = [
     ...APPROVABLE_TOKENS.map((t) => [t.symbol, t.address] as [string, Address]),
     ...(equities ? Object.values(STOCKS).map((st) => [st.symbol, st.address] as [string, Address]) : []),
@@ -635,7 +635,7 @@ routes.get('/delegation/params', async (c) => {
     contract: DELEGATION_ADDRESS,
     delegate: delegatePublicKey,
     venues: SETTLEMENT_VENUES,
-    token: ADDRESSES.usdcBase,
+    token: ADDRESSES.usdc,
     /*
      * EVERY token the delegation may need to pull, not just the one it spends.
      *

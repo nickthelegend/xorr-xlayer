@@ -136,19 +136,3 @@ describe('whether an address is usable is the executor’s answer', () => {
     expect(usableIn(entry({ usableAt: serverTime + 24 * HOUR }), serverTime)).toBe('in 24 h');
   });
 });
-
-describe('allowlist on Solana cluster', () => {
-  const validSolana = '7v91N7iZEdMoQg6zJ5pA9oG3eF1n3hXyZ1W2v3u4t5s6';
-  const validEvm = '0x95A0b368588713011a15f4b1041423f31B08e615';
-
-  it('accepts Solana base58 and rejects EVM when on Solana', () => {
-    expect(isValidAddress(validSolana, 'solana-fork')).toBe(true);
-    expect(isValidAddress('  ' + validSolana + '  ', 'solana-fork')).toBe(true);
-    expect(isValidAddress(validEvm, 'solana-fork')).toBe(false);
-  });
-
-  it('preserves case sensitivity for Solana base58 in sameAddress', () => {
-    expect(sameAddress(validSolana, validSolana)).toBe(true);
-    expect(sameAddress(validSolana, validSolana.toLowerCase())).toBe(false);
-  });
-});

@@ -16,7 +16,7 @@ import {
 } from 'viem';
 import { publicClient, walletClient, delegateAccount } from './client.js';
 import { markBroadcast } from '../http/request-id.js';
-import { ADDRESSES, SETTLEMENT_VENUES } from './chains.js';
+import { ADDRESSES, SETTLEMENT_VENUES, ONEINCH_ROUTER } from './chains.js';
 import 'dotenv/config';
 
 export const DELEGATION_ADDRESS = (process.env.DELEGATION_ADDRESS ??
@@ -354,8 +354,8 @@ export async function spendAsDelegate(
     functionName: 'spend',
     args: [
       params.owner,
-      params.token ?? ADDRESSES.usdcBase,
-      params.venue ?? ADDRESSES.oneInchRouter,
+      params.token ?? ADDRESSES.usdc,
+      params.venue ?? ONEINCH_ROUTER,
       usdToUnits(params.usd),
       params.tokenOut,
       params.minOut,

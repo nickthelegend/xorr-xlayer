@@ -42,10 +42,10 @@ if (!API_KEY) {
 export const SETTLEMENT_SYMBOL = 'USDC';
 
 export const TOKENS: Record<string, { address: Address; decimals: number }> = {
-  ETH: { address: QUOTE_ADDRESSES.nativeEth, decimals: 18 },
-  WETH: { address: QUOTE_ADDRESSES.wethBase, decimals: 18 },
-  USDC: { address: QUOTE_ADDRESSES.usdcBase, decimals: 6 },
-  CBBTC: { address: QUOTE_ADDRESSES.cbbtcBase, decimals: 8 },
+  ETH: { address: QUOTE_ADDRESSES.nativeToken, decimals: 18 },
+  WETH: { address: QUOTE_ADDRESSES.weth, decimals: 18 },
+  USDC: { address: QUOTE_ADDRESSES.usdc, decimals: 6 },
+  CBBTC: { address: QUOTE_ADDRESSES.btc, decimals: 8 },
   ...Object.fromEntries(
     Object.values(STOCKS).map((s) => [s.symbol, { address: s.address, decimals: s.decimals }]),
   ),
@@ -423,7 +423,7 @@ const FORK_AMMS = [
  */
 
 const AMM_ONLY =
-  CHAIN_KEY === 'base-fork' || CHAIN_KEY === 'localnet'
+  CHAIN_KEY === 'xlayer-fork' || CHAIN_KEY === 'localnet'
     ? `&complexityLevel=0&mainRouteParts=1&parts=1&protocols=${FORK_AMMS}`
     : '';
 
@@ -436,10 +436,10 @@ const AMM_ONLY =
  * owner to that, less the tolerance, in the contract's own floor. On Base the router enforces the tolerance itself.
  */
 export const FORK_ROUTER_SLIPPAGE_PCT = 50;
-const ROUTER_DRIFTS = CHAIN_KEY === 'base-fork' || CHAIN_KEY === 'localnet';
+const ROUTER_DRIFTS = CHAIN_KEY === 'xlayer-fork' || CHAIN_KEY === 'localnet';
 
 /** Where a swap can actually land. Base mainnet, or a fork of it. */
-export const CAN_SETTLE = CHAIN_KEY === 'base' || CHAIN_KEY === 'base-fork';
+export const CAN_SETTLE = CHAIN_KEY === 'xlayer' || CHAIN_KEY === 'xlayer-fork';
 
 /**
  * Build the calldata for a real swap.

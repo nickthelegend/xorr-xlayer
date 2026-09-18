@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 const h = vi.hoisted(() => ({ multicall: vi.fn(), getCode: vi.fn(), getJson: vi.fn(), staleValue: vi.fn() }));
 

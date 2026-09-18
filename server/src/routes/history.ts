@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 import { formatUnits, type Address } from 'viem';
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
-import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, IS_BASE_MAINNET_STATE, explorerTx } from '../evm/chains.js';
+import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, IS_MAINNET_STATE, explorerTx, ONEINCH_ROUTER } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { getLogsPaged } from '../evm/logs.js';
@@ -122,13 +122,13 @@ type Placed = { item: HistoryItem; txIndex: number; logIndex: number };
  * The token at an address, from the registry — or null, and the amount stays raw.
  *
  * `TOKENS` is all-mainnet on purpose (it is what 1inch is asked about), and on Base Sepolia the settlement USDC is
- * Circle's other deployment, `ADDRESSES.usdcBase`. So this chain's own USDC is checked first: without it every Sepolia
+ * Circle's other deployment, `ADDRESSES.usdc`. So this chain's own USDC is checked first: without it every Sepolia
  * spend would read as an unknown token.
  */
 function tokenAt(address: string): HistoryToken | null {
   const a = address.toLowerCase();
-  if (a === ADDRESSES.usdcBase.toLowerCase()) {
-    return { symbol: SETTLEMENT_SYMBOL, decimals: TOKENS[SETTLEMENT_SYMBOL]!.decimals, address: ADDRESSES.usdcBase };
+  if (a === ADDRESSES.usdc.toLowerCase()) {
+    return { symbol: SETTLEMENT_SYMBOL, decimals: TOKENS[SETTLEMENT_SYMBOL]!.decimals, address: ADDRESSES.usdc };
   }
   for (const [symbol, t] of Object.entries(TOKENS)) {
     if (t.address.toLowerCase() === a) return { symbol, decimals: t.decimals, address: t.address };
@@ -152,8 +152,8 @@ function dollarsOf(token: HistoryToken | null, amount: bigint): number | null {
  */
 function venueName(address: string): string {
   const named: [string | undefined, SettlementVenue][] = [
-    [ADDRESSES.oneInchRouter, '1inch'],
-    [IS_BASE_MAINNET_STATE ? AAVE_V3_POOL : undefined, 'aave'],
+    [ONEINCH_ROUTER, '1inch'],
+    [IS_MAINNET_STATE ? AAVE_V3_POOL : undefined, 'aave'],
     [bookAddress(), 'aqua'],
     [swapVmBookAddress(), 'swapvm'],
   ];
@@ -289,7 +289,7 @@ historyRoutes.get('/history', async (c) => {
    * failure can neither become an unhandled rejection nor take the chain's history down with it.
    */
   const fromOneInch =
-    CHAIN_KEY === 'base'
+    CHAIN_KEY === 'xlayer'
       ? oneinchHistory(owner, limit).then(
           (events) => ({ events, reason: null }),
           (e: unknown) => ({ events: [] as OneInchHistoryEvent[], reason: reasonOf(e) }),

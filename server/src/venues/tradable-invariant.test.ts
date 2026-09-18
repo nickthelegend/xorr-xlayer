@@ -9,7 +9,7 @@
  * Two sources of truth with no test holding them together, and the screen was the one that lied.
  */
 process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'base-sepolia';
+process.env.XORR_CHAIN ??= 'xlayer-testnet';
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 

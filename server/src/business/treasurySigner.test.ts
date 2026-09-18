@@ -8,13 +8,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeFunctionData, erc20Abi, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
-const env = vi.hoisted(() => ({ chain: 'base-fork' as string }));
+const env = vi.hoisted(() => ({ chain: 'xlayer-fork' as string }));
 vi.mock('../evm/chains.js', () => ({
   get CHAIN_KEY() {
     return env.chain;
   },
   get chain() {
-    return { id: env.chain === 'base-sepolia' ? 84532 : 8453 };
+    return { id: env.chain === 'xlayer-testnet' ? 84532 : 8453 };
   },
 }));
 vi.mock('../auth/privyPolicy.js', () => ({ rpcAsWallet: vi.fn() }));
@@ -58,7 +58,7 @@ const signed = (by = treasury, over: { data?: Hex; nonce?: number; to?: `0x${str
 
 beforeEach(() => {
   vi.clearAllMocks();
-  env.chain = 'base-fork';
+  env.chain = 'xlayer-fork';
   vi.mocked(publicClient.getTransactionCount).mockResolvedValue(7);
   vi.mocked(publicClient.estimateGas).mockResolvedValue(60_000n);
   vi.mocked(publicClient.estimateFeesPerGas).mockResolvedValue({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n } as never);
@@ -130,7 +130,7 @@ describe('on a fork, Privy signs and the executor sends', () => {
 
 describe('where Privy knows the chain, Privy sends', () => {
   it("asks for eth_sendTransaction on Base Sepolia and waits for Privy's transaction", async () => {
-    env.chain = 'base-sepolia';
+    env.chain = 'xlayer-testnet';
     vi.mocked(rpcAsWallet).mockResolvedValue({ method: 'eth_sendTransaction', data: { hash: HASH, caip2: 'eip155:84532' } });
 
     await expect(transactAsTreasury(call)).resolves.toEqual({ hash: HASH, broadcastBy: 'privy' });
@@ -145,7 +145,7 @@ describe('where Privy knows the chain, Privy sends', () => {
 
 describe('never where money is real', () => {
   it('refuses on Base before asking Privy for anything', async () => {
-    env.chain = 'base';
+    env.chain = 'xlayer';
 
     await expect(transactAsTreasury(call)).rejects.toThrow(/money is real/);
     expect(rpcAsWallet).not.toHaveBeenCalled();

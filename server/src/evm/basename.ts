@@ -13,7 +13,7 @@
  */
 import { namehash, type Address } from 'viem';
 import { publicClient } from './client.js';
-import { IS_BASE_MAINNET_STATE } from './chains.js';
+import { IS_MAINNET_STATE } from './chains.js';
 
 /** Base's L2 resolver. Basenames are a Base mainnet deployment; there is none on Sepolia. */
 export const L2_RESOLVER: Address = '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD';
@@ -61,7 +61,7 @@ export async function basenameOf(address: Address): Promise<string | null> {
 
   // Basenames exist on Base mainnet (and therefore on a fork of it). Anywhere else the resolver
   // has no code and the call would revert, so answer honestly instead of pretending.
-  if (!IS_BASE_MAINNET_STATE) {
+  if (!IS_MAINNET_STATE) {
     cache.set(key, null);
     return null;
   }
@@ -86,7 +86,7 @@ export async function basenameOf(address: Address): Promise<string | null> {
 
 /** Forward resolution, so a user can send to `someone.base.eth` instead of pasting 42 characters. */
 export async function addressOfBasename(name: string): Promise<Address | null> {
-  if (!IS_BASE_MAINNET_STATE) return null;
+  if (!IS_MAINNET_STATE) return null;
   try {
     const addr = await publicClient.readContract({
       address: L2_RESOLVER,

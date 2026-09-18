@@ -9,7 +9,7 @@
  * So the executor drips a little testnet gas to a wallet it has just seen created. Not a feature —
  * a testnet affordance, and it is fenced accordingly:
  *
- *   - **Testnet only.** `IS_BASE_MAINNET_STATE` covers Base and any fork of it, and this refuses on
+ *   - **Testnet only.** `IS_MAINNET_STATE` covers Base and any fork of it, and this refuses on
  *     both. Sending real ETH to an address because someone signed up is not a thing this should be
  *     able to do by accident.
  *   - **Once per wallet, and only a verified one.** The guarantee is `inserted` from `bindWallet`
@@ -32,7 +32,7 @@
 import { createWalletClient, formatEther, http, parseEther, type Address, type Hex } from 'viem';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { publicClient } from './client.js';
-import { IS_BASE_MAINNET_STATE, CHAIN_KEY, chain, rpcUrl } from './chains.js';
+import { IS_MAINNET_STATE, CHAIN_KEY, chain, rpcUrl } from './chains.js';
 import { moneyOn } from './money.js';
 import { markBroadcast } from '../http/request-id.js';
 
@@ -56,7 +56,7 @@ export async function dripGasIfNeeded(to: Address): Promise<DripResult> {
    * Never on Base's own state, and never on a chain whose money is real (`evm/money.ts`). Only the first was here, so a
    * mainnet under any other key, with a faucet key set, would have been sent real ETH from that key.
    */
-  if (IS_BASE_MAINNET_STATE || moneyOn(CHAIN_KEY) === 'real') {
+  if (IS_MAINNET_STATE || moneyOn(CHAIN_KEY) === 'real') {
     return { sent: false, reason: `refusing to send real ETH on ${CHAIN_KEY}` };
   }
 

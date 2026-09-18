@@ -46,8 +46,8 @@ vi.mock('../evm/client.js', () => ({
   delegateAccount: { address: '0x316DA498a463abE2F9B2dd316F4005f4343b910f' },
 }));
 vi.mock('../evm/chains.js', () => ({
-  ADDRESSES: { oneInchRouter: h.ROUTER, usdcBase: h.USDC, wethBase: h.WETH },
-  CHAIN_KEY: 'base-fork',
+  ADDRESSES: { oneInchRouter: h.ROUTER, usdc: h.USDC, weth: h.WETH },
+  CHAIN_KEY: 'xlayer-fork',
   chain: { id: 8453 },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
