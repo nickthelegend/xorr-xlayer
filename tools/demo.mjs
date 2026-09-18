@@ -12,10 +12,8 @@
  * aborting. A recording that ends at beat three because a button moved is worth less than one that
  * misses a beat and keeps going, and the log says exactly which beats landed.
  *
- * Run (records the deployed app):
- *   PRIVY_APP_ID=… PRIVY_APP_SECRET=… node tools/demo.mjs
- *
- * Or point it somewhere else:
+ * Run (APP_URL is required — the X Layer web app to record):
+ *   APP_URL=https://<the X Layer web app> PRIVY_APP_ID=… PRIVY_APP_SECRET=… node tools/demo.mjs
  *   APP_URL=http://localhost:8082 PRIVY_APP_ID=… PRIVY_APP_SECRET=… node tools/demo.mjs
  *
  * Then:  ffmpeg -i docs/demo/demo.webm -vf "fps=12,scale=402:-1" docs/demo/demo.gif
@@ -45,14 +43,22 @@ try {
 }
 
 /*
- * The SHIPPED app by default, not a machine only I can reach.
+ * Named, never defaulted.
  *
- * This defaulted to `localhost:8082`, and that is how the previous recording came to be shot
- * against a dev server: it ran, it worked, and nothing said the footage was of something nobody
- * else could open. A demo of the deployed product is the only demo worth having, so the deployed
- * product is what this records unless told otherwise.
+ * This defaulted to `localhost:8082` (footage of a dev server nobody else could open), then to app.xorr.finance —
+ * which, since the move to X Layer, serves the old Base build. A demo of the wrong product is worse than none, so the
+ * app to record is always said out loud.
  */
-const BASE = process.env.APP_URL ?? 'https://app.xorr.finance';
+/*
+ * The web app to drive. Required: the X Layer build's hosted URL is not settled yet, and app.xorr.finance still serves
+ * the Base build — a default there would sign in to, record or change the wrong product without saying so.
+ */
+const APP_URL = (process.env.APP_URL ?? '').trim().replace(/\/+$/, '');
+if (!/^https?:\/\//.test(APP_URL)) {
+  console.error('APP_URL is required: the X Layer web app to use, e.g. APP_URL=http://localhost:8082. There is no default.');
+  process.exit(2);
+}
+const BASE = APP_URL;
 const OUT = path.resolve(import.meta.dirname, '../docs/demo');
 /** design.md's canvas. A phone layout recorded at desktop width looks like a mistake. */
 const VIEWPORT = { width: 402, height: 874 };

@@ -12,7 +12,7 @@
  * executor never holds that key. So this does what a person does — signs in with Privy's test
  * credentials, opens the permission screen, chooses 30 days, presses "Sign this permission", and
  * approves each Privy dialog — and then reads the result back from the executor, which reads it
- * from the chain. Base Sepolia, so the only thing spent is testnet gas.
+ * from the chain. On X Layer testnet or the fork, so the only thing spent is test OKB for gas.
  *
  * WHAT THE PRIVY FLOW LOOKS LIKE, measured on 2026-09-11
  *
@@ -22,7 +22,8 @@
  * once, waited three minutes for a second dialog that was never going to appear, and granted
  * nothing.
  *
- * Run: node tools/grant-test-wallet.mjs [days]      (days: 1, 3, 7 or 30 — default 30)
+ * Run: APP_URL=<the X Layer web app> node tools/grant-test-wallet.mjs [days]      (days: 1, 3, 7 or 30 — default 30)
+ *      EXPO_PUBLIC_API_URL picks the executor that reads the permission back (default: the hosted X Layer fork's).
  */
 import { Buffer } from 'node:buffer';
 import { chromium } from 'playwright';
@@ -33,8 +34,17 @@ try {
   // No `.env` is legitimate; the checks below say what is missing.
 }
 
-const APP = process.env.APP_URL ?? 'https://app.xorr.finance';
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://executor-production-1659.up.railway.app';
+/*
+ * The web app to drive. Required: the X Layer build's hosted URL is not settled yet, and app.xorr.finance still serves
+ * the Base build — a default there would sign in to, record or change the wrong product without saying so.
+ */
+const APP_URL = (process.env.APP_URL ?? '').trim().replace(/\/+$/, '');
+if (!/^https?:\/\//.test(APP_URL)) {
+  console.error('APP_URL is required: the X Layer web app to use, e.g. APP_URL=http://localhost:8082. There is no default.');
+  process.exit(2);
+}
+const APP = APP_URL;
+const API = (process.env.EXPO_PUBLIC_API_URL ?? 'https://executor-fork-production-2db8.up.railway.app').replace(/\/+$/, '');
 const EMAIL = process.env.E2E_PRIVY_EMAIL ?? 'test-8958@privy.io';
 const WANT = `${process.argv[2] ?? '30'} Day${process.argv[2] === '1' ? '' : 's'}`;
 

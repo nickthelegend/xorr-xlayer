@@ -6,7 +6,9 @@
  * 400 or above (a 503 carrying Retry-After is the executor's warming handshake and is not a failure), the page's text,
  * and a screenshot at the design's canvas size. Nothing is mocked and nothing signs in: this is what a visitor gets.
  *
- *   WEB=https://app.xorr.finance ROUTES=routes.txt OUT=out-dir node tools/web-sweep.mjs
+ *   APP_URL=https://<the X Layer web app> ROUTES=routes.txt OUT=out-dir node tools/web-sweep.mjs
+ *
+ * `APP_URL` (or the older `WEB`) is required: app.xorr.finance still serves the Base build, so there is no default.
  *
  * `ROUTES` is one path per line (docs/qa/SCREENS.md's example URLs). Results land in `OUT/results.json`; the lines
  * printed are the routes with something to look at.
@@ -15,12 +17,12 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const BASE = (process.env.WEB ?? 'https://app.xorr.finance').replace(/\/+$/, '');
+const BASE = (process.env.APP_URL ?? process.env.WEB ?? '').trim().replace(/\/+$/, '');
 const OUT = process.env.OUT;
 const ROUTES = process.env.ROUTES;
 const SETTLE_MS = Number(process.env.SETTLE_MS ?? 6000);
-if (!OUT || !ROUTES) {
-  console.error('usage: WEB=… ROUTES=routes.txt OUT=dir node tools/web-sweep.mjs');
+if (!/^https?:\/\//.test(BASE) || !OUT || !ROUTES) {
+  console.error('usage: APP_URL=<the X Layer web app> ROUTES=routes.txt OUT=dir node tools/web-sweep.mjs — APP_URL has no default');
   process.exit(2);
 }
 fs.mkdirSync(OUT, { recursive: true });

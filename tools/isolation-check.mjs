@@ -9,15 +9,25 @@
  * Rendering an empty balance and an empty list is the failure mode — a screen that shows "$0.00"
  * to a signed-out visitor is stating a fact about a wallet it has not looked at.
  *
- * Run: node tools/isolation-check.mjs
+ * Run: APP_URL=<the X Layer web app> node tools/isolation-check.mjs
+ *      EXPO_PUBLIC_API_URL picks the executor asked about the second account (default: the hosted X Layer fork's).
  */
 import { Buffer } from 'node:buffer';
 import { chromium } from 'playwright';
 
 try { process.loadEnvFile(new URL('../.env', import.meta.url)); } catch {}
 
-const APP = process.env.APP_URL ?? 'https://app.xorr.finance';
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://executor-production-1659.up.railway.app';
+/*
+ * The web app to drive. Required: the X Layer build's hosted URL is not settled yet, and app.xorr.finance still serves
+ * the Base build — a default there would sign in to, record or change the wrong product without saying so.
+ */
+const APP_URL = (process.env.APP_URL ?? '').trim().replace(/\/+$/, '');
+if (!/^https?:\/\//.test(APP_URL)) {
+  console.error('APP_URL is required: the X Layer web app to use, e.g. APP_URL=http://localhost:8082. There is no default.');
+  process.exit(2);
+}
+const APP = APP_URL;
+const API = (process.env.EXPO_PUBLIC_API_URL ?? 'https://executor-fork-production-2db8.up.railway.app').replace(/\/+$/, '');
 const appId = process.env.PRIVY_APP_ID;
 const secret = process.env.PRIVY_APP_SECRET;
 const auth = {

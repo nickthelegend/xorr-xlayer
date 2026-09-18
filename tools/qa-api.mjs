@@ -88,10 +88,10 @@ await check('B3', 'forged JWT is 401 with a signature failure', async () => {
 });
 
 await check('B4', 'market quotes are live and positive', async () => {
-  const r = await req('/market/quotes?symbols=BTC,ETH,WETH,CBBTC,USDC', {}, false);
+  const r = await req('/market/quotes?symbols=BTC,ETH,WETH,USDC,USDT0', {}, false);
   const j = await r.json();
   must(r.status === 200, `status ${r.status}`);
-  for (const s of ['BTC', 'ETH', 'WETH', 'CBBTC', 'USDC']) {
+  for (const s of ['BTC', 'ETH', 'WETH', 'USDC', 'USDT0']) {
     must(j[s]?.price > 0, `${s} has no positive price`);
   }
   return `BTC $${j.BTC.price}`;
@@ -106,9 +106,10 @@ await check('B5', 'OHLC rows differ by window', async () => {
   return `${a.rows.length} vs ${b.rows.length} rows`;
 });
 
-await check('B6', 'all 8 equities price live from a route', async () => {
+await check('B6', 'every wrapped xStock prices live from an X Layer route', async () => {
   const rows = await (await req('/market/stocks', {}, false)).json();
-  must(rows.length === 8, `${rows.length} rows`);
+  // server/src/venues/stocks.ts lists eleven; the count is read, not assumed, so a listing added there is priced here too.
+  must(rows.length > 0, 'no xStocks listed');
   for (const s of rows) {
     must(s.feed === 'live', `${s.symbol} feed is ${s.feed}`);
     must(s.price > 5 && s.price < 5000, `${s.symbol} implausible price ${s.price}`);
@@ -126,7 +127,7 @@ await check('B7', 'tradable set matches the client', async () => {
   return server.join(',');
 });
 
-await check('B8', 'Aave rate is plausible, never a zeroed struct', async () => {
+await check('B8', 'Aave v3 (X Layer) rate is plausible, never a zeroed struct', async () => {
   const j = await (await req('/yield/supply', {}, false)).json();
   must(j.feed === 'live', `feed ${j.feed}`);
   must(j.estimatedApy > 0.001 && j.estimatedApy < 0.5, `apy ${j.estimatedApy}`);
@@ -144,26 +145,15 @@ await check('B9', 'perp: mark real, unknowables null, bad symbol 404', async () 
   return `mark $${j.markPx}`;
 });
 
-await check('B10', 'agent decision names its own reason', async () => {
-  const j = await (await req('/agent/decision')).json();
-  must(typeof j.act === 'boolean', `no act field: ${JSON.stringify(j)}`);
-  must((j.rationale ?? '').length > 10, `thin rationale: ${j.rationale}`);
-  return j.act ? `act, $${j.sizeUsd} via ${j.route?.venue}` : j.reason;
-});
-
-await check('B11', 'graph health', async () => {
-  const j = await (await req('/graph/health')).json();
-  must(j.block > 0, `block ${j.block}`);
-  must(j.healthy === true, 'indexer reports errors');
-  return `block ${j.block}`;
-});
+// B10 (the agent's decision, last served at /graph/decision) and B11 (graph health) are gone with The Graph: X Layer
+// has no subgraph, and the executor serves no /graph/* route.
 
 await check('B12', 'swap quote names real venues', async () => {
-  const j = await (await req('/swap/quote?in=USDC&out=WETH&amount=250')).json();
+  const j = await (await req('/swap/quote?in=USDC&out=XBTC&amount=250')).json();
   must(j.outAmount > 0, `outAmount ${j.outAmount}`);
   must(j.minimumOut > 0 && j.minimumOut < j.outAmount, 'minimumOut is not below outAmount');
   must(j.venues?.length > 0, 'no venues named');
-  return `${j.outAmount.toFixed(5)} WETH via ${j.venues.join('+')}`;
+  return `${j.outAmount.toFixed(8)} XBTC via ${j.venues.join('+')}`;
 });
 
 
@@ -173,7 +163,7 @@ const post = (path, body) => req(path, { method: 'POST', body: JSON.stringify(bo
 
 await check('B13', 'over-cap strategy is refused with the arithmetic', async () => {
   const r = await post('/strategies', {
-    kind: 'dca', state: 'live', label: 'qa over cap', symbol: 'WETH',
+    kind: 'dca', state: 'live', label: 'qa over cap', symbol: 'XBTC',
     cadence: 'daily', dailyAllocationUsd: 9_999_999,
   });
   const j = await r.json();
@@ -191,7 +181,7 @@ await check('B14', 'untradable symbol names what IS tradable', async () => {
   const j = await r.json();
   must(r.status === 400, `status ${r.status}`);
   must(/not tradable/.test(j.detail ?? ''), `detail ${j.detail}`);
-  must(/WETH/.test(j.detail ?? ''), 'does not name the alternatives');
+  must(/XBTC/.test(j.detail ?? ''), 'does not name the alternatives');
   return 'refused, alternatives named';
 });
 
@@ -204,7 +194,7 @@ await check('B15', 'malformed JSON is 400, never 500', async () => {
 });
 
 await check('B16', 'missing fields are named', async () => {
-  const r = await post('/strategies', { kind: 'dca', symbol: 'WETH' });
+  const r = await post('/strategies', { kind: 'dca', symbol: 'XBTC' });
   const j = await r.json();
   must(r.status === 400, `status ${r.status}`);
   must(j.error === 'invalid_request', `error ${j.error}`);
@@ -214,7 +204,7 @@ await check('B16', 'missing fields are named', async () => {
 
 await check('B17', 'running twice in a period is a no-op', async () => {
   const made = await post('/strategies', {
-    kind: 'dca', state: 'live', label: `qa idem ${Date.now()}`, symbol: 'WETH',
+    kind: 'dca', state: 'live', label: `qa idem ${Date.now()}`, symbol: 'XBTC',
     cadence: 'weekly', dailyAllocationUsd: 5, params: { usd: 5 },
   });
   if (made.status !== 200) return `skipped: cap full (${made.status})`;
@@ -250,7 +240,7 @@ await check('B19', 'agent lifecycle: hire is idempotent', async () => {
 await check('B20', 'a created alert comes back in the list', async () => {
   const name = `qa alert ${Date.now()}`;
   const made = await (
-    await post('/alerts', { kind: 'price', symbol: 'WETH', name, detail: 'qa', config: { above: 1 } })
+    await post('/alerts', { kind: 'price', symbol: 'BTC', name, detail: 'qa', config: { above: 1 } })
   ).json();
   must(made.id, `no id: ${JSON.stringify(made)}`);
   const list = await (await req('/alerts')).json();
@@ -308,7 +298,7 @@ await check('B23', 'the Aave supply rate is live and plausible', async () => {
   // than be displayed. Aave returns a zeroed struct for an asset it does not list, and 0.00% is
   // exactly what that looks like from the outside.
   must(y.estimatedApy > 0 && y.estimatedApy < 0.5, `implausible APY ${y.estimatedApy}`);
-  must(String(y.source).includes('Aave v3 Pool'), 'no verifiable source cited');
+  must(String(y.source).includes('Aave v3 Pool') && /X Layer/.test(String(y.source)), 'no verifiable source cited');
   return `${(y.estimatedApy * 100).toFixed(2)}% a year, ${y.source}`;
 });
 
@@ -332,7 +322,14 @@ await check('B25', 'the grant asks for the venues the executor actually uses', a
   // A tier-4 run calls the Aave Pool. If the grant screen never asks for it, every run reaches the
   // chain and dies as VenueNotAllowed — for a permission the user was never given the chance to
   // give. One list feeds both, so this check is what keeps them from drifting apart.
-  const pool = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5'.toLowerCase();
+  // Aave v3's Pool on X Layer mainnet (server/src/evm/chains.ts AAVE_V3_POOL_MAINNET). On the testnet there is none,
+  // and the grant rightly does not ask for it.
+  const health = await (await req('/health', {}, false)).json();
+  if (health.chain === 'xlayer-testnet' || health.chain === 'localnet') {
+    must(!p.venues.some((v) => v.toLowerCase() === '0xe3f3caefdd7180f884c01e57f65df979af84f116'), `an Aave Pool on ${health.chain}`);
+    return `${health.chain} has no lending pool; venues [${p.venues.join(', ')}]`;
+  }
+  const pool = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116'.toLowerCase();
   must(
     p.venues.some((v) => v.toLowerCase() === pool),
     `the Aave Pool is not in the grant: ${p.venues.join(', ')}`,
@@ -376,7 +373,7 @@ await check('B27', 'a strategy kind with no executor is refused at creation', as
     body: JSON.stringify({
       // `momentum` is tier 6 and genuinely has no executor. This used to say `grid`, which became
       // wrong the moment tier 5 shipped — a test asserting a gap has to move as the gap closes.
-      kind: 'momentum', state: 'live', label: 'should not exist', symbol: 'WETH',
+      kind: 'momentum', state: 'live', label: 'should not exist', symbol: 'XBTC',
       params: {}, cadence: 'daily', dailyAllocationUsd: 5,
     }),
   });
@@ -440,13 +437,14 @@ await check('B31', 'metrics are derived from the tables, not a counter', async (
   must(typeof m.runFailureRate === 'number', 'no failure rate');
   must(m.gas && typeof m.gas.eth === 'number', 'no gas reading');
   must(typeof m.spentTodayUsd === 'number', 'no spend figure');
-  return `${Object.entries(m.runs).map(([k, v]) => `${v} ${k}`).join(', ')}; gas ${m.gas.eth.toFixed(3)} ETH`;
+  // `gas.eth` is the delegate's native balance under its historical name — OKB on X Layer.
+  return `${Object.entries(m.runs).map(([k, v]) => `${v} ${k}`).join(', ')}; gas ${m.gas.eth.toFixed(3)} OKB`;
 });
 
 await check('B32', 'a retried POST with the same key does not run twice', async () => {
   const key = `qa-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const body = JSON.stringify({
-    kind: 'dca', state: 'live', label: `qa idem ${key}`, symbol: 'WETH',
+    kind: 'dca', state: 'live', label: `qa idem ${key}`, symbol: 'XBTC',
     params: { usd: 5 }, cadence: 'weekly', dailyAllocationUsd: 5,
   });
   const send = () =>
@@ -513,23 +511,24 @@ await check('B35', 'a request carries an id, and honours one it is given', async
 });
 
 await check('B36', 'prices are cross-checked against a second, on-chain source', async () => {
-  const r = await withRetry(() => fetch(`${B}/market/crosscheck?symbol=ETH`));
+  // BTC is carried on X Layer by OKX's XBTC, whose Uniswap v3 pools are what a fill would touch.
+  const r = await withRetry(() => fetch(`${B}/market/crosscheck?symbol=BTC`));
   must(r.status === 200, `status ${r.status}`);
   const x = await r.json();
   // The second source is worth having because it is derived from the pools a fill would touch,
   // not because it is merely a second API.
-  must(typeof x.oneinch === 'number' && x.oneinch > 0, `no on-chain price: ${JSON.stringify(x)}`);
+  must(typeof x.pool === 'number' && x.pool > 0, `no on-chain price: ${JSON.stringify(x)}`);
   if (x.coingecko === null) return 'only the on-chain source answered — reported as such, not as a disagreement';
   must(typeof x.spreadPct === 'number', 'two prices but no spread computed');
   must(x.spreadPct < 5, `implausible spread ${x.spreadPct}%`);
-  return `coingecko $${x.coingecko.toFixed(2)} vs 1inch $${x.oneinch.toFixed(2)} — ${x.spreadPct.toFixed(3)}%`;
+  return `coingecko $${x.coingecko.toFixed(2)} vs X Layer pool $${x.pool.toFixed(2)} — ${x.spreadPct.toFixed(3)}%`;
 });
 
 await check('B37', 'an unroutable symbol gets no second opinion, not a wrong one', async () => {
-  const x = await (await withRetry(() => fetch(`${B}/market/crosscheck?symbol=BTC`))).json();
-  // This used to fall back to WETH's address and return WETH's price labelled as BTC.
-  must(x.oneinch === null, `BTC was priced on chain as ${x.oneinch} — that is WETH's price`);
-  must(/not routable/i.test(x.note), `unhelpful note: ${x.note}`);
+  // WETH has no pool with real liquidity on X Layer; it must come back unpriced rather than borrow another pool's price.
+  const x = await (await withRetry(() => fetch(`${B}/market/crosscheck?symbol=ETH`))).json();
+  must(x.pool === null, `ETH was priced on chain as ${x.pool} with no X Layer pool to price it`);
+  must(/no pool on X Layer/i.test(x.note), `unhelpful note: ${x.note}`);
   return x.note;
 });
 

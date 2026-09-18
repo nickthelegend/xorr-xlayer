@@ -1,6 +1,6 @@
 /**
  * docs/TESTPLAN.md C04, C05, C06, C07, C09 and C11 — the delegation and the audit anchor refuse what they must, as
- * deployed.
+ * deployed on X Layer.
  *
  * On the chain an executor settles on, read at one block and asked with `eth_call`, so nothing is sent:
  *
@@ -17,14 +17,28 @@
  *        a minute past the policy's expiry, `PolicyExpired`;
  *   C09  `closePosition()` reverts the same way, so a stop ends stop-losses too.
  *
- * The executor's reads are the owner's own, so they take the owner's Privy access token, which is never printed:
+ * Two ways to run it.
  *
- *   anvil --fork-url https://base-fork-production.up.railway.app --port 8563 --silent &
+ * With the executor (`PROOF_TOKEN` set): the executor's reads are the owner's own, so they take the owner's Privy access
+ * token, which is never printed. The contract, the owner, the delegate, the venues and the anchor all come from it, and
+ * C11 compares its trail with the chain:
+ *
+ *   anvil --fork-url https://xlayer-fork-production.up.railway.app --port 8563 --silent &
  *   PROOF_TOKEN=$(cd server && npx tsx --env-file=../.env src/e2e-token.ts <email> | tail -n 1) \
  *   PROOF_LOCAL_RPC=http://127.0.0.1:8563 server/node_modules/.bin/tsx tools/prove-contract-refusals.ts
  *
- * `PROOF_EXECUTOR` and `PROOF_RPC` default to the hosted fork; any EVM chain an executor runs on is pointed at the same
- * way. Refuses a local node that is not anvil, or that copies a different chain.
+ * From the chain alone (no `PROOF_TOKEN` — the executor is not asked anything): the contract is `PROOF_DELEGATION`, the
+ * anchor `PROOF_ANCHOR` (both default to the hosted X Layer fork's deployment), the owner `PROOF_OWNER`, and the venues
+ * are X Layer's settlement venues (server/src/evm/chains.ts SETTLEMENT_VENUES). The contract's own settlement token is
+ * checked against X Layer's USDC. Where the owner holds no live permission on the chain, C05 and C04 need one: with
+ * `PROOF_LOCAL_RPC` the owner grants one on the local copy by impersonation (to `PROOF_DELEGATE`, a synthetic delegate),
+ * so every check still runs without anything sent to the chain under test; without it only what needs no permission runs.
+ *
+ *   server/node_modules/.bin/tsx tools/prove-contract-refusals.ts                      # read-only, the hosted fork
+ *   PROOF_LOCAL_RPC=http://127.0.0.1:8563 server/node_modules/.bin/tsx tools/prove-contract-refusals.ts
+ *
+ * `PROOF_EXECUTOR` and `PROOF_RPC` default to the hosted X Layer fork; any EVM chain an executor runs on is pointed at
+ * the same way. Refuses a local node that is not anvil, or that copies a different chain.
  */
 import {
   BaseError,
@@ -36,25 +50,58 @@ import {
   encodeFunctionData,
   getAddress,
   http,
+  keccak256,
   parseAbi,
   parseEther,
+  toHex,
   type Address,
+  type PublicClient,
 } from 'viem';
 
-const EXECUTOR = (process.env.PROOF_EXECUTOR ?? 'https://executor-fork-production.up.railway.app').replace(/\/+$/, '');
-const RPC = process.env.PROOF_RPC ?? 'https://base-fork-production.up.railway.app';
+const EXECUTOR = (process.env.PROOF_EXECUTOR ?? 'https://executor-fork-production-2db8.up.railway.app').replace(/\/+$/, '');
+const RPC = process.env.PROOF_RPC ?? 'https://xlayer-fork-production.up.railway.app';
 const LOCAL_RPC = process.env.PROOF_LOCAL_RPC;
 const TOKEN = process.env.PROOF_TOKEN;
+
+/** The hosted X Layer fork's deployment — the chain-only defaults. */
+const HOSTED_DELEGATION = '0xf50a4ec95c07e497095ddad99a006cf44ceb7819';
+const HOSTED_ANCHOR = '0x9d22e2b3e1d31a6973b6395cbb6d369ef8b6cf12';
+
+/** Circle's native USDC on X Layer (server/src/evm/chains.ts): mainnet and its fork, and the testnet. */
+const XLAYER_USDC: Record<number, Address> = {
+  196: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+  1952: '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3',
+};
+/** Tether's USD₮0 on X Layer mainnet: any output other than the token spent satisfies the named-output rule. */
+const XLAYER_USDT0: Address = '0x779Ded0c9e1022225f8E0630b35a9b54bE713736';
+/**
+ * X Layer mainnet's settlement venues (server/src/evm/chains.ts SETTLEMENT_VENUES): Uniswap v3 SwapRouter02, the OKX DEX
+ * router and its approval contract, and Aave v3's Pool. The testnet has none of them.
+ */
+const XLAYER_VENUES: Address[] = [
+  '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA',
+  '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf',
+  '0x8b773D83bc66Be128c60e07E17C8901f7a64F000',
+  '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116',
+];
 
 /** A venue nobody allows: nothing is deployed there. */
 const CONTROL = getAddress('0x000000000000000000000000000000000000dEaD');
 
+/**
+ * The delegate a chain-only run grants to on its local copy. Derived from a fixed phrase so every run agrees on it; no key
+ * controls it, and it is only ever impersonated on anvil.
+ */
+const SYNTHETIC_DELEGATE = getAddress(`0x${keccak256(toHex('xorr proof delegate')).slice(-40)}`);
+
 const DELEGATION = parseAbi([
+  'function SETTLEMENT_TOKEN() view returns (address)',
   'function policyOf(address owner) view returns (address delegate, uint256 dailyCap, uint64 expiresAt, bool revoked)',
   'function remainingToday(address owner) view returns (uint256)',
   'function isVenueAllowed(address owner, address venue) view returns (bool)',
   'function spend(address owner, address token, address venue, uint256 amount, address tokenOut, uint256 minOut, bytes data) returns (bytes)',
   'function closePosition(address owner, address token, address venue, uint256 amount, address tokenOut, uint256 minOut, bytes data) returns (bytes)',
+  'function grant(address delegate, uint256 dailyCap, uint64 expiresAt, address[] venues)',
   'function revoke()',
   'error NotDelegate()',
   'error PolicyRevoked()',
@@ -90,11 +137,26 @@ type AnchorState = {
   latest: AnchorRecord | null;
 };
 
+/** What the checks are run against: from the executor, or from the chain and the environment alone. */
+type Subject = {
+  source: string;
+  contract: Address;
+  owner: Address;
+  token: Address;
+  other: Address;
+  venues: Address[];
+  /** The executor's delegate, where there is an executor to name it. */
+  expectedDelegate?: Address;
+  /** `/audit/anchor` as the executor shows it, or just the anchor contract and, when known, who anchors. */
+  anchors: { contract: Address; anchoredBy?: Address; shown?: AnchorState } | null;
+};
+
 let failures = 0;
 const check = (ok: boolean, what: string, observed: string) => {
   if (!ok) failures++;
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}\n       ${observed}`);
 };
+const skipped = (what: string, why: string) => console.log(`  --   ${what}\n       not run: ${why}`);
 
 type Refusal = { error: string; args: string[] };
 
@@ -125,11 +187,8 @@ async function executor<T>(path: string, signedIn = true): Promise<T> {
   return (await res.json()) as T;
 }
 
-async function main() {
-  if (!TOKEN) {
-    console.error("PROOF_TOKEN is not set: the executor's reads are the owner's own permission and trail.");
-    process.exit(1);
-  }
+/** Everything from the executor: the owner's wallet, the parameters the grant was built from, and the anchor it shows. */
+async function fromExecutor(): Promise<Subject> {
   const health = await executor<Health>('/health', false);
   const wallet = await executor<{ address: string } | null>('/wallet');
   if (!wallet) {
@@ -138,174 +197,72 @@ async function main() {
   }
   const params = await executor<Params>('/delegation/params');
   const anchors = await executor<AnchorState>('/audit/anchor');
-
-  const owner = getAddress(wallet.address);
-  const contract = getAddress(health.delegation);
   const token = getAddress(params.token);
-  const venues = params.venues.map((v) => getAddress(typeof v === 'string' ? v : v.address));
   // Any output other than the token spent satisfies the named-output rule; the refusals below come before any transfer.
   const other = params.tokens.map((t) => getAddress(t.address)).find((a) => a !== token);
   if (!other) {
     console.error(`${EXECUTOR} names no token other than ${token} to trade into.`);
     process.exit(1);
   }
-
-  const reader = createPublicClient({ transport: http(RPC, { timeout: 30_000 }) });
-  const chainId = await reader.getChainId();
-  const blockNumber = await reader.getBlockNumber();
-  const block = await reader.getBlock({ blockNumber });
   console.log(`executor ${EXECUTOR}: ${health.chain} at ${health.version.slice(0, 7)}`);
-  console.log(`chain ${chainId}, block ${blockNumber}\ncontract ${contract}\nowner    ${owner}\n`);
-
-  const [delegate, dailyCap, expiresAt, revoked] = await reader.readContract({
-    address: contract,
-    abi: DELEGATION,
-    functionName: 'policyOf',
-    args: [owner],
-    blockNumber,
-  });
-  if (revoked || block.timestamp >= expiresAt) {
-    console.error(`The owner holds no live permission on ${contract}, so there is nothing for it to refuse. Grant one, then rerun.`);
-    process.exit(1);
-  }
-  const remaining = await reader.readContract({
-    address: contract,
-    abi: DELEGATION,
-    functionName: 'remainingToday',
-    args: [owner],
-    blockNumber,
-  });
-  const allowed = await Promise.all(
-    [...venues, CONTROL].map((v) =>
-      reader.readContract({ address: contract, abi: DELEGATION, functionName: 'isVenueAllowed', args: [owner, v], blockNumber }),
-    ),
-  );
-  const venue = venues.find((_, i) => allowed[i]);
-  const controlAllowed = allowed[venues.length];
-  console.log(`live permission: cap ${dailyCap}, ${remaining} left today, expires ${iso(expiresAt)}, delegate ${delegate}\n`);
-
-  const spendBy = (account: Address, to: Address, amount: bigint) =>
-    refusal(
-      reader.simulateContract({
-        address: contract,
-        abi: DELEGATION,
-        functionName: 'spend',
-        args: [owner, token, to, amount, other, 1n, '0x'],
-        account,
-        blockNumber,
-      }),
-    );
-
-  console.log('the delegation, as deployed');
-  check(getAddress(delegate) === getAddress(params.delegate), "the policy's delegate is the executor's", `${delegate}`);
-  const notDelegate = await spendBy(CONTROL, venue ?? CONTROL, 1n);
-  check(is(notDelegate, 'NotDelegate'), 'C07 a spend from an address that is not the delegate reverts', said(notDelegate));
-  const notAllowed = await spendBy(delegate, CONTROL, 1n);
-  check(
-    controlAllowed === false && is(notAllowed, 'VenueNotAllowed', CONTROL),
-    'C05 a spend by the delegate to a venue the owner did not allow reverts',
-    said(notAllowed),
-  );
-  if (venue) {
-    const over = remaining + 1n;
-    const overCap = await spendBy(delegate, venue, over);
-    check(
-      is(overCap, 'DailyCapExceeded', String(over), String(remaining)),
-      "C04 a spend by the delegate one unit over what is left of today's cap reverts",
-      said(overCap),
-    );
-  } else {
-    check(false, 'C04 a venue the owner allows, to spend over the cap at', `none of ${venues.join(', ')} is allowed`);
-  }
-
-  console.log('\nthe audit anchor');
-  if (!anchors.configured) {
-    check(false, 'C11 the executor anchors its trail', `configured ${anchors.configured}`);
-  } else {
-    const anchorContract = getAddress(anchors.contract);
-    const anchorer = getAddress(anchors.anchoredBy);
-    const onChain = await reader.readContract({
-      address: anchorContract,
-      abi: ANCHOR,
-      functionName: 'latest',
-      args: [anchorer, owner],
-      blockNumber,
-    });
-    const count = await reader.readContract({
-      address: anchorContract,
-      abi: ANCHOR,
-      functionName: 'count',
-      args: [anchorer, owner],
-      blockNumber,
-    });
-    const agrees = (a: AnchorRecord | null) =>
-      a !== null &&
-      a.head.toLowerCase() === onChain.head.toLowerCase() &&
-      BigInt(a.entryCount) === onChain.entryCount &&
-      BigInt(a.blockNo) === onChain.blockNo;
-    // The chain is read after the executor, so an anchor that landed in between is asked about once more.
-    const shown = agrees(anchors.latest) ? anchors : await executor<AnchorState>('/audit/anchor');
-    check(
-      agrees(shown.latest),
-      'C11 the latest anchor on the chain is the one /audit/anchor shows',
-      `head ${onChain.head} at entry ${onChain.entryCount}, block ${onChain.blockNo}; ${count} anchors`,
-    );
-    // `ahead` is given only when the executor's row at the anchored length still hashes to that head.
-    check(
-      ['match', 'ahead'].includes(shown.state) && onChain.entryCount <= BigInt(shown.entryCount),
-      "C11 the executor's trail agrees with it",
-      `${shown.state}, ${shown.entryCount} entries held`,
-    );
-    if (onChain.entryCount > 0n) {
-      const backwards = await refusal(
-        reader.simulateContract({
-          address: anchorContract,
-          abi: ANCHOR,
-          functionName: 'anchor',
-          args: [owner, onChain.head, onChain.entryCount - 1n],
-          account: anchorer,
-          blockNumber,
-        }),
-      );
-      check(
-        is(backwards, 'CountWentBackwards', String(onChain.entryCount), String(onChain.entryCount - 1n)),
-        'C11 an anchor whose count goes backwards reverts',
-        said(backwards),
-      );
-    }
-    const empty = await refusal(
-      reader.simulateContract({
-        address: anchorContract,
-        abi: ANCHOR,
-        functionName: 'anchor',
-        args: [owner, `0x${'00'.repeat(32)}`, onChain.entryCount],
-        account: anchorer,
-        blockNumber,
-      }),
-    );
-    check(is(empty, 'EmptyHead'), 'C11 an anchor with an empty head reverts', said(empty));
-  }
-
-  if (LOCAL_RPC) {
-    await localCopy(LOCAL_RPC, { chainId, contract, owner, delegate, token, other, venue: venue ?? CONTROL, expiresAt });
-  } else {
-    console.log('\nC06 and C09 not run: set PROOF_LOCAL_RPC to an anvil forked from this chain');
-  }
-
-  console.log(failures ? `\n${failures} check(s) FAILED` : '\nevery check passed');
-  process.exit(failures ? 1 : 0);
+  return {
+    source: 'the executor',
+    contract: getAddress(health.delegation),
+    owner: getAddress(wallet.address),
+    token,
+    other,
+    venues: params.venues.map((v) => getAddress(typeof v === 'string' ? v : v.address)),
+    expectedDelegate: getAddress(params.delegate),
+    anchors: anchors.configured
+      ? { contract: getAddress(anchors.contract), anchoredBy: getAddress(anchors.anchoredBy), shown: anchors }
+      : null,
+  };
 }
 
-async function localCopy(
-  rpc: string,
-  p: { chainId: number; contract: Address; owner: Address; delegate: Address; token: Address; other: Address; venue: Address; expiresAt: bigint },
-) {
-  const chain = defineChain({
-    id: p.chainId,
-    name: 'local copy',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+/** Everything from the chain and the environment: no executor is asked. */
+async function fromChain(reader: PublicClient, chainId: number): Promise<Subject> {
+  const contract = getAddress(process.env.PROOF_DELEGATION ?? HOSTED_DELEGATION);
+  const anchor = getAddress(process.env.PROOF_ANCHOR ?? HOSTED_ANCHOR);
+  const owner = getAddress(process.env.PROOF_OWNER ?? '0x95A0b368588713011a15f4b1041423f31B08e615');
+  const code = await reader.getCode({ address: contract });
+  if (!code || code === '0x') {
+    console.error(`There is no contract at ${contract} on ${RPC}.`);
+    process.exit(1);
+  }
+  const token = getAddress(await reader.readContract({ address: contract, abi: DELEGATION, functionName: 'SETTLEMENT_TOKEN' }));
+  console.log(`no PROOF_TOKEN: reading the chain alone — ${EXECUTOR} is not asked anything`);
+  console.log('\nthe deployment');
+  const usdc = XLAYER_USDC[chainId];
+  check(
+    usdc !== undefined && token === getAddress(usdc),
+    "the delegation settles in X Layer's USDC",
+    `SETTLEMENT_TOKEN() = ${token} on chain ${chainId}${usdc ? `; X Layer USDC is ${usdc}` : ' — not an X Layer chain id'}`,
+  );
+  const anchorCode = await reader.getCode({ address: anchor });
+  check(Boolean(anchorCode && anchorCode !== '0x'), 'the audit anchor is deployed', `${anchor}: ${anchorCode ? (anchorCode.length - 2) / 2 : 0} bytes`);
+  return {
+    source: 'the chain',
+    contract,
+    owner,
+    token,
+    other: XLAYER_USDT0,
+    venues: chainId === 196 ? XLAYER_VENUES.map((v) => getAddress(v)) : [],
+    anchors: anchorCode && anchorCode !== '0x' ? { contract: anchor, anchoredBy: process.env.PROOF_ANCHORER ? getAddress(process.env.PROOF_ANCHORER) : undefined } : null,
+  };
+}
+
+function xlayerCopy(id: number, rpc: string) {
+  return defineChain({
+    id,
+    name: 'X Layer (local copy)',
+    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
     rpcUrls: { default: { http: [rpc] } },
   });
+}
+
+/** An anvil at `rpc`, reset to a fresh copy of the chain under test, refusing anything else. */
+async function freshCopy(rpc: string, chainId: number) {
+  const chain = xlayerCopy(chainId, rpc);
   const local = createPublicClient({ chain, transport: http(rpc, { timeout: 60_000 }) });
   const client = String(await local.request({ method: 'web3_clientVersion' }));
   if (!client.startsWith('anvil')) {
@@ -315,10 +272,255 @@ async function localCopy(
   const test = createTestClient({ mode: 'anvil', chain, transport: http(rpc, { timeout: 60_000 }) });
   // A fresh copy of the chain as it is now, so nothing an earlier run did there is what gets measured.
   await test.reset({ jsonRpcUrl: RPC });
-  if ((await local.getChainId()) !== p.chainId) {
-    console.error(`Refusing: ${rpc} is not a copy of chain ${p.chainId}.`);
+  if ((await local.getChainId()) !== chainId) {
+    console.error(`Refusing: ${rpc} is not a copy of chain ${chainId}.`);
     process.exit(1);
   }
+  return { chain, local, test };
+}
+
+/**
+ * On a local copy only: the owner grants the synthetic delegate a day's permission over every venue, by impersonation.
+ * This is what lets a chain-only run prove C04/C05 for an owner who holds no permission on the chain under test.
+ */
+async function grantOnCopy(rpc: string, chainId: number, s: Subject, delegate: Address): Promise<void> {
+  const chain = xlayerCopy(chainId, rpc);
+  const local = createPublicClient({ chain, transport: http(rpc, { timeout: 60_000 }) });
+  const test = createTestClient({ mode: 'anvil', chain, transport: http(rpc, { timeout: 60_000 }) });
+  const now = (await local.getBlock()).timestamp;
+  await test.impersonateAccount({ address: s.owner });
+  await test.setBalance({ address: s.owner, value: parseEther('1') });
+  const owner = createWalletClient({ account: s.owner, chain, transport: http(rpc) });
+  const hash = await owner.sendTransaction({
+    to: s.contract,
+    data: encodeFunctionData({
+      abi: DELEGATION,
+      functionName: 'grant',
+      args: [delegate, 100_000_000n, now + 86_400n, s.venues],
+    }),
+  });
+  const receipt = await local.waitForTransactionReceipt({ hash });
+  await test.stopImpersonatingAccount({ address: s.owner });
+  if (receipt.status !== 'success') {
+    console.error(`The grant on the local copy did not land: ${hash}`);
+    process.exit(1);
+  }
+}
+
+async function main() {
+  const rpcReader = createPublicClient({ transport: http(RPC, { timeout: 30_000 }) });
+  const chainId = await rpcReader.getChainId();
+  const s = TOKEN ? await fromExecutor() : await fromChain(rpcReader, chainId);
+
+  // Where the owner holds no permission on the chain under test, a chain-only run with a local copy grants one THERE.
+  let reader: PublicClient = rpcReader;
+  let grantedOnCopy: Address | undefined;
+  const onChain = await rpcReader.readContract({ address: s.contract, abi: DELEGATION, functionName: 'policyOf', args: [s.owner] });
+  const liveOnChain = !onChain[3] && (await rpcReader.getBlock()).timestamp < onChain[2];
+  if (!liveOnChain && !TOKEN && LOCAL_RPC && s.venues.length > 0) {
+    grantedOnCopy = getAddress(process.env.PROOF_DELEGATE ?? SYNTHETIC_DELEGATE);
+    const { local } = await freshCopy(LOCAL_RPC, chainId);
+    await grantOnCopy(LOCAL_RPC, chainId, s, grantedOnCopy);
+    reader = local as PublicClient;
+    console.log(
+      `\n${s.owner} holds no live permission on ${RPC}; on the local copy ${LOCAL_RPC} it granted ${grantedOnCopy} ` +
+        `a day's $100 cap over ${s.venues.length} venues, by impersonation — nothing was sent to ${RPC}`,
+    );
+  }
+
+  const blockNumber = await reader.getBlockNumber();
+  const block = await reader.getBlock({ blockNumber });
+  console.log(`\nchain ${chainId}, block ${blockNumber}\ncontract ${s.contract}\nowner    ${s.owner}\n`);
+
+  const [delegate, dailyCap, expiresAt, revoked] = await reader.readContract({
+    address: s.contract,
+    abi: DELEGATION,
+    functionName: 'policyOf',
+    args: [s.owner],
+    blockNumber,
+  });
+  const live = !revoked && block.timestamp < expiresAt;
+  if (!live && TOKEN) {
+    console.error(`The owner holds no live permission on ${s.contract}, so there is nothing for it to refuse. Grant one, then rerun.`);
+    process.exit(1);
+  }
+  const remaining = await reader.readContract({
+    address: s.contract,
+    abi: DELEGATION,
+    functionName: 'remainingToday',
+    args: [s.owner],
+    blockNumber,
+  });
+  const allowed = await Promise.all(
+    [...s.venues, CONTROL].map((v) =>
+      reader.readContract({ address: s.contract, abi: DELEGATION, functionName: 'isVenueAllowed', args: [s.owner, v], blockNumber }),
+    ),
+  );
+  const venue = s.venues.find((_, i) => allowed[i]);
+  const controlAllowed = allowed[s.venues.length];
+  console.log(
+    live
+      ? `live permission: cap ${dailyCap}, ${remaining} left today, expires ${iso(expiresAt)}, delegate ${delegate}\n`
+      : `no live permission for this owner (delegate ${delegate}, revoked ${revoked}, expires ${iso(expiresAt)})\n`,
+  );
+
+  const spendBy = (account: Address, to: Address, amount: bigint) =>
+    refusal(
+      reader.simulateContract({
+        address: s.contract,
+        abi: DELEGATION,
+        functionName: 'spend',
+        args: [s.owner, s.token, to, amount, s.other, 1n, '0x'],
+        account,
+        blockNumber,
+      }),
+    );
+
+  console.log('the delegation, as deployed');
+  if (s.expectedDelegate) check(getAddress(delegate) === s.expectedDelegate, "the policy's delegate is the executor's", `${delegate}`);
+  // With no permission the policy's delegate is the zero address, and any real caller is still not it.
+  const notDelegate = await spendBy(CONTROL, venue ?? CONTROL, 1n);
+  check(is(notDelegate, 'NotDelegate'), 'C07 a spend from an address that is not the delegate reverts', said(notDelegate));
+  if (live) {
+    const notAllowed = await spendBy(delegate, CONTROL, 1n);
+    check(
+      controlAllowed === false && is(notAllowed, 'VenueNotAllowed', CONTROL),
+      'C05 a spend by the delegate to a venue the owner did not allow reverts',
+      said(notAllowed),
+    );
+    if (venue) {
+      const over = remaining + 1n;
+      const overCap = await spendBy(delegate, venue, over);
+      check(
+        is(overCap, 'DailyCapExceeded', String(over), String(remaining)),
+        "C04 a spend by the delegate one unit over what is left of today's cap reverts",
+        said(overCap),
+      );
+    } else {
+      check(false, 'C04 a venue the owner allows, to spend over the cap at', `none of ${s.venues.join(', ') || '(no venues)'} is allowed`);
+    }
+  } else {
+    const why = `${s.owner} holds no live permission here${LOCAL_RPC ? '' : ' — set PROOF_LOCAL_RPC to grant one on a local copy'}`;
+    skipped('C05 a spend by the delegate to a venue the owner did not allow reverts', why);
+    skipped("C04 a spend by the delegate one unit over what is left of today's cap reverts", why);
+  }
+
+  console.log('\nthe audit anchor');
+  if (!s.anchors) {
+    if (TOKEN) check(false, 'C11 the executor anchors its trail', 'configured false');
+    else skipped('C11 the audit anchor refuses what it must', 'no anchor contract with code');
+  } else {
+    const anchorContract = s.anchors.contract;
+    // Who anchors matters for the series read; an empty head is refused whoever sends it.
+    const anchorer = s.anchors.anchoredBy ?? CONTROL;
+    const latest = await reader.readContract({
+      address: anchorContract,
+      abi: ANCHOR,
+      functionName: 'latest',
+      args: [anchorer, s.owner],
+      blockNumber,
+    });
+    const count = await reader.readContract({
+      address: anchorContract,
+      abi: ANCHOR,
+      functionName: 'count',
+      args: [anchorer, s.owner],
+      blockNumber,
+    });
+    if (s.anchors.shown) {
+      const agrees = (a: AnchorRecord | null) =>
+        a !== null &&
+        a.head.toLowerCase() === latest.head.toLowerCase() &&
+        BigInt(a.entryCount) === latest.entryCount &&
+        BigInt(a.blockNo) === latest.blockNo;
+      // The chain is read after the executor, so an anchor that landed in between is asked about once more.
+      const shown = agrees(s.anchors.shown.latest) ? s.anchors.shown : await executor<AnchorState>('/audit/anchor');
+      check(
+        agrees(shown.latest),
+        'C11 the latest anchor on the chain is the one /audit/anchor shows',
+        `head ${latest.head} at entry ${latest.entryCount}, block ${latest.blockNo}; ${count} anchors`,
+      );
+      // `ahead` is given only when the executor's row at the anchored length still hashes to that head.
+      check(
+        ['match', 'ahead'].includes(shown.state) && latest.entryCount <= BigInt(shown.entryCount),
+        "C11 the executor's trail agrees with it",
+        `${shown.state}, ${shown.entryCount} entries held`,
+      );
+    } else {
+      console.log(`  ${count} anchor(s) by ${anchorer} about ${s.owner} on the chain${s.anchors.anchoredBy ? '' : ' (PROOF_ANCHORER not set)'}`);
+    }
+    if (latest.entryCount > 0n) {
+      const backwards = await refusal(
+        reader.simulateContract({
+          address: anchorContract,
+          abi: ANCHOR,
+          functionName: 'anchor',
+          args: [s.owner, latest.head, latest.entryCount - 1n],
+          account: anchorer,
+          blockNumber,
+        }),
+      );
+      check(
+        is(backwards, 'CountWentBackwards', String(latest.entryCount), String(latest.entryCount - 1n)),
+        'C11 an anchor whose count goes backwards reverts',
+        said(backwards),
+      );
+    } else {
+      skipped('C11 an anchor whose count goes backwards reverts', `no anchor by ${anchorer} about ${s.owner} to go back from`);
+    }
+    const empty = await refusal(
+      reader.simulateContract({
+        address: anchorContract,
+        abi: ANCHOR,
+        functionName: 'anchor',
+        args: [s.owner, `0x${'00'.repeat(32)}`, latest.entryCount],
+        account: anchorer,
+        blockNumber,
+      }),
+    );
+    check(is(empty, 'EmptyHead'), 'C11 an anchor with an empty head reverts', said(empty));
+  }
+
+  if (LOCAL_RPC && (live || grantedOnCopy)) {
+    await localCopy(LOCAL_RPC, {
+      chainId,
+      contract: s.contract,
+      owner: s.owner,
+      delegate: getAddress(delegate),
+      token: s.token,
+      other: s.other,
+      venue: venue ?? CONTROL,
+      expiresAt,
+      regrant: grantedOnCopy ? (rpc: string) => grantOnCopy(rpc, chainId, s, grantedOnCopy!) : undefined,
+    });
+  } else if (!LOCAL_RPC) {
+    console.log('\nC06 and C09 not run: set PROOF_LOCAL_RPC to an anvil forked from this chain');
+  } else {
+    console.log('\nC06 and C09 not run: there is no permission to end, on the chain or on a local copy');
+  }
+
+  console.log(failures ? `\n${failures} check(s) FAILED` : '\nevery check that ran passed');
+  process.exit(failures ? 1 : 0);
+}
+
+async function localCopy(
+  rpc: string,
+  p: {
+    chainId: number;
+    contract: Address;
+    owner: Address;
+    delegate: Address;
+    token: Address;
+    other: Address;
+    venue: Address;
+    expiresAt: bigint;
+    /** A chain-only run's grant, made again after every reset — it exists only on the local copy. */
+    regrant?: (rpc: string) => Promise<void>;
+  },
+) {
+  const { chain, local, test } = await freshCopy(rpc, p.chainId);
+  if (p.regrant) await p.regrant(rpc);
+  const [, , expiresAt] = await local.readContract({ address: p.contract, abi: DELEGATION, functionName: 'policyOf', args: [p.owner] });
   const asDelegate = {
     spend: () =>
       refusal(
@@ -371,15 +573,16 @@ async function localCopy(
   const closeRevoked = await asDelegate.close();
   check(is(closeRevoked, 'PolicyRevoked'), 'C09 closing a position after the revoke reverts', said(closeRevoked));
 
-  console.log(`\non a fresh local copy, a minute past the permission's expiry (${iso(p.expiresAt)})`);
+  console.log(`\non a fresh local copy, a minute past the permission's expiry (${iso(expiresAt)})`);
   await test.reset({ jsonRpcUrl: RPC });
-  const [, , , revokedOnCopy] = await local.readContract({
+  if (p.regrant) await p.regrant(rpc);
+  const [, , expiresAgain, revokedOnCopy] = await local.readContract({
     address: p.contract,
     abi: DELEGATION,
     functionName: 'policyOf',
     args: [p.owner],
   });
-  await test.setNextBlockTimestamp({ timestamp: p.expiresAt + 60n });
+  await test.setNextBlockTimestamp({ timestamp: expiresAgain + 60n });
   await test.mine({ blocks: 1 });
   const spendExpired = await asDelegate.spend();
   check(

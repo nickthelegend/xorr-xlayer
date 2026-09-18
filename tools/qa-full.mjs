@@ -6,20 +6,21 @@
  * "matched what the handler and the app say", not "did not throw". Every result is a real HTTP call
  * against a deployed executor; nothing is mocked.
  *
- *   QA_BASE_URL=https://executor-fork-production.up.railway.app \
- *   QA_TOKEN="$TOKEN" QA_OUT=docs/qa/endpoints-2026-09-14.json node tools/qa-full.mjs
+ *   QA_BASE_URL=https://executor-fork-production-2db8.up.railway.app \
+ *   QA_TOKEN="$TOKEN" QA_OUT=docs/qa/endpoints-xlayer.json node tools/qa-full.mjs
  *
  * The token is a Privy access token for the test account, minted outside this script with
  * `cd server && npx tsx --env-file=../.env src/e2e-token.ts test-8958@privy.io` (last line of stdout).
  * This script never prints, logs or writes it.
  *
- * Optional: QA_EXPECT_CHAIN (base-fork | base-sepolia), QA_EXPECT_VERSION (the commit the executor
- * must report), QA_ONLY (comma-separated check ids, or a path substring), QA_SEPOLIA_RPC (a public
- * RPC, used only to find a real, unrelated transaction hash on Base Sepolia for refusal checks).
+ * Optional: QA_EXPECT_CHAIN (xlayer-fork | xlayer-testnet | xlayer | localnet), QA_EXPECT_VERSION (the
+ * commit the executor must report), QA_ONLY (comma-separated check ids, or a path substring),
+ * QA_TESTNET_RPC (X Layer testnet's public RPC by default, used only to find a real, unrelated
+ * transaction hash on X Layer testnet for refusal checks).
  *
  * Definitions every check uses:
  *   - a NAMED error is a machine-readable code, /^[a-z][a-z0-9_]*$/, in `error` — or in `reason`
- *     beside `status: 'blocked'` on the withdrawal, faucet and limit-order routes. Never a sentence.
+ *     beside `status: 'blocked'` on the withdrawal and faucet routes. Never a sentence.
  *   - a 503 carrying Retry-After (`warming`, `rate_unavailable`) and the limiter's 429 are part of the
  *     contract and are waited out, as the app does (src/data/warming.ts).
  *   - no single request may take longer than the app waits for it: 45s for a read, 180s for a write
@@ -37,7 +38,7 @@ const BASE = (process.env.QA_BASE_URL ?? '').trim().replace(/\/+$/, '');
 const TOKEN = (process.env.QA_TOKEN ?? '').trim();
 const OUT = process.env.QA_OUT ?? `qa-full-${BASE.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-')}.json`;
 const ONLY = (process.env.QA_ONLY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-const SEPOLIA_RPC = process.env.QA_SEPOLIA_RPC ?? 'https://sepolia.base.org';
+const TESTNET_RPC = process.env.QA_TESTNET_RPC ?? 'https://testrpc.xlayer.tech';
 
 if (!/^https?:\/\//.test(BASE)) throw new Error('QA_BASE_URL is required (the executor base URL).');
 if (TOKEN.length < 100) throw new Error('QA_TOKEN is required (a Privy access token for the test account).');
@@ -98,7 +99,7 @@ const randomHash = () => `0x${randomBytes(32).toString('hex')}`;
  * under all of them rather than spending real users' headroom.
  */
 const UPSTREAM_PATHS = [
-  '/swap', '/crosschain/quote', '/wallet/tokens', '/history', '/limit-orders', '/faucet', '/orders',
+  '/swap', '/wallet/tokens', '/history', '/faucet', '/orders',
   '/strategies/', '/agent/strategies/', '/positions/close', '/panic/flatten', '/agent/positions/close',
   '/yield/supply', '/yield/withdraw-calldata', '/withdrawals/', '/agents/', '/strategies/backtest', '/bot/say',
 ];
@@ -327,8 +328,10 @@ async function bootstrap() {
   must(health.json && typeof health.json.chain === 'string', `GET /health gave no chain: ${show(health)}`);
   ctx.health = health.json;
   ctx.chain = health.json.chain;
-  ctx.fork = ctx.chain === 'base-fork';
-  ctx.sepolia = ctx.chain === 'base-sepolia';
+  ctx.fork = ctx.chain === 'xlayer-fork';
+  ctx.testnet = ctx.chain === 'xlayer-testnet';
+  /** Mainnet state (mainnet and its fork): the xStocks, Uniswap's pools, OKX DEX and Aave exist only there. */
+  ctx.mainnetState = ctx.chain === 'xlayer' || ctx.fork;
   if (process.env.QA_EXPECT_CHAIN && process.env.QA_EXPECT_CHAIN !== ctx.chain) {
     throw new Error(`QA_EXPECT_CHAIN is ${process.env.QA_EXPECT_CHAIN} but ${BASE} serves ${ctx.chain}`);
   }
@@ -340,12 +343,28 @@ async function bootstrap() {
   ctx.owner = wallet.json.address;
   ctx.params = (await get('/delegation/params')).json;
   ctx.delegation = (await get('/delegation')).json;
-  ctx.usdc = ctx.sepolia ? '0x036CbD53842c5426634e7929541eC2318f3dCF7e' : '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+  // Circle's native USDC on X Layer (server/src/evm/chains.ts): the testnet and its local copy have their own.
+  ctx.usdc = ctx.mainnetState ? '0xB6CEceAB302E2E4948951eE7843FC24E92933061' : '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3';
   ctx.verifyAtStart = (await get('/activity/verify')).json;
 }
 
+/** Where each chain shows a transaction — `EXPLORER_TX` in server/src/evm/chains.ts. */
 const explorerFor = (hash) =>
-  ctx.fork ? `fork:${hash}` : ctx.chain === 'base' ? `https://basescan.org/tx/${hash}` : ctx.sepolia ? `https://sepolia.basescan.org/tx/${hash}` : `local:${hash}`;
+  ctx.fork
+    ? `fork:${hash}`
+    : ctx.chain === 'xlayer'
+      ? `https://www.oklink.com/xlayer/tx/${hash}`
+      : ctx.testnet
+        ? `https://www.oklink.com/xlayer-test/tx/${hash}`
+        : `local:${hash}`;
+
+/** X Layer's venues (server/src/evm/chains.ts). */
+const UNISWAP_ROUTER = '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA';
+const OKX_DEX_ROUTER = '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf';
+const OKX_DEX_APPROVE_SPENDER = '0x8b773D83bc66Be128c60e07E17C8901f7a64F000';
+const AAVE_V3_POOL = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116';
+/** What `server/src/executor/settle.ts` records as a fill's venue. */
+const VENUES = ['uniswap-v3', 'okx-dex', 'aave'];
 
 const PERSONAS = ['momentum-scout', 'earnings-desk', 'yield-keeper', 'drawdown-guard'];
 
@@ -358,7 +377,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 array of at most 200 rows, newest first (ids strictly decreasing), each {id: numeric string, t: "hh:mm AM|PM", agent, action (non-empty), detail, amount, kind ∈ trade|risk|block|yield}. A row with a signature carries explorer "fork:<hash>" on base-fork or "https://sepolia.basescan.org/tx/<hash>" on base-sepolia; a row without one has no explorer.',
+      '200 array of at most 200 rows, newest first (ids strictly decreasing), each {id: numeric string, t: "hh:mm AM|PM", agent, action (non-empty), detail, amount, kind ∈ trade|risk|block|yield}. A row with a signature carries explorer "fork:<hash>" on xlayer-fork, "https://www.oklink.com/xlayer-test/tx/<hash>" on xlayer-testnet or "https://www.oklink.com/xlayer/tx/<hash>" on xlayer; a row without one has no explorer.',
   },
   async () => {
     const r = await get('/activity');
@@ -452,7 +471,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {ok, checked, intact, linkBreaks}; intact = checked (no row altered; kind is never "content"); ok=false only with kind "link". base-fork: ok true and linkBreaks 0. base-sepolia: at most the one permanent fork (linkBreaks ≤ 1, brokenAtSeq "2"). checked matches /audit/anchor entryCount within 3 (concurrent appends).',
+      '200 {ok, checked, intact, linkBreaks}; intact = checked (no row altered; kind is never "content"); ok=false only with kind "link". xlayer-fork and xlayer-testnet: ok true and linkBreaks 0 (the X Layer trails started after the per-wallet append lock). checked matches /audit/anchor entryCount within 3 (concurrent appends).',
   },
   async () => {
     const r = await get('/activity/verify');
@@ -463,8 +482,7 @@ check(
     must(v.intact === v.checked, `${v.checked - v.intact} row(s) do not hash to their own contents (kind ${v.kind})`);
     must(v.kind !== 'content', `content tampering reported at ${v.brokenAtSeq}`);
     must(v.ok === (v.kind === undefined), `ok=${v.ok} with kind=${v.kind}`);
-    if (ctx.fork) must(v.ok === true && v.linkBreaks === 0, `base-fork trail: ok=${v.ok}, linkBreaks=${v.linkBreaks}`);
-    if (ctx.sepolia) must(v.linkBreaks <= 1 && (v.ok || v.brokenAtSeq === '2'), `base-sepolia trail: linkBreaks=${v.linkBreaks}, first break at ${v.brokenAtSeq}`);
+    if (ctx.fork || ctx.testnet) must(v.ok === true && v.linkBreaks === 0, `${ctx.chain} trail: ok=${v.ok}, linkBreaks=${v.linkBreaks}`);
     if (anchor.status === 200) must(Math.abs(anchor.json.entryCount - v.checked) <= 3, `anchor entryCount ${anchor.json.entryCount} vs checked ${v.checked}`);
     return `ok=${v.ok}, ${v.checked} checked, ${v.intact} intact, ${v.linkBreaks} link break(s)${v.kind ? ` (first at ${v.brokenAtSeq})` : ''}`;
   },
@@ -496,7 +514,7 @@ agentSurface('GET', '/agent/due');
 agentSurface('GET', '/agent/keys');
 agentSurface('POST', '/agent/keys', { name: 'qa-full', scopes: ['read'] });
 agentSurface('DELETE', '/agent/keys/:id');
-agentSurface('POST', '/agent/positions/close', { owner: randomAddress(), symbol: 'WETH', fraction: 1 });
+agentSurface('POST', '/agent/positions/close', { owner: randomAddress(), symbol: 'XBTC', fraction: 1 });
 agentSurface('POST', '/agent/strategies/:id/run');
 agentSurface('POST', '/agent/tick');
 agentSurface('GET', '/agent/whoami');
@@ -815,7 +833,7 @@ function alertShape(a, what) {
 /** A price alert no market will ever reach, unique per call, so it never fires and never duplicates. */
 const probeAlert = (label) => ({
   kind: 'price',
-  symbol: 'WETH',
+  symbol: 'BTC',
   name: `qa-full ${label} ${Date.now()}`,
   detail: 'qa-full probe; deleted by the same check',
   config: { above: 900_000_000 + Math.floor(Math.random() * 1_000_000) + 0.5 },
@@ -856,7 +874,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'Reversible happy path: a price alert on WETH with an Idempotency-Key → 200 {id, enabled:true, armed:true, fireCount:0, lastFiredAt:null, config as sent}; the same request with the same key replays (idempotent-replay: true, same id); GET /alerts lists it exactly once; the same alert without a key → 409 {error:"duplicate_alert"} naming it; deleted afterwards.',
+      'Reversible happy path: a price alert on BTC with an Idempotency-Key → 200 {id, enabled:true, armed:true, fireCount:0, lastFiredAt:null, config as sent}; the same request with the same key replays (idempotent-replay: true, same id); GET /alerts lists it exactly once; the same alert without a key → 409 {error:"duplicate_alert"} naming it; deleted afterwards.',
   },
   async () => {
     const key = `qa-full-${randomUUID()}`;
@@ -864,7 +882,7 @@ check(
     try {
       alertShape(r.json, 'created');
       must(r.json.enabled && r.json.armed && r.json.fireCount === 0 && r.json.lastFiredAt === null, `new alert state: ${clip(r.text)}`);
-      must(r.json.name === body.name && r.json.symbol === 'WETH' && r.json.config.above === body.config.above, `not what was sent: ${clip(r.text)}`);
+      must(r.json.name === body.name && r.json.symbol === 'BTC' && r.json.config.above === body.config.above, `not what was sent: ${clip(r.text)}`);
       const replay = await post('/alerts', body, { headers: { 'idempotency-key': key } });
       expectStatus(replay, 200, 'replay with the same Idempotency-Key');
       must(replay.headers.get('idempotent-replay') === 'true' && replay.json?.id === id, `not a replay: header ${replay.headers.get('idempotent-replay')}, id ${replay.json?.id}`);
@@ -895,7 +913,7 @@ check(
     const nope = await post('/alerts', { kind: 'price', symbol: 'NOPE', name: 'qa-full', config: { above: 1 } });
     expectRefusal(nope, 400, 'unevaluable_alert', 'price alert on NOPE');
     must(/NOPE/.test(nope.json.message ?? ''), `message does not name the symbol: ${nope.json.message}`);
-    expectRefusal(await post('/alerts', { kind: 'price', symbol: 'WETH', name: 'qa-full', config: {} }), 400, 'unevaluable_alert', 'price alert without a level');
+    expectRefusal(await post('/alerts', { kind: 'price', symbol: 'BTC', name: 'qa-full', config: {} }), 400, 'unevaluable_alert', 'price alert without a level');
     expectRefusal(await post('/alerts', { kind: 'agent', name: 'qa-full', config: {} }), 400, 'unevaluable_alert', 'agent alert without blockedRuns');
     expectRefusal(await http('POST', '/alerts', { raw: '{"kind":' }), 400, 'invalid_json', 'malformed JSON');
     const after = (await get('/alerts')).json.length;
@@ -971,7 +989,8 @@ function formatUnits(value, decimals) {
 }
 
 function allowanceShape(t, what) {
-  const decimals = { USDC: 6, WETH: 18, CBBTC: 8 }[t.symbol];
+  // server/src/venues/tokens.ts: the stablecoins are 6, OKX's XBTC 8, WETH and WOKB 18.
+  const decimals = { USDC: 6, USDT0: 6, USDG: 6, XBTC: 8, WETH: 18, WOKB: 18 }[t.symbol];
   must(ADDRESS.test(t.address) && (decimals === undefined || t.decimals === decimals), `${what} ${t.symbol}: address/decimals ${t.address} ${t.decimals}`);
   if (t.allowance === null) {
     must(t.unread === true && t.display === null && t.none === false && t.unlimited === false, `${what} ${t.symbol}: unread shape ${clip(t)}`);
@@ -990,7 +1009,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {spender, tokens, spenders}: spender = /delegation/params contract = /health delegation; tokens are exactly the /delegation/params tokens (same symbols, addresses), each {symbol, address, decimals (USDC 6, WETH 18, CBBTC 8), allowance: uint256 string | null, display = allowance in token units, unlimited ⇔ allowance ≥ 2^254, none ⇔ "0", unread ⇔ null}. spenders[0] = {role "delegation", address = spender, source "chain", tokens = tokens}; spenders[1] = {role "router"} at 0x1111111254…0A65 read from the chain off Base mainnet, same token shape — or {address:null, tokens:null, unread:true} when it could not be read.',
+      '200 {spender, tokens, spenders}: spender = /delegation/params contract = /health delegation; tokens are exactly the /delegation/params tokens (same symbols, addresses), each {symbol, address, decimals (USDC/USDT0/USDG 6, XBTC 8, WETH/WOKB 18), allowance: uint256 string | null, display = allowance in token units, unlimited ⇔ allowance ≥ 2^254, none ⇔ "0", unread ⇔ null}. spenders[0] = {role "delegation", address = spender, source "chain", tokens = tokens}; spenders[1] = {role "router", name "Uniswap v3 router"} at SwapRouter02 0x4f0C…9bcA, read from the chain, same token shape; on mainnet state (xlayer, xlayer-fork) spenders[2] = {role "router", name "OKX DEX approval contract"} at 0x8b77…F000. A router with no address is {address:null, tokens:null, unread:true}.',
   },
   async () => {
     const r = await get('/approvals');
@@ -1001,12 +1020,19 @@ check(
     a.tokens.forEach((t) => allowanceShape(t, 'delegation'));
     const [dlg, router] = a.spenders ?? [];
     must(dlg?.role === 'delegation' && sameAddr(dlg.address, a.spender) && dlg.source === 'chain' && JSON.stringify(dlg.tokens) === JSON.stringify(a.tokens), `delegation spender ${clip(dlg)}`);
-    must(router?.role === 'router' && router.name === '1inch router', `router spender ${clip(router)}`);
+    must(router?.role === 'router' && router.name === 'Uniswap v3 router', `router spender ${clip(router)}`);
     if (router.unread) {
       must(router.address === null && router.tokens === null, `unread router shape ${clip(router)}`);
     } else {
-      must(sameAddr(router.address, '0x111111125421cA6dc452d289314280a0f8842A65') && router.source === 'chain', `router ${router.address} source ${router.source}`);
+      must(sameAddr(router.address, UNISWAP_ROUTER) && router.source === 'chain', `router ${router.address} source ${router.source}`);
       router.tokens.forEach((t) => allowanceShape(t, 'router'));
+    }
+    const okx = a.spenders[2];
+    if (ctx.mainnetState) {
+      must(okx?.role === 'router' && okx.name === 'OKX DEX approval contract' && sameAddr(okx.address, OKX_DEX_APPROVE_SPENDER), `OKX DEX spender ${clip(okx)}`);
+      okx.tokens.forEach((t) => allowanceShape(t, 'okx-dex'));
+    } else {
+      must(okx === undefined, `an OKX DEX spender on ${ctx.chain}, which has no OKX DEX: ${clip(okx)}`);
     }
     return a.tokens.map((t) => `${t.symbol} ${t.unlimited ? 'unlimited' : t.none ? 'none' : t.display}`).join(', ');
   },
@@ -1049,51 +1075,9 @@ check(
   },
 );
 unauthorized('GET', '/audit/anchor');
-unauthorized('POST', '/audit/anchor', { body: {}, extra: 'Happy path not executed: it publishes the trail head to Base and spends gas.' });
+unauthorized('POST', '/audit/anchor', { body: {}, extra: 'Happy path not executed: it publishes the trail head to X Layer and spends gas (OKB).' });
 
-/* ───────────────────────────────────────────────────────────── /basename, /bot, /briefing, /catchup */
-
-check(
-  {
-    method: 'GET',
-    path: '/basename',
-    auth: 'public',
-    kind: 'contract',
-    correct:
-      'Public (no token). ?address=<the wallet> → 200 {address echoed, name: null or "<label>.base.eth"} — always null on base-sepolia, which has no Basenames; ?name=<a name nobody registered> → 200 {name echoed, address: null}.',
-  },
-  async () => {
-    const byAddress = await get(`/basename?address=${ctx.owner}`, { auth: false });
-    expectStatus(byAddress, 200, 'reverse lookup');
-    must(byAddress.json.address === ctx.owner && (byAddress.json.name === null || /\.base\.eth$/.test(byAddress.json.name)), `answer ${clip(byAddress.text)}`);
-    if (ctx.sepolia) must(byAddress.json.name === null, `a name on base-sepolia: ${byAddress.json.name}`);
-    const name = `qa-full-${randomBytes(6).toString('hex')}.base.eth`;
-    const byName = await get(`/basename?name=${name}`, { auth: false });
-    expectStatus(byName, 200, 'forward lookup');
-    must(byName.json.name === name && byName.json.address === null, `answer ${clip(byName.text)}`);
-    return `reverse name ${byAddress.json.name}; unregistered name → null`;
-  },
-);
-
-check(
-  {
-    method: 'GET',
-    path: '/basename',
-    auth: 'public',
-    kind: 'validation',
-    correct: 'Bad parameters → 400 with a named error: no query at all, and ?address=0x123 (not an address).',
-  },
-  async () => {
-    const none = await get('/basename', { auth: false });
-    const badAddr = await get('/basename?address=0x123', { auth: false });
-    const problems = [];
-    for (const [label, r] of [['no query', none], ['?address=0x123', badAddr]]) {
-      if (r.status !== 400 || !named(r)) problems.push(`${label} → ${show(r)}`);
-    }
-    must(problems.length === 0, problems.join('; '));
-    return `400 ${named(none)}; 400 ${named(badAddr)}`;
-  },
-);
+/* ───────────────────────────────────────────────────────────── /bot, /briefing, /catchup */
 
 check(
   {
@@ -1155,107 +1139,13 @@ unauthorized('POST', '/catchup/seen', {
   extra: 'Happy path not executed: it moves the account\'s last-seen marker, which cannot be put back.',
 });
 
-/* ───────────────────────────────────────────────────────────── /crosschain */
-
-const DESTINATIONS = { 42161: 'Arbitrum', 10: 'Optimism', 1: 'Ethereum', 137: 'Polygon' };
-
-check(
-  {
-    method: 'GET',
-    path: '/crosschain/destinations',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      '200 {from:{chainId:8453, name:"Base"}, tokens:["USDC","WETH"], destinations}: exactly Arbitrum 42161, Optimism 10, Ethereum 1 and Polygon 137, each with USDC (6 decimals) and WETH (18 decimals) at valid, distinct addresses.',
-  },
-  async () => {
-    const r = await get('/crosschain/destinations');
-    expectStatus(r, 200, 'GET /crosschain/destinations');
-    const d = r.json;
-    must(d.from?.chainId === 8453 && d.from?.name === 'Base', `from ${clip(d.from)}`);
-    must(JSON.stringify(d.tokens) === '["USDC","WETH"]', `tokens ${clip(d.tokens)}`);
-    must(d.destinations.length === 4, `${d.destinations.length} destinations`);
-    for (const dest of d.destinations) {
-      must(DESTINATIONS[dest.chainId] === dest.name, `destination ${dest.chainId} ${dest.name}`);
-      must(dest.tokens.USDC.decimals === 6 && dest.tokens.WETH.decimals === 18, `${dest.name} decimals`);
-      must(ADDRESS.test(dest.tokens.USDC.address) && ADDRESS.test(dest.tokens.WETH.address) && !sameAddr(dest.tokens.USDC.address, dest.tokens.WETH.address), `${dest.name} addresses`);
-    }
-    return d.destinations.map((x) => `${x.name} ${x.chainId}`).join(', ');
-  },
-);
-unauthorized('GET', '/crosschain/destinations');
-
-function crosschainShape(q, want, what) {
-  must(q.token === want.token && q.submittable === false && typeof q.reason === 'string' && q.reason.length > 0, `${what}: token/submittable/reason ${clip(q)}`);
-  must(q.from.chainId === 8453 && q.from.name === 'Base' && near(q.from.amount, want.amount, 1e-12), `${what}: from ${clip(q.from)}`);
-  must(q.to.chainId === want.to && q.to.name === DESTINATIONS[want.to] && ADDRESS.test(q.to.address), `${what}: to ${clip(q.to)}`);
-  must(q.to.amount > want.amount * 0.9 && q.to.amount <= want.amount * 1.001, `${what}: ${q.to.amount} arrives for ${want.amount} sent`);
-  must(Array.isArray(q.presets) && q.presets.length >= 1 && q.presets.length <= 3, `${what}: presets ${clip(q.presets, 80)}`);
-  must(q.presets.filter((p) => p.recommended).length <= 1, `${what}: more than one recommended preset`);
-  for (const p of q.presets) {
-    must(['fast', 'medium', 'slow'].includes(p.name) && typeof p.recommended === 'boolean', `${what}: preset ${clip(p)}`);
-    must(p.startsInSeconds >= 0 && p.auctionSeconds > 0, `${what}: ${p.name} timings ${p.startsInSeconds}/${p.auctionSeconds}`);
-    must(p.receiveMost >= p.receiveLeast && p.receiveLeast > 0 && p.costInToken >= 0, `${what}: ${p.name} amounts ${p.receiveMost}/${p.receiveLeast}/${p.costInToken}`);
-    must(p.costUsd === null || (isNum(p.costUsd) && p.costUsd >= 0), `${what}: ${p.name} costUsd ${p.costUsd}`);
-  }
-}
-
-check(
-  {
-    method: 'GET',
-    path: '/crosschain/quote',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      'As the app sends it (to=<chainId>, src/data/crosschain.ts:65): to=42161&token=USDC&amount=100 → 200 {token, from:{chainId 8453, "Base", Base USDC, amount 100}, to:{chainId 42161, "Arbitrum", address, amount in (90, 100.1]}, presets: 1–3 of fast|medium|slow, each {recommended (at most one), startsInSeconds ≥ 0, auctionSeconds > 0, receiveMost ≥ receiveLeast > 0, costInToken ≥ 0, costUsd: number|null}, submittable:false, reason}. to=10&token=WETH&amount=0.05 answers the same shape for Optimism.',
-  },
-  async () => {
-    const usdc = await get('/crosschain/quote?to=42161&token=USDC&amount=100');
-    expectStatus(usdc, 200, 'USDC → Arbitrum');
-    crosschainShape(usdc.json, { token: 'USDC', to: 42161, amount: 100 }, 'USDC → Arbitrum');
-    must(sameAddr(usdc.json.from.address, '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'), `from address ${usdc.json.from.address}`);
-    const weth = await get('/crosschain/quote?to=10&token=WETH&amount=0.05');
-    expectStatus(weth, 200, 'WETH → Optimism');
-    crosschainShape(weth.json, { token: 'WETH', to: 10, amount: 0.05 }, 'WETH → Optimism');
-    return `100 USDC → ${usdc.json.to.amount} on Arbitrum; 0.05 WETH → ${weth.json.to.amount} on Optimism`;
-  },
-);
-
-check(
-  {
-    method: 'GET',
-    path: '/crosschain/quote',
-    auth: 'user',
-    kind: 'validation',
-    correct:
-      'A question that cannot be asked is refused before 1inch is asked: to=999 → 400 unknown_chain; token=DOGE → 400 unknown_token; amount=abc, amount=0 and a USDC amount with 7 decimals → 400 invalid_amount; each with a detail sentence.',
-  },
-  async () => {
-    const cases = [
-      ['to=999&token=USDC&amount=100', 'unknown_chain'],
-      ['to=42161&token=DOGE&amount=100', 'unknown_token'],
-      ['to=42161&token=USDC&amount=abc', 'invalid_amount'],
-      ['to=42161&token=USDC&amount=0', 'invalid_amount'],
-      ['to=42161&token=USDC&amount=0.0000001', 'invalid_amount'],
-    ];
-    for (const [q, code] of cases) {
-      const r = await get(`/crosschain/quote?${q}`);
-      expectRefusal(r, 400, code, q);
-      must(prose(r), `${q}: no detail sentence`);
-    }
-    return cases.map(([, c]) => c).join(', ');
-  },
-);
-unauthorized('GET', '/crosschain/quote');
-
 /* ───────────────────────────────────────────────────────────── /delegation */
 
-const ONEINCH_ROUTER = '0x111111125421cA6dc452d289314280a0f8842A65';
-const AAVE_POOL = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
-const WETH = '0x4200000000000000000000000000000000000006';
+/** Tokens the grant approves on mainnet state (server/src/evm/chains.ts APPROVABLE_TOKENS). */
+const USDT0 = '0x779Ded0c9e1022225f8E0630b35a9b54bE713736';
 
 async function rpc(method, params) {
-  const res = await fetch(SEPOLIA_RPC, {
+  const res = await fetch(TESTNET_RPC, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -1268,12 +1158,12 @@ async function rpc(method, params) {
 /**
  * A real, successful transaction this wallet did not send and that grants nothing: one of the
  * delegate's settlements from /history on the fork (its RPC is private), an unrelated transaction
- * from a recent block on Base Sepolia.
+ * from a recent block on X Layer testnet (QA_TESTNET_RPC).
  */
 async function realTxNotFromOwner() {
   if (ctx.txProbe !== undefined) return ctx.txProbe;
   ctx.txProbe = null;
-  if (!ctx.sepolia) {
+  if (!ctx.testnet) {
     const h = await get('/history?limit=10');
     const item = h.json?.items?.find((i) => i.kind === 'spent') ?? h.json?.items?.[0];
     if (item) ctx.txProbe = { hash: item.txHash, source: `this wallet's ${item.kind} settlement ${item.txHash.slice(0, 10)}…, sent by the delegate` };
@@ -1283,10 +1173,11 @@ async function realTxNotFromOwner() {
   for (let back = 6; back < 30 && !ctx.txProbe; back += 1) {
     const block = await rpc('eth_getBlockByNumber', [`0x${(head - back).toString(16)}`, true]);
     for (const t of block?.transactions ?? []) {
+      // 0x7e is the OP Stack's deposit transaction, which X Layer (OP Stack since 2025-10) has at the top of each block.
       if (t.type === '0x7e' || !t.to || sameAddr(t.from, ctx.owner)) continue;
       const receipt = await rpc('eth_getTransactionReceipt', [t.hash]);
       if (receipt?.status === '0x1') {
-        ctx.txProbe = { hash: t.hash, source: `an unrelated Base Sepolia transaction ${t.hash.slice(0, 10)}… (block ${head - back})` };
+        ctx.txProbe = { hash: t.hash, source: `an unrelated X Layer testnet transaction ${t.hash.slice(0, 10)}… (block ${head - back})` };
         break;
       }
     }
@@ -1301,7 +1192,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 null (no permission on chain) or {delegatePubkey, delegateName: string|null, delegateIsCurrent = (delegatePubkey = /delegation/params delegate), ownerPubkey = the wallet, ownerName (null on base-sepolia), dailyCapUsd > 0, expiresAt (ms), grantedAt: ms before expiresAt | null, venueAllowlist ⊆ /delegation/params venues, withdrawalAllowlist [], revoked, onChainRemainingUsd in [0, cap], spentTodayUsd ≥ 0; while live, onChainRemainingUsd + spentTodayUsd = dailyCapUsd within a cent}; cap, expiry and the chain\'s spend agree with GET /limits.',
+      '200 null (no permission on chain) or {delegatePubkey, delegateName: string|null, delegateIsCurrent = (delegatePubkey = /delegation/params delegate), ownerPubkey = the wallet, ownerName and delegateName null (X Layer has no name service this build resolves), dailyCapUsd > 0, expiresAt (ms), grantedAt: ms before expiresAt | null, venueAllowlist ⊆ /delegation/params venues, withdrawalAllowlist [], revoked, onChainRemainingUsd in [0, cap], spentTodayUsd ≥ 0; while live, onChainRemainingUsd + spentTodayUsd = dailyCapUsd within a cent}; cap, expiry and the chain\'s spend agree with GET /limits.',
   },
   async () => {
     const r = await get('/delegation');
@@ -1314,7 +1205,7 @@ check(
     }
     must(ADDRESS.test(d.delegatePubkey) && d.delegateIsCurrent === sameAddr(d.delegatePubkey, ctx.params.delegate), `delegate ${d.delegatePubkey}, isCurrent ${d.delegateIsCurrent}`);
     must(d.ownerPubkey === ctx.owner, `ownerPubkey ${d.ownerPubkey}`);
-    if (ctx.sepolia) must(d.ownerName === null && d.delegateName === null, 'a Basename on base-sepolia');
+    must(d.ownerName === null && d.delegateName === null, `a name on ${ctx.chain}, which has no name service: ${d.ownerName} / ${d.delegateName}`);
     must(d.dailyCapUsd > 0 && isMs(d.expiresAt) && typeof d.revoked === 'boolean', `cap ${d.dailyCapUsd}, expiresAt ${d.expiresAt}, revoked ${d.revoked}`);
     must(d.grantedAt === null || (isMs(d.grantedAt) && d.grantedAt < d.expiresAt), `grantedAt ${d.grantedAt}`);
     must(Array.isArray(d.venueAllowlist) && d.venueAllowlist.every((v) => ctx.params.venues.some((p) => sameAddr(p, v))), `venueAllowlist ${clip(d.venueAllowlist)} not ⊆ params.venues`);
@@ -1338,19 +1229,22 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {contract = /health delegation, delegate (address), venues: the 1inch router 0x1111111254…0A65, plus the Aave v3 Pool 0xA238…d1c5 exactly where Aave exists (base-fork yes, base-sepolia no), token = this chain\'s USDC (base-fork 0x8335…2913, base-sepolia 0x036C…CF7e), tokens: [{symbol, address}] starting with USDC at token, including WETH at 0x4200…0006, and no tokenized equity (they do not function on either chain), chain = /health chain}.',
+      '200 {contract = /health delegation, delegate (address), venues = SETTLEMENT_VENUES: on mainnet state (xlayer, xlayer-fork) exactly Uniswap v3 SwapRouter02 0x4f0C…9bcA, the OKX DEX router 0x7c5b…eaf and its approval contract 0x8b77…F000, and the Aave v3 Pool 0xE3F3…f116; on the testnet none (no DEX, no lending pool); token = this chain\'s Circle USDC (mainnet state 0xB6CE…3061, testnet 0xDec9…B9B3), tokens: [{symbol, address}] starting with USDC at token — on mainnet state including USDT0 (tier 4) — and xStocks (…x) only on mainnet state, chain = /health chain}.',
   },
   async () => {
     const r = await get('/delegation/params');
     expectStatus(r, 200, 'GET /delegation/params');
     const p = r.json;
     must(sameAddr(p.contract, ctx.health.delegation) && ADDRESS.test(p.delegate) && p.chain === ctx.chain, `contract ${p.contract}, delegate ${p.delegate}, chain ${p.chain}`);
-    must(p.venues.some((v) => sameAddr(v, ONEINCH_ROUTER)), `no 1inch router in ${clip(p.venues)}`);
-    must(p.venues.some((v) => sameAddr(v, AAVE_POOL)) === ctx.fork, `Aave pool listed=${p.venues.some((v) => sameAddr(v, AAVE_POOL))} on ${ctx.chain}`);
+    const expected = ctx.mainnetState ? [UNISWAP_ROUTER, OKX_DEX_ROUTER, OKX_DEX_APPROVE_SPENDER, AAVE_V3_POOL] : [];
+    must(
+      p.venues.length === expected.length && expected.every((v) => p.venues.some((x) => sameAddr(x, v))),
+      `venues ${clip(p.venues)}, expected ${expected.length ? expected.join(', ') : 'none'} on ${ctx.chain}`,
+    );
     must(sameAddr(p.token, ctx.usdc), `token ${p.token}, expected ${ctx.usdc}`);
     must(p.tokens[0]?.symbol === 'USDC' && sameAddr(p.tokens[0].address, p.token), `tokens[0] ${clip(p.tokens[0])}`);
-    must(p.tokens.some((t) => t.symbol === 'WETH' && sameAddr(t.address, WETH)), 'no WETH');
-    must(!p.tokens.some((t) => /c$/.test(t.symbol)), `a tokenized equity is offered: ${clip(p.tokens.map((t) => t.symbol))}`);
+    if (ctx.mainnetState) must(p.tokens.some((t) => t.symbol === 'USDT0' && sameAddr(t.address, USDT0)), 'no USDT0, which tier 4 supplies');
+    else must(!p.tokens.some((t) => /x$/.test(t.symbol)), `an xStock is offered on ${ctx.chain}, where none has code: ${clip(p.tokens.map((t) => t.symbol))}`);
     return `${p.venues.length} venue(s); tokens ${p.tokens.map((t) => t.symbol).join(', ')}`;
   },
 );
@@ -1363,7 +1257,7 @@ check(
     auth: 'user',
     kind: 'refusal',
     correct:
-      'Nothing unverifiable enters the trail: {txHash:"0xabc"} → 400 invalid_request naming txHash; malformed JSON → 400 invalid_json; a hash no chain has seen → 400 tx_not_found; a real, successful transaction that grants nothing (base-fork: this wallet\'s own spend from /history; base-sepolia: an unrelated transaction) → 400 no_grant_event. No "Trading permission granted" row is written. Happy path not executed: it needs a grant the owner signs on chain.',
+      'Nothing unverifiable enters the trail: {txHash:"0xabc"} → 400 invalid_request naming txHash; malformed JSON → 400 invalid_json; a hash no chain has seen → 400 tx_not_found; a real, successful transaction that grants nothing (xlayer-fork: this wallet\'s own spend from /history; xlayer-testnet: an unrelated transaction) → 400 no_grant_event. No "Trading permission granted" row is written. Happy path not executed: it needs a grant the owner signs on chain.',
   },
   async () => {
     const newest = Number((await get('/activity')).json[0]?.id ?? 0);
@@ -1469,7 +1363,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {chain = /health chain, available, reason: null iff available, detail, source ("fork-holder" on base-fork, "faucet-key" on base-sepolia; null when unavailable), from, usdc, usdcRaw = usdc × 10^6, ethFloor (0.05 on the fork; null otherwise), windowHours 24, wallet:{address = the wallet, lastClaimAt: ms|null, nextAt, canAsk}}; nextAt = lastClaimAt + 24h inside the window, else null; canAsk = available && nextAt === null. The fork offers exactly 1,000 USDC; base-sepolia at most 10.',
+      '200 {chain = /health chain, available, reason: null iff available, detail, source ("fork-holder" — the fork-only reserve — on xlayer-fork and localnet, "faucet-key" on xlayer-testnet; null when unavailable), from, usdc, usdcRaw = usdc × 10^6, ethFloor (the wallet\'s OKB floor: 0.05 on a fork; null otherwise), windowHours 24, wallet:{address = the wallet, lastClaimAt: ms|null, nextAt, canAsk}}; nextAt = lastClaimAt + 24h inside the window, else null; canAsk = available && nextAt === null. The fork offers exactly 1,000 USDC; xlayer-testnet at most 10; xlayer (real money) is unavailable with reason "real_money".',
   },
   async () => {
     const r = await get('/faucet');
@@ -1480,9 +1374,11 @@ check(
     if (f.available) {
       must(f.source === (ctx.fork ? 'fork-holder' : 'faucet-key') && ADDRESS.test(f.from), `source ${f.source}, from ${f.from}`);
       must(String(Math.round(f.usdc * 1e6)) === f.usdcRaw, `usdc ${f.usdc} vs raw ${f.usdcRaw}`);
-      if (ctx.fork) must(f.usdc === 1000 && f.ethFloor === 0.05, `fork offer ${f.usdc} USDC, floor ${f.ethFloor}`);
-      if (ctx.sepolia) must(f.usdc > 0 && f.usdc <= 10 && f.ethFloor === null, `sepolia offer ${f.usdc}`);
+      if (ctx.fork) must(f.usdc === 1000 && f.ethFloor === 0.05, `fork offer ${f.usdc} USDC, OKB floor ${f.ethFloor}`);
+      if (ctx.testnet) must(f.usdc > 0 && f.usdc <= 10 && f.ethFloor === null, `testnet offer ${f.usdc}`);
+      must(ctx.chain !== 'xlayer', 'a faucet on X Layer mainnet, where USDC is real money');
     } else {
+      if (ctx.chain === 'xlayer') must(f.reason === 'real_money', `mainnet faucet refusal ${f.reason}`);
       must(CODE.test(f.reason) && f.source === null && f.from === null && f.usdc === null && f.usdcRaw === null, `unavailable shape ${clip(f)}`);
     }
     const w = f.wallet;
@@ -1525,112 +1421,6 @@ check(
 );
 unauthorized('POST', '/faucet', { body: {} });
 
-/* ───────────────────────────────────────────────────────────── /graph */
-
-check(
-  {
-    method: 'GET',
-    path: '/graph/activity',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      '200 {spends: ≤100 {id, amount (integer string), spentToday, venue (address), token (address), txHash, timestamp}, newest first; daily: ≤14 {day, total, tradeCount ≥ 0}, newest day first} — read from the subgraph for this wallet\'s address.',
-  },
-  async () => {
-    const r = await get('/graph/activity');
-    expectStatus(r, 200, 'GET /graph/activity');
-    const { spends, daily } = r.json ?? {};
-    must(Array.isArray(spends) && spends.length <= 100 && Array.isArray(daily) && daily.length <= 14, `shape ${clip(r.text)}`);
-    let prev = Number.POSITIVE_INFINITY;
-    for (const s of spends) {
-      must(/^\d+$/.test(s.amount) && ADDRESS.test(s.venue) && ADDRESS.test(s.token) && TX.test(s.txHash) && /^\d+$/.test(s.timestamp), `spend ${clip(s)}`);
-      must(Number(s.timestamp) <= prev, 'spends not newest first');
-      prev = Number(s.timestamp);
-    }
-    prev = Number.POSITIVE_INFINITY;
-    for (const d of daily) {
-      must(/^\d+$/.test(String(d.day)) && /^\d+$/.test(String(d.total)) && Number.isInteger(d.tradeCount) && d.tradeCount >= 0, `day ${clip(d)}`);
-      must(Number(d.day) <= prev, 'days not newest first');
-      prev = Number(d.day);
-    }
-    return `${spends.length} spend(s), ${daily.length} day(s)`;
-  },
-);
-unauthorized('GET', '/graph/activity');
-
-check(
-  {
-    method: 'GET',
-    path: '/graph/decision',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      'As the app sends it (?usd=100, ?usd=2500 — app/graph/decision.tsx SIZES): 200 {act:false, reason: named, rationale} or {act:true, sizeUsd, observedRemainingUsd, route:{venue ∈ aqua|1inch, why}, rationale}. act:true ⇒ 5 ≤ sizeUsd ≤ min(usd, 25% of observedRemainingUsd) — asking for $2,500 is sized down — and observedRemainingUsd ≤ the on-chain cap. base-fork, whose subgraph indexes another deployment: act:false with reason "index_is_for_another_deployment".',
-  },
-  async () => {
-    const cap = ctx.delegation?.dailyCapUsd ?? 0;
-    const out = [];
-    for (const usd of [100, 2500]) {
-      const r = await get(`/graph/decision?usd=${usd}`);
-      expectStatus(r, 200, `?usd=${usd}`);
-      const d = r.json;
-      must(typeof d.act === 'boolean' && typeof d.rationale === 'string' && d.rationale.length > 10, `?usd=${usd}: ${clip(r.text)}`);
-      if (d.act) {
-        must(isNum(d.sizeUsd) && d.sizeUsd >= 5 && d.sizeUsd <= usd + 1e-9 && d.sizeUsd <= d.observedRemainingUsd * 0.25 + 1e-6, `?usd=${usd}: sizeUsd ${d.sizeUsd} of remaining ${d.observedRemainingUsd}`);
-        must(d.observedRemainingUsd <= cap + 0.01, `?usd=${usd}: remaining ${d.observedRemainingUsd} above cap ${cap}`);
-        must(['aqua', '1inch'].includes(d.route?.venue) && typeof d.route.why === 'string', `?usd=${usd}: route ${clip(d.route)}`);
-        out.push(`$${usd}→act $${d.sizeUsd} via ${d.route.venue}`);
-      } else {
-        must(CODE.test(d.reason ?? ''), `?usd=${usd}: reason ${d.reason}`);
-        out.push(`$${usd}→${d.reason}`);
-      }
-      if (ctx.fork) must(!d.act && d.reason === 'index_is_for_another_deployment', `base-fork decided from another deployment's index: ${clip(r.text)}`);
-    }
-    return out.join('; ');
-  },
-);
-
-check(
-  {
-    method: 'GET',
-    path: '/graph/decision',
-    auth: 'user',
-    kind: 'validation',
-    correct: 'A size that is not a number (?usd=abc) → 400 with a named error, never a decision about $NaN.',
-  },
-  async () => {
-    const r = await get('/graph/decision?usd=abc');
-    expectRefusal(r, 400, undefined, '?usd=abc');
-    return `400 ${named(r)}`;
-  },
-);
-unauthorized('GET', '/graph/decision');
-
-check(
-  {
-    method: 'GET',
-    path: '/graph/health',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      '200 {block > 0, healthy: true, endpoint (URL), indexedDelegation, activeDelegation = /health delegation lower-cased, indexesThisDeployment = (indexedDelegation = activeDelegation, both set)}; /health\'s subgraph dependency is "up" exactly when healthy and indexing this deployment.',
-  },
-  async () => {
-    const r = await get('/graph/health');
-    const h = (await get('/health', { auth: false })).json;
-    expectStatus(r, 200, 'GET /graph/health');
-    const g = r.json;
-    must(Number.isInteger(g.block) && g.block > 0 && g.healthy === true, `block ${g.block}, healthy ${g.healthy}`);
-    must(/^https:\/\//.test(g.endpoint ?? ''), `endpoint ${clip(g.endpoint)}`);
-    must(g.activeDelegation === lower(h.delegation), `activeDelegation ${g.activeDelegation} vs ${h.delegation}`);
-    must(g.indexesThisDeployment === (g.indexedDelegation.length > 0 && g.indexedDelegation === g.activeDelegation), `indexesThisDeployment ${g.indexesThisDeployment}`);
-    const dep = h.dependencies.find((x) => x.name === 'subgraph');
-    must((dep?.status === 'up') === (g.healthy && g.indexesThisDeployment), `/health subgraph ${dep?.status} vs healthy ${g.healthy}/indexes ${g.indexesThisDeployment}`);
-    return `block ${g.block}, indexes this deployment: ${g.indexesThisDeployment}`;
-  },
-);
-unauthorized('GET', '/graph/health');
-
 /* ───────────────────────────────────────────────────────────── /health, /history */
 
 /** The lists the app mirrors, read from its source so a drift fails here rather than on a screen. */
@@ -1645,8 +1435,8 @@ function appList(relative, pattern) {
 
 const SERVER_PUBLIC_PATHS = [
   '/health', '/market/quotes', '/market/sparklines', '/market/ohlc', '/market/symbols', '/market/logos', '/market/tradable',
-  '/market/watchable', '/market/stocks', '/market/stocks/history', '/yield/supply', '/verify', '/basename', '/metrics',
-  '/market/crosscheck', '/market/futures',
+  '/market/watchable', '/market/stocks', '/market/xstocks', '/market/stocks/history', '/yield/supply', '/verify', '/metrics',
+  '/market/crosscheck', '/market/corporate-action', '/market/futures',
 ];
 
 check(
@@ -1656,7 +1446,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200 (503 only when a critical dependency is down) {ok = status ≠ "down", status ∈ up|degraded|down = the worst dependency, chain (= QA_EXPECT_CHAIN), version: a commit sha (= QA_EXPECT_VERSION when set), delegation, uptimeSec ≥ 0, dependencies: postgres, rpc, delegation (critical) and gas, subgraph, upstreams (not critical), each {status, ms ≥ 0, detail}, breakers: [{host, failures, openUntil, open}], db, publicSurface: {paths = the server\'s 16 public paths = src/data/publicPaths.ts, prefixes ["/perp/"]}, voice: {configured: boolean}}; headers x-request-id and access-control-allow-origin; status not "down".',
+      'Public. 200 (503 only when a critical dependency is down) {ok = status ≠ "down", status ∈ up|degraded|down = the worst dependency, chain (= QA_EXPECT_CHAIN), version: a commit sha (= QA_EXPECT_VERSION when set), delegation, uptimeSec ≥ 0, dependencies: postgres, rpc, delegation (critical) and gas (the delegate\'s OKB), upstreams (not critical) — no subgraph on X Layer — each {status, ms ≥ 0, detail}, breakers: [{host, failures, openUntil, open}], db, publicSurface: {paths = the server\'s 17 public paths = src/data/publicPaths.ts, prefixes ["/perp/"]}, voice: {configured: boolean}}; headers x-request-id and access-control-allow-origin; status not "down".',
   },
   async () => {
     const r = await get('/health', { auth: false, retry: false });
@@ -1669,7 +1459,9 @@ check(
     if (process.env.QA_EXPECT_VERSION) must(h.version === process.env.QA_EXPECT_VERSION, `version ${h.version}, expected ${process.env.QA_EXPECT_VERSION}`);
     must(ADDRESS.test(h.delegation) && isNum(h.uptimeSec) && h.uptimeSec >= 0, `delegation ${h.delegation}, uptime ${h.uptimeSec}`);
     const names = h.dependencies.map((d) => `${d.name}:${d.critical}`).join(',');
-    must(names === 'postgres:true,rpc:true,delegation:true,gas:false,subgraph:false,upstreams:false', `dependencies ${names}`);
+    must(names === 'postgres:true,rpc:true,delegation:true,gas:false,upstreams:false', `dependencies ${names}`);
+    const gas = h.dependencies.find((d) => d.name === 'gas');
+    must(gas.status !== 'up' || / OKB$/.test(gas.detail), `the gas balance is not stated in OKB: ${gas.detail}`);
     for (const d of h.dependencies) {
       must(['up', 'degraded', 'down'].includes(d.status) && isNum(d.ms) && d.ms >= 0 && typeof d.detail === 'string', `dependency ${clip(d)}`);
       must(d.status !== (d.critical ? 'degraded' : 'down'), `${d.name}: status ${d.status} for critical=${d.critical}`);
@@ -1700,7 +1492,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the app sends it (?limit=50, src/data/history.ts:61): 200 {owner = the wallet, chain, source "chain" (1inch is only asked on Base mainnet), window:{fromBlock < toBlock, span ≤ 9,000 blocks, since: ISO|null}, unavailable: null, items: ≤ 50 {kind ∈ spent|closed, txHash, block inside the window, at: ISO|null, venue, token: {symbol, decimals, address}|null, amount: integer string, usd = amount/10^6 exactly when the token is USDC (null otherwise), run?: {kind, symbol, venue, side, units, usd}, explorer ("fork:<hash>" / basescan)}}, newest first; ?limit=2 returns at most 2.',
+      'As the app sends it (?limit=50, src/data/history.ts:61): 200 {owner = the wallet, chain, source "chain" (read from the delegation\'s events on X Layer), window:{fromBlock < toBlock, span ≤ 9,000 blocks, since: ISO|null}, unavailable: null, items: ≤ 50 {kind ∈ spent|closed, txHash, block inside the window, at: ISO|null, venue, token: {symbol, decimals, address}|null, amount: integer string, usd = amount/10^6 exactly when the token is USDC (null otherwise), run?: {kind, symbol, venue, side, units, usd}, explorer ("fork:<hash>" / OKLink)}}, newest first; ?limit=2 returns at most 2.',
   },
   async () => {
     const r = await get('/history?limit=50');
@@ -1744,70 +1536,6 @@ check(
   },
 );
 unauthorized('GET', '/history');
-
-/* ───────────────────────────────────────────────────────────── /limit-orders */
-
-check(
-  {
-    method: 'GET',
-    path: '/limit-orders',
-    auth: 'user',
-    kind: 'contract',
-    correct:
-      '200. base-fork (fills settle): {settles:true, chain, detail:null, orders: ≤100 {hash, maker, sells "WETH", pays "USDC", makingAmount/takingAmount integer strings, size = making/10^18, cost = taking/10^6, price = cost/size, nonce, expiresAt: ms|null, createdAt, status, fillable: bool|null, detail, filledAt, fillTx, takenByYou}} where filledAt ⇒ fillTx and a filled order is not fillable. base-sepolia (nothing settles): {settles:false, chain, detail saying why, orders: []}.',
-  },
-  async () => {
-    const r = await get('/limit-orders');
-    expectStatus(r, 200, 'GET /limit-orders');
-    const l = r.json;
-    must(l.chain === ctx.chain, `chain ${l.chain}`);
-    if (ctx.sepolia) {
-      must(l.settles === false && Array.isArray(l.orders) && l.orders.length === 0 && /settles/i.test(l.detail ?? ''), `base-sepolia answer ${clip(r.text)}`);
-      return `settles:false — "${l.detail}"`;
-    }
-    must(l.settles === true && l.detail === null && Array.isArray(l.orders) && l.orders.length <= 100, `header ${clip({ ...l, orders: l.orders?.length })}`);
-    for (const o of l.orders) {
-      must(TX.test(o.hash) && ADDRESS.test(o.maker) && o.sells === 'WETH' && o.pays === 'USDC', `order ${clip(o)}`);
-      must(/^\d+$/.test(o.makingAmount) && /^\d+$/.test(o.takingAmount), `amounts ${o.makingAmount}/${o.takingAmount}`);
-      must(near(o.size, Number(BigInt(o.makingAmount)) / 1e18, 1e-12, 1e-9) && near(o.cost, Number(BigInt(o.takingAmount)) / 1e6, 1e-9), `${o.hash.slice(0, 10)}: size ${o.size}, cost ${o.cost}`);
-      must(near(o.price, o.cost / o.size, 1e-9, 1e-9), `${o.hash.slice(0, 10)}: price ${o.price} ≠ cost/size`);
-      must((o.expiresAt === null || isMs(o.expiresAt)) && isMs(o.createdAt) && typeof o.takenByYou === 'boolean', `${o.hash.slice(0, 10)}: times ${o.expiresAt}/${o.createdAt}`);
-      must(o.filledAt === null || (isMs(o.filledAt) && TX.test(o.fillTx ?? '')), `${o.hash.slice(0, 10)}: filledAt ${o.filledAt} without fillTx`);
-      if (o.status === 'filled') must(o.fillable === false, `${o.hash.slice(0, 10)}: filled but fillable ${o.fillable}`);
-    }
-    return `${l.orders.length} order(s): ${l.orders.map((o) => o.status).join(', ')}`;
-  },
-);
-unauthorized('GET', '/limit-orders');
-operatorOnly('POST', '/limit-orders', {
-  order: {
-    salt: '1', maker: ZERO_ADDRESS, receiver: ZERO_ADDRESS, makerAsset: WETH, takerAsset: ZERO_ADDRESS,
-    makingAmount: '1', takingAmount: '1', makerTraits: '0',
-  },
-  signature: `0x${'00'.repeat(65)}`,
-});
-
-check(
-  {
-    method: 'POST',
-    path: '/limit-orders/:hash/fill',
-    auth: 'user',
-    kind: 'refusal',
-    correct:
-      'Refusals only; nothing is taken. base-fork: a malformed hash → 400 {status:"blocked", reason:"invalid_hash"}; a well-formed hash no listed order has → 404 {status:"blocked", reason:"not_found"}. base-sepolia: any hash → 409 {status:"blocked", reason:"not_settleable_here"}. Happy path not executed: taking an order spends USDC through the permission.',
-  },
-  async () => {
-    if (ctx.sepolia) {
-      const r = await post(`/limit-orders/${randomHash()}/fill`, {}, { retry: false });
-      expectRefusal(r, 409, 'not_settleable_here', 'fill on base-sepolia');
-      return '409 not_settleable_here';
-    }
-    expectRefusal(await post('/limit-orders/xyz/fill', {}, { retry: false }), 400, 'invalid_hash', 'malformed hash');
-    expectRefusal(await post(`/limit-orders/${randomHash()}/fill`, {}, { retry: false }), 404, 'not_found', 'unlisted hash');
-    return '400 invalid_hash; 404 not_found';
-  },
-);
-unauthorized('POST', '/limit-orders/:hash/fill', { body: {} });
 
 /* ───────────────────────────────────────────────────────────── /limits */
 
@@ -1897,23 +1625,23 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the asset screen sends it (?symbol=WETH, ?symbol=ETH): 200 {symbol echoed, coingecko > 0, oneinch > 0, spreadPct = |coingecko − oneinch| / their mean × 100, compared:true, agree = spreadPct ≤ 0.75, note}. ?symbol=BTC (not routable on Base) → 200 {oneinch:null, spreadPct:null, compared:false, agree:true, note "not routable"}. compared:false always carries agree:true and spreadPct:null.',
+      'Public; as the asset screen sends it (?symbol=BTC, priced a second way through the X Layer Uniswap v3 pools XBTC trades in): 200 {symbol echoed, coingecko > 0, pool > 0, spreadPct = |coingecko − pool| / their mean × 100, compared:true, agree = spreadPct ≤ 0.75, note}. ?symbol=ETH (WETH has no pool with real liquidity on X Layer) → 200 {pool:null, spreadPct:null, compared:false, agree:true, note "has no pool on X Layer"}. compared:false always carries agree:true and spreadPct:null.',
   },
   async () => {
     const out = [];
-    for (const symbol of ['WETH', 'ETH']) {
+    for (const symbol of ['BTC']) {
       const r = await get(`/market/crosscheck?symbol=${symbol}`, { auth: false });
       expectStatus(r, 200, `?symbol=${symbol}`);
       const x = r.json;
-      must(x.symbol === symbol && x.coingecko > 0 && x.oneinch > 0 && x.compared === true, `${symbol}: ${clip(r.text)}`);
-      must(near(x.spreadPct, (Math.abs(x.coingecko - x.oneinch) / ((x.coingecko + x.oneinch) / 2)) * 100, 1e-9, 1e-6), `${symbol}: spreadPct ${x.spreadPct}`);
+      must(x.symbol === symbol && x.coingecko > 0 && x.pool > 0 && x.compared === true, `${symbol}: ${clip(r.text)}`);
+      must(near(x.spreadPct, (Math.abs(x.coingecko - x.pool) / ((x.coingecko + x.pool) / 2)) * 100, 1e-9, 1e-6), `${symbol}: spreadPct ${x.spreadPct}`);
       must(x.agree === x.spreadPct <= 0.75 && typeof x.note === 'string', `${symbol}: agree ${x.agree} at ${x.spreadPct}%`);
       out.push(`${symbol} ${x.spreadPct.toFixed(3)}%`);
     }
-    const btc = await get('/market/crosscheck?symbol=BTC', { auth: false });
-    expectStatus(btc, 200, '?symbol=BTC');
-    must(btc.json.oneinch === null && btc.json.spreadPct === null && btc.json.compared === false && btc.json.agree === true && /not routable/i.test(btc.json.note), `BTC: ${clip(btc.text)}`);
-    return `${out.join(', ')}; BTC not routable`;
+    const eth = await get('/market/crosscheck?symbol=ETH', { auth: false });
+    expectStatus(eth, 200, '?symbol=ETH');
+    must(eth.json.pool === null && eth.json.spreadPct === null && eth.json.compared === false && eth.json.agree === true && /no pool on X Layer/i.test(eth.json.note), `ETH: ${clip(eth.text)}`);
+    return `${out.join(', ')}; ETH has no pool on X Layer`;
   },
 );
 
@@ -1939,22 +1667,22 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the earnings screen sends it (?symbol=NVDAc, its default): 200 {symbol "NVDAc", cik 1045810, reported: ≥ 3 ms dates newest first, gapDays[i] = round((reported[i] − reported[i+1]) / 1 day), medianGapDays in [80, 100], errorDays = the widest gap\'s distance from the median, nextAt = reported[0] + medianGapDays days}; ?symbol=nvdac resolves to the same calendar.',
+      'As the earnings screen sends it (?symbol=NVDAx, its default): 200 {symbol "NVDAx", cik 1045810 (NVIDIA), reported: ≥ 3 ms dates newest first, gapDays[i] = round((reported[i] − reported[i+1]) / 1 day), medianGapDays in [80, 100], errorDays = the widest gap\'s distance from the median, nextAt = reported[0] + medianGapDays days}; ?symbol=nvdax resolves to the same calendar.',
   },
   async () => {
-    const r = await get('/market/earnings?symbol=NVDAc');
-    expectStatus(r, 200, '?symbol=NVDAc');
+    const r = await get('/market/earnings?symbol=NVDAx');
+    expectStatus(r, 200, '?symbol=NVDAx');
     const e = r.json;
-    must(e.symbol === 'NVDAc' && e.cik === 1045810, `symbol ${e.symbol}, cik ${e.cik}`);
+    must(e.symbol === 'NVDAx' && e.cik === 1045810, `symbol ${e.symbol}, cik ${e.cik}`);
     must(Array.isArray(e.reported) && e.reported.length >= 3 && e.reported.every(isMs), `reported ${clip(e.reported)}`);
     for (let i = 1; i < e.reported.length; i += 1) must(e.reported[i] < e.reported[i - 1], 'reported not newest first');
     must(e.gapDays.length === e.reported.length - 1 && e.gapDays.every((g, i) => g === Math.round((e.reported[i] - e.reported[i + 1]) / 86_400_000)), `gapDays ${clip(e.gapDays)}`);
     must(e.medianGapDays >= 80 && e.medianGapDays <= 100, `medianGapDays ${e.medianGapDays}`);
     must(e.errorDays === Math.max(...e.gapDays.map((g) => Math.abs(g - e.medianGapDays))), `errorDays ${e.errorDays}`);
     must(e.nextAt === e.reported[0] + e.medianGapDays * 86_400_000, `nextAt ${e.nextAt}`);
-    const lowerCase = await get('/market/earnings?symbol=nvdac');
-    expectStatus(lowerCase, 200, '?symbol=nvdac');
-    must(lowerCase.json.symbol === 'NVDAc' && lowerCase.json.nextAt === e.nextAt, `nvdac → ${clip(lowerCase.text)}`);
+    const lowerCase = await get('/market/earnings?symbol=nvdax');
+    expectStatus(lowerCase, 200, '?symbol=nvdax');
+    must(lowerCase.json.symbol === 'NVDAx' && lowerCase.json.nextAt === e.nextAt, `nvdax → ${clip(lowerCase.text)}`);
     return `${e.reported.length} prints, next ~${new Date(e.nextAt).toISOString().slice(0, 10)} ±${e.errorDays}d`;
   },
 );
@@ -2015,22 +1743,22 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the app asks (?symbols=a,b,c): 200 object whose keys are among the symbols asked, each {url: https URL | null, source: "1inch" | "coingecko" | null} with url null ⇔ source null; BTC (CoinGecko) and WETH (1inch) resolve to a URL within four asks 5 s apart — the app asks again for whatever is absent (a symbol still resolving is absent, not null); ?symbols= (empty) → {}.',
+      'Public; as the app asks (?symbols=a,b,c): 200 object whose keys are among the symbols asked, each {url: https URL | null, source: "xstocks" | "coingecko" | null} with url null ⇔ source null; BTC (CoinGecko) and NVDAx (the xStocks issuer\'s registry) resolve to a URL within four asks 5 s apart — the app asks again for whatever is absent (a symbol still resolving is absent, not null); ?symbols= (empty) → {}.',
   },
   async () => {
-    const asked = ['BTC', 'WETH', 'NVDAc', 'ZZZNOPE'];
+    const asked = ['BTC', 'WETH', 'NVDAx', 'ZZZNOPE'];
     let body = {};
-    for (let i = 0; i < 4 && !(body.BTC?.url && body.WETH?.url); i += 1) {
+    for (let i = 0; i < 4 && !(body.BTC?.url && body.NVDAx?.url); i += 1) {
       if (i > 0) await sleep(5_000);
       const r = await get(`/market/logos?symbols=${asked.join(',')}`, { auth: false });
       expectStatus(r, 200, 'GET /market/logos');
       body = r.json;
       for (const [k, v] of Object.entries(body)) {
         must(asked.includes(k), `unasked key ${k}`);
-        must((v.url === null) === (v.source === null) && (v.url === null || /^https:\/\//.test(v.url)) && [null, '1inch', 'coingecko'].includes(v.source), `${k}: ${clip(v)}`);
+        must((v.url === null) === (v.source === null) && (v.url === null || /^https:\/\//.test(v.url)) && [null, 'xstocks', 'coingecko'].includes(v.source), `${k}: ${clip(v)}`);
       }
     }
-    must(body.BTC?.url && body.WETH?.url, `BTC/WETH did not resolve: ${clip(body)}`);
+    must(body.BTC?.url && body.NVDAx?.url, `BTC/NVDAx did not resolve: ${clip(body)}`);
     const empty = await get('/market/logos?symbols=', { auth: false });
     must(empty.status === 200 && JSON.stringify(empty.json) === '{}', `empty ask: ${show(empty)}`);
     return Object.entries(body).map(([k, v]) => `${k}:${v.source ?? 'none'}`).join(', ');
@@ -2103,15 +1831,15 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the market list asks (?symbols=BTC,ETH,WETH,USDC,CBBTC,SOL,NVDAc,NOPE): 200 {SYMBOL: {price > 0, change24h finite, source "coingecko"}} for exactly the symbols with a feed — NVDAc (priced by /market/stocks) and NOPE are omitted; USDC within [0.98, 1.02]; WETH within 1% of ETH; CBBTC within 2% of BTC; ?symbols=weth answers under WETH; no symbols → {}.',
+      'Public; as the market list asks (?symbols=BTC,ETH,WETH,USDC,USDT0,SOL,NVDAx,NOPE): 200 {SYMBOL: {price > 0, change24h finite, source "coingecko"}} for exactly the symbols with a feed — NVDAx (priced by its X Layer pool, /market/stocks) and NOPE are omitted; USDC and USDT0 within [0.98, 1.02]; WETH within 1% of ETH; ?symbols=weth answers under WETH; no symbols → {}.',
   },
   async () => {
-    const q = await quotes('BTC,ETH,WETH,USDC,CBBTC,SOL,NVDAc,NOPE');
-    must(JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['BTC', 'CBBTC', 'ETH', 'SOL', 'USDC', 'WETH']), `keys ${Object.keys(q)}`);
+    const q = await quotes('BTC,ETH,WETH,USDC,USDT0,SOL,NVDAx,NOPE');
+    must(JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['BTC', 'ETH', 'SOL', 'USDC', 'USDT0', 'WETH']), `keys ${Object.keys(q)}`);
     for (const [k, v] of Object.entries(q)) must(v.price > 0 && isNum(v.change24h) && v.source === 'coingecko', `${k}: ${clip(v)}`);
     must(q.USDC.price >= 0.98 && q.USDC.price <= 1.02, `USDC ${q.USDC.price}`);
     must(Math.abs(q.WETH.price / q.ETH.price - 1) < 0.01, `WETH ${q.WETH.price} vs ETH ${q.ETH.price}`);
-    must(Math.abs(q.CBBTC.price / q.BTC.price - 1) < 0.02, `CBBTC ${q.CBBTC.price} vs BTC ${q.BTC.price}`);
+    must(q.USDT0.price >= 0.98 && q.USDT0.price <= 1.02, `USDT0 ${q.USDT0.price}`);
     const lowerCase = await quotes('weth');
     must(lowerCase.WETH?.price > 0, `?symbols=weth → ${clip(lowerCase)}`);
     const none = await quotes('');
@@ -2127,15 +1855,15 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the market list asks (?symbols=BTC,ETH,WETH,CBBTC,NVDAc): 200 {SYMBOL: 2–24 positive closes}; keys are among the symbols with a feed (NVDAc never; a symbol still warming is absent, never an empty series); BTC and ETH are present; each series ends within 5% of /market/quotes; no symbols → {}.',
+      'Public; as the market list asks (?symbols=BTC,ETH,WETH,USDT0,NVDAx): 200 {SYMBOL: 2–24 positive closes}; keys are among the symbols with a feed (NVDAx never; a symbol still warming is absent, never an empty series); BTC and ETH are present; each series ends within 5% of /market/quotes; no symbols → {}.',
   },
   async () => {
-    const r = await get('/market/sparklines?symbols=BTC,ETH,WETH,CBBTC,NVDAc', { auth: false });
+    const r = await get('/market/sparklines?symbols=BTC,ETH,WETH,USDT0,NVDAx', { auth: false });
     expectStatus(r, 200, 'GET /market/sparklines');
     const s = r.json;
-    const q = await quotes('BTC,ETH,WETH,CBBTC');
+    const q = await quotes('BTC,ETH,WETH,USDT0');
     for (const [k, v] of Object.entries(s)) {
-      must(['BTC', 'ETH', 'WETH', 'CBBTC'].includes(k), `unexpected key ${k}`);
+      must(['BTC', 'ETH', 'WETH', 'USDT0'].includes(k), `unexpected key ${k}`);
       must(Array.isArray(v) && v.length >= 2 && v.length <= 24 && v.every((n) => isNum(n) && n > 0), `${k}: ${clip(v)}`);
       must(Math.abs(v.at(-1) / q[k].price - 1) < 0.05, `${k}: ends at ${v.at(-1)}, spot ${q[k].price}`);
     }
@@ -2146,7 +1874,8 @@ check(
   },
 );
 
-const EQUITIES = ['NVDAc', 'AAPLc', 'TSLAc', 'METAc', 'MSFTc', 'AMZNc', 'GOOGLc', 'MSTRc'];
+/** The wrapped xStocks on X Layer, in the order server/src/venues/stocks.ts lists them. */
+const EQUITIES = ['TSLAx', 'QQQx', 'GOOGLx', 'COINx', 'SPYx', 'NVDAx', 'AAPLx', 'MSFTx', 'METAx', 'MSTRx', 'AMZNx'];
 
 check(
   {
@@ -2155,7 +1884,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200: the eight tokenized equities in order NVDAc, AAPLc, TSLAc, METAc, MSFTc, AMZNc, GOOGLc, MSTRc, each {symbol, name, address (0xb2000…), price, venues, feed}; feed "live" ⇒ price in (1, 10000) and at least one venue; "unavailable" ⇒ price null and venues []. All eight are live — priced from a real 1inch route on Base.',
+      'Public. 200: the eleven wrapped xStocks in registry order TSLAx, QQQx, GOOGLx, COINx, SPYx, NVDAx, AAPLx, MSFTx, METAx, MSTRx, AMZNx, each {symbol, name, address (an ERC-4626 wrapper on X Layer), price, venues, feed}; feed "live" ⇒ price in (1, 10000) and at least one venue (uniswap-v3 / okx-dex); "unavailable" ⇒ price null and venues []. On mainnet state all eleven are live — priced from a real $1,000 Uniswap v3 quote on X Layer.',
   },
   async () => {
     const r = await get('/market/stocks', { auth: false });
@@ -2163,15 +1892,15 @@ check(
     must(Array.isArray(r.json) && JSON.stringify(r.json.map((s) => s.symbol)) === JSON.stringify(EQUITIES), `symbols ${clip(r.json?.map?.((s) => s.symbol))}`);
     const dead = [];
     for (const s of r.json) {
-      must(typeof s.name === 'string' && s.name && /^0xb2000/i.test(s.address), `${s.symbol}: name/address ${s.name} ${s.address}`);
+      must(typeof s.name === 'string' && s.name && ADDRESS.test(s.address), `${s.symbol}: name/address ${s.name} ${s.address}`);
       if (s.feed === 'live') must(s.price > 1 && s.price < 10_000 && s.venues.length > 0, `${s.symbol}: live at ${s.price} via ${clip(s.venues)}`);
       else {
         must(s.feed === 'unavailable' && s.price === null && s.venues.length === 0, `${s.symbol}: ${clip(s)}`);
         dead.push(s.symbol);
       }
     }
-    must(dead.length === 0, `unavailable: ${dead.join(', ')}`);
-    return r.json.map((s) => `${s.symbol} $${s.price.toFixed(2)}`).join(', ');
+    if (ctx.mainnetState) must(dead.length === 0, `unavailable: ${dead.join(', ')}`);
+    return r.json.map((s) => `${s.symbol} ${s.price === null ? 'unpriced' : `$${s.price.toFixed(2)}`}`).join(', ');
   },
 );
 
@@ -2182,13 +1911,13 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the app asks (?symbol=NVDAc&hours=720): 200 {symbol "NVDAc", points: [{at ascending, usd > 0}] all within the last 720 hours, observedSince = points[0].at (null when empty), note = "<n> readings since <first ISO>." or the no-readings sentence}.',
+      'Public; as the app asks (?symbol=NVDAx&hours=720): 200 {symbol "NVDAx", points: [{at ascending, usd > 0}] all within the last 720 hours, observedSince = points[0].at (null when empty), note = "<n> readings since <first ISO>." or the no-readings sentence}.',
   },
   async () => {
-    const r = await get('/market/stocks/history?symbol=NVDAc&hours=720', { auth: false });
-    expectStatus(r, 200, '?symbol=NVDAc&hours=720');
+    const r = await get('/market/stocks/history?symbol=NVDAx&hours=720', { auth: false });
+    expectStatus(r, 200, '?symbol=NVDAx&hours=720');
     const h = r.json;
-    must(h.symbol === 'NVDAc' && Array.isArray(h.points), `answer ${clip(r.text)}`);
+    must(h.symbol === 'NVDAx' && Array.isArray(h.points), `answer ${clip(r.text)}`);
     let prev = 0;
     for (const p of h.points) {
       must(isMs(p.at) && p.at > Date.now() - 720 * 3_600_000 - 120_000 && p.usd > 0, `point ${clip(p)}`);
@@ -2211,11 +1940,11 @@ check(
     path: '/market/stocks/history',
     auth: 'public',
     kind: 'validation',
-    correct: 'Bad parameters get a named 400, never an empty "No readings yet" or a sentence with a hole: no ?symbol → 400 named; ?symbol=NVDAc&hours=abc → 400 named.',
+    correct: 'Bad parameters get a named 400, never an empty "No readings yet" or a sentence with a hole: no ?symbol → 400 named; ?symbol=NVDAx&hours=abc → 400 named.',
   },
   async () => {
     const none = await get('/market/stocks/history', { auth: false });
-    const hours = await get('/market/stocks/history?symbol=NVDAc&hours=abc', { auth: false });
+    const hours = await get('/market/stocks/history?symbol=NVDAx&hours=abc', { auth: false });
     const problems = [];
     if (none.status !== 400 || !named(none)) problems.push(`no ?symbol → ${show(none)}`);
     if (hours.status !== 400 || !named(hours)) problems.push(`hours=abc → ${show(hours)}`);
@@ -2224,7 +1953,7 @@ check(
   },
 );
 
-const FEEDS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'HYPE', 'AAVE', 'LINK', 'TON', 'XAUT', 'PAXG', 'WETH', 'USDC', 'CBBTC'];
+const FEEDS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'HYPE', 'AAVE', 'LINK', 'TON', 'XAUT', 'PAXG', 'WETH', 'USDC', 'USDT0', 'CBBTC'];
 
 check(
   {
@@ -2232,7 +1961,7 @@ check(
     path: '/market/symbols',
     auth: 'public',
     kind: 'contract',
-    correct: 'Public. 200: exactly the feed table BTC, ETH, SOL, XRP, DOGE, HYPE, AAVE, LINK, TON, XAUT, PAXG, WETH, USDC, CBBTC — no duplicates — and every one prices in /market/quotes.',
+    correct: 'Public. 200: exactly the feed table (server/src/market/ids.ts) BTC, ETH, SOL, XRP, DOGE, HYPE, AAVE, LINK, TON, XAUT, PAXG, WETH, USDC, USDT0, CBBTC — no duplicates — and every one prices in /market/quotes.',
   },
   async () => {
     const r = await get('/market/symbols', { auth: false });
@@ -2245,20 +1974,28 @@ check(
   },
 );
 
-const NATIVE_ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-const CBBTC = '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf';
+/**
+ * The token registry (server/src/venues/tokens.ts) in its own order, at X Layer mainnet addresses — prices are a mainnet
+ * question — with USDC at this chain's own Circle deployment. The xStocks follow wherever they function (mainnet state).
+ */
+const REGISTRY = [
+  ['USDC', null, 6],
+  ['USDG', '0x4ae46a509F6b1D9056937BA4500cb143933D2dc8', 6],
+  ['USDT0', USDT0, 6],
+  ['XBTC', '0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f', 8],
+  ['WOKB', '0xe538905cf8410324e03A5A23C1c177a474D59b2b', 18],
+  ['WETH', '0x5A77f1443D16ee5761d310e38b62f77f726bC71c', 18],
+];
 
 function watchableRows(rows, what) {
-  const want = [
-    ['ETH', NATIVE_ETH, 18],
-    ['WETH', WETH, 18],
-    ['USDC', ctx.usdc, 6],
-    ['CBBTC', CBBTC, 8],
-  ];
-  must(Array.isArray(rows) && rows.length === want.length, `${what}: ${clip(rows)}`);
-  want.forEach(([symbol, address, decimals], i) => {
-    must(rows[i].symbol === symbol && sameAddr(rows[i].address, address) && rows[i].decimals === decimals, `${what}: row ${i} ${clip(rows[i])}, expected ${symbol} ${address} ${decimals}`);
+  must(Array.isArray(rows) && rows.length >= REGISTRY.length, `${what}: ${clip(rows)}`);
+  REGISTRY.forEach(([symbol, address, decimals], i) => {
+    const at = address ?? ctx.usdc;
+    must(rows[i].symbol === symbol && sameAddr(rows[i].address, at) && rows[i].decimals === decimals, `${what}: row ${i} ${clip(rows[i])}, expected ${symbol} ${at} ${decimals}`);
   });
+  const stocks = rows.slice(REGISTRY.length).map((r) => r.symbol);
+  if (ctx.mainnetState) must(JSON.stringify(stocks) === JSON.stringify(EQUITIES), `${what}: xStocks ${clip(stocks)}, expected ${EQUITIES.join(', ')}`);
+  else must(stocks.length === 0, `${what}: xStocks offered on ${ctx.chain}, where none has code: ${clip(stocks)}`);
 }
 
 check(
@@ -2268,23 +2005,24 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. base-fork (fills settle): exactly ETH, WETH, USDC, CBBTC at this chain\'s settlement addresses with decimals 18, 18, 6, 8 — the app\'s TRADABLE list (src/data/tradable.ts) less the equities, which do not function on a fork — identical to /market/watchable. base-sepolia: [] (1inch cannot settle there).',
+      'Public. Mainnet state (xlayer, xlayer-fork — fills settle): the token registry\'s routable symbols (watchable\'s rows less WETH, which no X Layer pool routes) at X Layer\'s addresses with their decimals — exactly the app\'s TRADABLE list (src/data/tradable.ts). xlayer-testnet: [] (no DEX routes there).',
   },
   async () => {
     const r = await get('/market/tradable', { auth: false });
     expectStatus(r, 200, 'GET /market/tradable');
-    if (ctx.sepolia) {
-      must(Array.isArray(r.json) && r.json.length === 0, `base-sepolia offers ${clip(r.json)}`);
+    if (!ctx.mainnetState) {
+      must(Array.isArray(r.json) && r.json.length === 0, `${ctx.chain} offers ${clip(r.json)}`);
       return '[]';
     }
-    watchableRows(r.json, 'tradable');
-    const app = appList('../src/data/tradable.ts', /^\s*'([A-Za-z]+)',\s*$/gm);
+    const watch = (await get('/market/watchable', { auth: false })).json;
+    must(JSON.stringify(watch.filter((t) => t.symbol !== 'WETH')) === JSON.stringify(r.json), `tradable ${clip(r.json.map((t) => t.symbol))} is not watchable less WETH`);
+    const app = appList('../src/data/tradable.ts', /^\s*'([A-Za-z0-9]+)',\s*$/gm);
     if (app) {
-      const crypto = app.filter((s) => !EQUITIES.includes(s));
-      must(JSON.stringify(crypto) === JSON.stringify(r.json.map((t) => t.symbol)), `app TRADABLE crypto ${clip(crypto)} vs ${clip(r.json.map((t) => t.symbol))}`);
+      // Routable symbols only: WETH is in the registry (held and shown) but no X Layer pool routes it, so the app's
+      // TRADABLE leaves it out — and a tradable list that offers it promises a buy no signed transaction can fill.
+      const served = r.json.map((t) => t.symbol);
+      must(JSON.stringify([...app].sort()) === JSON.stringify([...served].sort()), `app TRADABLE ${clip(app)} vs served ${clip(served)}`);
     }
-    const watch = await get('/market/watchable', { auth: false });
-    must(JSON.stringify(watch.json) === JSON.stringify(r.json), `watchable ${clip(watch.json)} differs`);
     return r.json.map((t) => t.symbol).join(', ');
   },
 );
@@ -2296,7 +2034,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. ETH, WETH, USDC, CBBTC with decimals 18, 18, 6, 8 at this chain\'s addresses — native 0xEeee…EEeE, WETH 0x4200…0006, USDC 0x8335…2913 on base-fork or 0x036C…CF7e on base-sepolia, cbBTC 0xcbB7…33Bf — and no equities.',
+      'Public. The token registry USDC (this chain\'s Circle USDC: 0xB6CE…3061 on mainnet state, 0xDec9…B9B3 on the testnet), USDG 0x4ae4…2dc8, USDT0 0x779D…3736, XBTC 0xb7C0…6b4f (8 decimals), WOKB 0xe538…2b2b, WETH 0x5A77…C71c — then the eleven xStocks where they function (mainnet state) and none elsewhere.',
   },
   async () => {
     const r = await get('/market/watchable', { auth: false });
@@ -2315,7 +2053,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200 {runs: {status: count}, runFailureRate = failed / (filled + failed) (0 when neither), failuresByCause: keys among price_moved, permission_revoked, permission_expired, daily_cap, venue_not_allowed, wrong_delegate, venue_could_not_fill, upstream_unreachable, other, totalling ≤ runs.failed, fillsByVenue summing to runs.filled (±1 for a fill landing between the reads), fillQuality: {venues, measured, unmeasurable, basis} | null, strategies: {state: count}, alertsEnabled ≥ 0, alertsFiredTotal ≥ 0, spentTodayUsd ≥ 0, gas: {eth > 0, enough = eth ≥ floor, floor 0.01, address = /delegation/params delegate}, uptimeSec}; at most one run pending.',
+      'Public. 200 {runs: {status: count}, runFailureRate = failed / (filled + failed) (0 when neither), failuresByCause: keys among price_moved, permission_revoked, permission_expired, daily_cap, venue_not_allowed, wrong_delegate, venue_could_not_fill, upstream_unreachable, other, totalling ≤ runs.failed, fillsByVenue summing to runs.filled (±1 for a fill landing between the reads), fillQuality: {venues, measured, unmeasurable, basis} | null, strategies: {state: count}, alertsEnabled ≥ 0, alertsFiredTotal ≥ 0, spentTodayUsd ≥ 0, gas: {eth (the delegate\'s OKB, under its historical name) > 0, enough = eth ≥ floor, floor 0.01, address = /delegation/params delegate}, uptimeSec}; fillsByVenue keys are among uniswap-v3, okx-dex, aave (or "unrecorded"); at most one run pending.',
   },
   async () => {
     const r = await get('/metrics', { auth: false });
@@ -2329,11 +2067,12 @@ check(
     must(Object.values(m.failuresByCause).reduce((a, b) => a + b, 0) <= failed, `causes ${clip(m.failuresByCause)} exceed ${failed} failed`);
     const venues = Object.values(m.fillsByVenue).reduce((a, b) => a + b, 0);
     must(Math.abs(venues - filled) <= 1, `fillsByVenue total ${venues} vs ${filled} filled`);
+    must(Object.keys(m.fillsByVenue).every((k) => [...VENUES, 'unrecorded'].includes(k)), `a venue X Layer does not settle on: ${clip(Object.keys(m.fillsByVenue))}`);
     must(m.fillQuality === null || (Array.isArray(m.fillQuality.venues) && ['same-chain', 'forked'].includes(m.fillQuality.basis)), `fillQuality ${clip(m.fillQuality)}`);
     must(Number.isInteger(m.alertsEnabled) && m.alertsEnabled >= 0 && m.alertsFiredTotal >= 0 && m.spentTodayUsd >= 0, `alerts/spend ${m.alertsEnabled}/${m.alertsFiredTotal}/${m.spentTodayUsd}`);
     must(m.gas && m.gas.eth > 0 && m.gas.floor === 0.01 && m.gas.enough === m.gas.eth >= m.gas.floor && sameAddr(m.gas.address, ctx.params.delegate), `gas ${clip(m.gas)}`);
     must((m.runs.pending ?? 0) <= 1, `${m.runs.pending} runs stuck pending`);
-    return `runs ${clip(m.runs, 100)}; failure rate ${(m.runFailureRate * 100).toFixed(1)}%; gas ${m.gas.eth.toFixed(4)} ETH`;
+    return `runs ${clip(m.runs, 100)}; failure rate ${(m.runFailureRate * 100).toFixed(1)}%; gas ${m.gas.eth.toFixed(4)} OKB`;
   },
 );
 
@@ -2398,17 +2137,17 @@ check(
     auth: 'user',
     kind: 'validation',
     correct:
-      'Refused before anything is placed: {symbol:"WETH", usd:-5} → 400 invalid_request; {usd:10} without a symbol → 400 invalid_request; a 13-character symbol → 400 invalid_request; malformed JSON → 400 invalid_json. Happy path not executed: it places a market order.',
+      'Refused before anything is placed: {symbol:"XBTC", usd:-5} → 400 invalid_request; {usd:10} without a symbol → 400 invalid_request; a 13-character symbol → 400 invalid_request; malformed JSON → 400 invalid_json. Happy path not executed: it places a market order.',
   },
   async () => {
-    expectRefusal(await post('/orders', { symbol: 'WETH', usd: -5 }, { retry: false }), 400, 'invalid_request', 'usd -5');
+    expectRefusal(await post('/orders', { symbol: 'XBTC', usd: -5 }, { retry: false }), 400, 'invalid_request', 'usd -5');
     expectRefusal(await post('/orders', { usd: 10 }, { retry: false }), 400, 'invalid_request', 'no symbol');
     expectRefusal(await post('/orders', { symbol: 'ABCDEFGHIJKLM', usd: 10 }, { retry: false }), 400, 'invalid_request', '13-character symbol');
     expectRefusal(await http('POST', '/orders', { raw: '{"symbol":', retry: false }), 400, 'invalid_json', 'malformed JSON');
     return '400 invalid_request ×3, 400 invalid_json';
   },
 );
-unauthorized('POST', '/orders', { body: { symbol: 'WETH', usd: 1 } });
+unauthorized('POST', '/orders', { body: { symbol: 'XBTC', usd: 1 } });
 
 unauthorized('POST', '/panic/flatten', {
   extra: 'Happy path not executed: it sells every holding — with a live permission an authenticated call sells, so no token-bearing request is sent at all.',
@@ -2421,7 +2160,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {legs: [{symbol, units > 0, usd ≥ 1}], totalUsd = Σ legs.usd, dustBelowUsd 1, slippagePct 2, skipped: symbols held below $1}; USDC and native ETH are never legs; each leg\'s units equal /wallet/balance holdings for that symbol.',
+      '200 {legs: [{symbol, units > 0, usd ≥ 1}], totalUsd = Σ legs.usd, dustBelowUsd 1, slippagePct 2, skipped: symbols held below $1}; USDC and native OKB are never legs; each leg\'s units equal /wallet/balance holdings for that symbol.',
   },
   async () => {
     const r = await get('/panic/preview');
@@ -2431,7 +2170,7 @@ check(
     must(p.dustBelowUsd === 1 && p.slippagePct === 2 && Array.isArray(p.legs) && Array.isArray(p.skipped), `shape ${clip(p)}`);
     must(near(p.totalUsd, p.legs.reduce((a, l) => a + l.usd, 0), 1e-6), `totalUsd ${p.totalUsd} ≠ Σ legs`);
     for (const l of p.legs) {
-      must(l.units > 0 && l.usd >= 1 && !['USDC', 'ETH'].includes(l.symbol), `leg ${clip(l)}`);
+      must(l.units > 0 && l.usd >= 1 && !['USDC', 'OKB'].includes(l.symbol), `leg ${clip(l)}`);
       const held = balance.holdings.find((h) => h.symbol === l.symbol);
       must(held && near(held.units, l.units, 1e-12, 1e-9), `${l.symbol}: preview ${l.units} vs balance ${held?.units}`);
     }
@@ -2447,7 +2186,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the futures screen asks (/perp/BTC): 200 {symbol "BTC", markPx > 0, oraclePx > 0, markVsIndex = markPx − oraclePx, change24hPct: number|null, openInterestUsd ≥ 0, dayVolumeUsd ≥ 0, fundingRate finite, fundingIntervalHours 1, maxLeverage ≥ 1, nextFundingSeconds in [0, 3600], nextFundingAt on the next whole hour, venue "Hyperliquid", feed "live"}. /perp/WETH answers for ETH, its underlying; /perp/cbbtc for BTC.',
+      'Public; as the futures screen asks (/perp/BTC): 200 {symbol "BTC", markPx > 0, oraclePx > 0, markVsIndex = markPx − oraclePx, change24hPct: number|null, openInterestUsd ≥ 0, dayVolumeUsd ≥ 0, fundingRate finite, fundingIntervalHours 1, maxLeverage ≥ 1, nextFundingSeconds in [0, 3600], nextFundingAt on the next whole hour, venue "Hyperliquid", feed "live"}. /perp/WETH answers for ETH, its underlying; /perp/xbtc (OKX\'s wrapped BTC on X Layer) for BTC.',
   },
   async () => {
     const r = await get('/perp/BTC', { auth: false });
@@ -2459,9 +2198,9 @@ check(
     must(m.nextFundingSeconds >= 0 && m.nextFundingSeconds <= 3600 && m.nextFundingAt % 3_600_000 === 0 && m.nextFundingAt > Date.now() - 60_000 && m.nextFundingAt <= Date.now() + 3_660_000, `funding clock ${m.nextFundingSeconds}s / ${m.nextFundingAt}`);
     const weth = await get('/perp/WETH', { auth: false });
     must(weth.status === 200 && weth.json.symbol === 'ETH', `/perp/WETH → ${show(weth)}`);
-    const cbbtc = await get('/perp/cbbtc', { auth: false });
-    must(cbbtc.status === 200 && cbbtc.json.symbol === 'BTC', `/perp/cbbtc → ${show(cbbtc)}`);
-    return `BTC mark ${m.markPx}, funding ${m.fundingRate}; WETH→ETH, cbbtc→BTC`;
+    const xbtc = await get('/perp/xbtc', { auth: false });
+    must(xbtc.status === 200 && xbtc.json.symbol === 'BTC', `/perp/xbtc → ${show(xbtc)}`);
+    return `BTC mark ${m.markPx}, funding ${m.fundingRate}; WETH→ETH, xbtc→BTC`;
   },
 );
 
@@ -2471,11 +2210,11 @@ check(
     path: '/perp/:symbol',
     auth: 'public',
     kind: 'validation',
-    correct: 'No contract for the symbol → 404 {error:"no_feed", detail}: /perp/NOPE, and /perp/NVDAc (a tokenized equity has no perpetual).',
+    correct: 'No contract for the symbol → 404 {error:"no_feed", detail}: /perp/NOPE, and /perp/NVDAx (a tokenized equity has no perpetual).',
   },
   async () => {
     expectRefusal(await get('/perp/NOPE', { auth: false }), 404, 'no_feed', '/perp/NOPE');
-    expectRefusal(await get('/perp/NVDAc', { auth: false }), 404, 'no_feed', '/perp/NVDAc');
+    expectRefusal(await get('/perp/NVDAx', { auth: false }), 404, 'no_feed', '/perp/NVDAx');
     return '404 no_feed ×2';
   },
 );
@@ -2716,17 +2455,17 @@ check(
     auth: 'user',
     kind: 'validation',
     correct:
-      'Refused before anything is sold: {symbol:"WETH", fraction:2} → 400 invalid_request; {symbol:"", fraction:1} → 400 invalid_request; {symbol:"WETH", fraction:0} → 400 invalid_request; malformed JSON → 400 invalid_json. Happy path not executed: it sells a holding.',
+      'Refused before anything is sold: {symbol:"XBTC", fraction:2} → 400 invalid_request; {symbol:"", fraction:1} → 400 invalid_request; {symbol:"XBTC", fraction:0} → 400 invalid_request; malformed JSON → 400 invalid_json. Happy path not executed: it sells a holding.',
   },
   async () => {
-    expectRefusal(await post('/positions/close', { symbol: 'WETH', fraction: 2 }, { retry: false }), 400, 'invalid_request', 'fraction 2');
+    expectRefusal(await post('/positions/close', { symbol: 'XBTC', fraction: 2 }, { retry: false }), 400, 'invalid_request', 'fraction 2');
     expectRefusal(await post('/positions/close', { symbol: '', fraction: 1 }, { retry: false }), 400, 'invalid_request', 'empty symbol');
-    expectRefusal(await post('/positions/close', { symbol: 'WETH', fraction: 0 }, { retry: false }), 400, 'invalid_request', 'fraction 0');
+    expectRefusal(await post('/positions/close', { symbol: 'XBTC', fraction: 0 }, { retry: false }), 400, 'invalid_request', 'fraction 0');
     expectRefusal(await http('POST', '/positions/close', { raw: '{"symbol":', retry: false }), 400, 'invalid_json', 'malformed JSON');
     return '400 invalid_request ×3, 400 invalid_json';
   },
 );
-unauthorized('POST', '/positions/close', { body: { symbol: 'WETH', fraction: 1 } });
+unauthorized('POST', '/positions/close', { body: { symbol: 'XBTC', fraction: 1 } });
 
 check(
   {
@@ -2735,7 +2474,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {symbol, price > 0, source}: /price/BTC → source "coingecko", within 2% of /market/quotes BTC; /price/nvdac → symbol "NVDAc" (the registry\'s spelling), source "1inch", within 2% of /market/stocks NVDAc. Each ask answers inside a screen\'s patience: a price still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
+      '200 {symbol, price > 0, source}: /price/BTC → source "coingecko", within 2% of /market/quotes BTC; /price/nvdax → symbol "NVDAx" (the registry\'s spelling), source "uniswap-v3" (its X Layer pool), within 2% of /market/stocks NVDAx. Each ask answers inside a screen\'s patience: a price still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
   },
   async () => {
     const btc = await get('/price/BTC');
@@ -2743,12 +2482,12 @@ check(
     must(btc.ms < 45_000, `/price/BTC took ${btc.ms}ms on its last attempt`);
     const q = await quotes('BTC');
     must(btc.json.symbol === 'BTC' && btc.json.source === 'coingecko' && Math.abs(btc.json.price / q.BTC.price - 1) < 0.02, `BTC ${clip(btc.text)} vs spot ${q.BTC.price}`);
-    const nvda = await get('/price/nvdac');
-    expectStatus(nvda, 200, '/price/nvdac');
-    const stock = (await get('/market/stocks', { auth: false })).json.find((s) => s.symbol === 'NVDAc');
-    must(nvda.json.symbol === 'NVDAc' && nvda.json.source === '1inch' && nvda.json.price > 0, `nvdac ${clip(nvda.text)}`);
-    if (stock?.price) must(Math.abs(nvda.json.price / stock.price - 1) < 0.02, `NVDAc ${nvda.json.price} vs /market/stocks ${stock.price}`);
-    return `BTC $${btc.json.price}; NVDAc $${nvda.json.price.toFixed(2)}`;
+    const nvda = await get('/price/nvdax');
+    expectStatus(nvda, 200, '/price/nvdax');
+    const stock = (await get('/market/stocks', { auth: false })).json.find((s) => s.symbol === 'NVDAx');
+    must(nvda.json.symbol === 'NVDAx' && nvda.json.source === 'uniswap-v3' && nvda.json.price > 0, `nvdax ${clip(nvda.text)}`);
+    if (stock?.price) must(Math.abs(nvda.json.price / stock.price - 1) < 0.02, `NVDAx ${nvda.json.price} vs /market/stocks ${stock.price}`);
+    return `BTC $${btc.json.price}; NVDAx $${nvda.json.price.toFixed(2)}`;
   },
 );
 
@@ -2951,28 +2690,28 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the route screen asks (?in=USDC&out=WETH&amount=500, app/route/[symbol].tsx SIZES[1]): 200 {inSymbol "USDC", outSymbol "WETH", amount 500, quotes: aqua, swapvm, 1inch in that order, each {served:true, outAmount > 0, detail, gasUsd?, netUsd?} or {served:false, reason}; best = the served venue with the most out; edgeBps = round((best − second) / second × 10^4) when two serve, absent otherwise; bestNet only when every served venue has netUsd, and then the largest}; the aggregator serves at a rate within 3% of /market/quotes WETH.',
+      'As the route screen asks (?in=USDC&out=XBTC&amount=500, app/route/[symbol].tsx SIZES[1]): 200 {inSymbol "USDC", outSymbol "XBTC", amount 500, venues: "Uniswap v3" then "OKX DEX" in that order, each {venue, outAmount: number > 0 | null, unavailable: null | a reason} with outAmount null ⇔ unavailable set; best = the venue with the most out (null when none priced); edgeBps = round((best − runner-up) / runner-up × 10^4) when two price, null otherwise}; Uniswap v3 prices on mainnet state, at a rate within 3% of /market/quotes BTC; OKX DEX says why when this deployment has no key.',
   },
   async () => {
-    const r = await get('/route/compare?in=USDC&out=WETH&amount=500');
+    const r = await get('/route/compare?in=USDC&out=XBTC&amount=500');
     expectStatus(r, 200, 'GET /route/compare');
     const c = r.json;
-    must(c.inSymbol === 'USDC' && c.outSymbol === 'WETH' && c.amount === 500, `header ${clip(c)}`);
-    must(JSON.stringify(c.quotes.map((q) => q.venue)) === '["aqua","swapvm","1inch"]', `venues ${clip(c.quotes.map((q) => q.venue))}`);
-    for (const q of c.quotes) {
-      if (q.served) must(q.outAmount > 0 && typeof q.detail === 'string' && (q.gasUsd === undefined || q.gasUsd >= 0), `${q.venue}: ${clip(q)}`);
-      else must(q.served === false && typeof q.reason === 'string' && q.reason.length > 0, `${q.venue}: ${clip(q)}`);
+    must(c.inSymbol === 'USDC' && c.outSymbol === 'XBTC' && c.amount === 500, `header ${clip(c)}`);
+    must(JSON.stringify(c.venues.map((q) => q.venue)) === '["Uniswap v3","OKX DEX"]', `venues ${clip(c.venues.map((q) => q.venue))}`);
+    for (const q of c.venues) {
+      if (q.outAmount !== null) must(q.outAmount > 0 && q.unavailable === null, `${q.venue}: ${clip(q)}`);
+      else must(typeof q.unavailable === 'string' && q.unavailable.length > 0, `${q.venue}: ${clip(q)}`);
     }
-    const served = c.quotes.filter((q) => q.served).sort((a, b) => b.outAmount - a.outAmount);
-    must(c.best === served[0]?.venue, `best ${c.best}, largest out ${served[0]?.venue}`);
-    must(served.length > 1 && served[1].outAmount > 0 ? c.edgeBps === Math.round(((served[0].outAmount - served[1].outAmount) / served[1].outAmount) * 10_000) : c.edgeBps === undefined, `edgeBps ${c.edgeBps}`);
-    const allCosted = served.length > 0 && served.every((q) => q.netUsd !== undefined);
-    must(allCosted ? c.bestNet === [...served].sort((a, b) => b.netUsd - a.netUsd)[0].venue : c.bestNet === undefined, `bestNet ${c.bestNet}`);
-    const agg = c.quotes.find((q) => q.venue === '1inch');
-    must(agg.served, `the aggregator did not serve: ${agg.reason}`);
-    const q = await quotes('WETH');
-    must(Math.abs(500 / agg.outAmount / q.WETH.price - 1) < 0.03, `aggregator rate ${(500 / agg.outAmount).toFixed(2)} vs spot ${q.WETH.price}`);
-    return c.quotes.map((x) => `${x.venue}:${x.served ? x.outAmount.toFixed(5) : 'no'}`).join(', ') + `; best ${c.best}`;
+    const priced = c.venues.filter((q) => q.outAmount !== null && q.outAmount > 0).sort((a, b) => b.outAmount - a.outAmount);
+    must(c.best === (priced[0]?.venue ?? null), `best ${c.best}, largest out ${priced[0]?.venue}`);
+    must(priced.length > 1 ? c.edgeBps === Math.round(((priced[0].outAmount - priced[1].outAmount) / priced[1].outAmount) * 10_000) : c.edgeBps === null, `edgeBps ${c.edgeBps}`);
+    const uni = c.venues.find((q) => q.venue === 'Uniswap v3');
+    if (ctx.mainnetState) {
+      must(uni.outAmount > 0, `Uniswap v3 did not price: ${uni.unavailable}`);
+      const q = await quotes('BTC');
+      must(Math.abs(500 / uni.outAmount / q.BTC.price - 1) < 0.03, `Uniswap v3 rate ${(500 / uni.outAmount).toFixed(2)} vs BTC spot ${q.BTC.price}`);
+    }
+    return c.venues.map((x) => `${x.venue}:${x.outAmount === null ? 'no' : x.outAmount.toFixed(6)}`).join(', ') + `; best ${c.best}`;
   },
 );
 
@@ -2986,7 +2725,7 @@ check(
   },
   async () => {
     const problems = [];
-    for (const q of ['in=NOPE&out=WETH&amount=500', 'in=USDC&out=WETH&amount=abc']) {
+    for (const q of ['in=NOPE&out=XBTC&amount=500', 'in=USDC&out=XBTC&amount=abc']) {
       const r = await get(`/route/compare?${q}`, { retry: false });
       if (r.status !== 400 || !named(r)) problems.push(`?${q} → ${show(r)}`);
     }
@@ -3080,7 +2819,7 @@ check(
 unauthorized('GET', '/strategies');
 
 /** A draft recurring buy: never picked up by the scheduler, well inside the cap, ended by the check that made it. */
-const draftStrategy = (symbol = 'WETH') => ({
+const draftStrategy = (symbol = 'XBTC') => ({
   kind: 'dca',
   state: 'draft',
   label: `qa-full draft ${Date.now()}`,
@@ -3105,20 +2844,20 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'Reversible happy path: {kind "dca", state "draft", label, symbol "weth", params {usd:1}, cadence "weekly", dailyAllocationUsd 1} → 200 {id, kind "dca", state "draft", label, symbol stored under the registry\'s spelling "WETH" (the handler\'s own rule: "weth from a client is WETH here"), params, cadence "weekly", nextRunAt within the next 8 days, dailyAllocationUsd 1}; GET /strategies lists it; it is then ended with DELETE.',
+      'Reversible happy path: {kind "dca", state "draft", label, symbol "xbtc", params {usd:1}, cadence "weekly", dailyAllocationUsd 1} → 200 {id, kind "dca", state "draft", label, symbol stored under the registry\'s spelling "XBTC" (the handler\'s own rule: a client\'s spelling is resolved through canonicalSymbol), params, cadence "weekly", nextRunAt within the next 8 days, dailyAllocationUsd 1}; GET /strategies lists it; it is then ended with DELETE.',
   },
   async () => {
-    const { r, body, id } = await createDraft('weth');
+    const { r, body, id } = await createDraft('xbtc');
     try {
       const s = r.json;
       must(s.kind === 'dca' && s.state === 'draft' && s.label === body.label && s.cadence === 'weekly' && s.dailyAllocationUsd === 1 && s.params.usd === 1, `answer ${clip(r.text)}`);
       must(isMs(s.nextRunAt) && s.nextRunAt > Date.now() - 60_000 && s.nextRunAt < Date.now() + 8 * 86_400_000, `nextRunAt ${s.nextRunAt}`);
       must((await get('/strategies')).json.some((x) => x.id === id), 'not listed');
-      must(s.symbol === 'WETH', `stored the symbol as sent, "${s.symbol}", not the registry's "WETH"`);
+      must(s.symbol === 'XBTC', `stored the symbol as sent, "${s.symbol}", not the registry's "XBTC"`);
     } finally {
       await del(`/strategies/${id}`);
     }
-    return 'created draft (symbol WETH), listed, ended';
+    return 'created draft (symbol XBTC), listed, ended';
   },
 );
 
@@ -3129,11 +2868,11 @@ check(
     auth: 'user',
     kind: 'validation',
     correct:
-      'Refusals, none of which creates a strategy: {kind, symbol} only → 400 invalid_request naming label and state; kind "nonsense" → 400 invalid_request listing the runnable kinds; symbol "SOL" → 400 invalid_request naming what is tradable; a dca on USDC → 400 not_settleable_here; a dca on NVDAc → 400 not_settleable_here; dailyAllocationUsd 0 on a dca → 400 invalid_request; 9,999,999 a day → 400 over_cap with the arithmetic; an agentId that is not a hired agent of this wallet → 400 unknown_agent; a PORTFOLIO rebalance with targets adding to 150% → 400 invalid_request; malformed JSON → 400 invalid_json.',
+      'Refusals, none of which creates a strategy: {kind, symbol} only → 400 invalid_request naming label and state; kind "nonsense" → 400 invalid_request listing the runnable kinds; symbol "SOL" → 400 invalid_request naming what is tradable; a dca on USDC → 400 not_settleable_here; on the testnet (no xStock has code there) a dca on NVDAx → 400 not_settleable_here; dailyAllocationUsd 0 on a dca → 400 invalid_request; 9,999,999 a day → 400 over_cap with the arithmetic; an agentId that is not a hired agent of this wallet → 400 unknown_agent; a PORTFOLIO rebalance with targets adding to 150% → 400 invalid_request; malformed JSON → 400 invalid_json.',
   },
   async () => {
     const before = (await get('/strategies')).json.length;
-    const missing = await post('/strategies', { kind: 'dca', symbol: 'WETH' });
+    const missing = await post('/strategies', { kind: 'dca', symbol: 'XBTC' });
     expectRefusal(missing, 400, 'invalid_request', 'missing fields');
     must(/label/.test(missing.json.detail ?? '') && /state/.test(missing.json.detail ?? ''), `detail ${missing.json.detail}`);
     const kind = await post('/strategies', { ...draftStrategy(), kind: 'nonsense' });
@@ -3141,19 +2880,19 @@ check(
     must(/dca/.test(kind.json.detail ?? ''), `does not list the runnable kinds: ${kind.json.detail}`);
     const sol = await post('/strategies', draftStrategy('SOL'));
     expectRefusal(sol, 400, 'invalid_request', 'symbol SOL');
-    must(/WETH/.test(sol.json.detail ?? ''), `does not name what is tradable: ${sol.json.detail}`);
+    must(/XBTC/.test(sol.json.detail ?? ''), `does not name what is tradable: ${sol.json.detail}`);
     expectRefusal(await post('/strategies', draftStrategy('USDC')), 400, 'not_settleable_here', 'dca on USDC');
-    expectRefusal(await post('/strategies', draftStrategy('NVDAc')), 400, 'not_settleable_here', 'dca on NVDAc');
+    if (!ctx.mainnetState) expectRefusal(await post('/strategies', draftStrategy('NVDAx')), 400, 'not_settleable_here', 'dca on NVDAx');
     expectRefusal(await post('/strategies', { ...draftStrategy(), dailyAllocationUsd: 0 }), 400, 'invalid_request', 'dailyAllocationUsd 0');
     const over = await post('/strategies', { ...draftStrategy(), dailyAllocationUsd: 9_999_999 });
     expectRefusal(over, 400, 'over_cap', '9,999,999 a day');
     must(/\$[\d,.]+ a day against a \$[\d,.]+ cap/.test(over.json.message ?? ''), `no arithmetic: ${over.json.message}`);
     expectRefusal(await post('/strategies', { ...draftStrategy(), agentId: randomUUID() }), 400, 'unknown_agent', 'foreign agentId');
-    expectRefusal(await post('/strategies', { kind: 'rebalance', state: 'draft', label: 'qa-full', symbol: 'PORTFOLIO', params: { targets: { WETH: 100, CBBTC: 50 } }, dailyAllocationUsd: 0 }), 400, 'invalid_request', 'targets over 100%');
+    expectRefusal(await post('/strategies', { kind: 'rebalance', state: 'draft', label: 'qa-full', symbol: 'PORTFOLIO', params: { targets: { XBTC: 100, WOKB: 50 } }, dailyAllocationUsd: 0 }), 400, 'invalid_request', 'targets over 100%');
     expectRefusal(await http('POST', '/strategies', { raw: '{not json' }), 400, 'invalid_json', 'malformed JSON');
     const after = (await get('/strategies')).json.length;
     must(after === before, `strategy count changed ${before} → ${after}`);
-    return '10 refusals, all named; nothing created';
+    return `${ctx.mainnetState ? 9 : 10} refusals, all named; nothing created`;
   },
 );
 unauthorized('POST', '/strategies', { body: draftStrategy() });
@@ -3233,17 +2972,17 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'Read-only. As the backtest screen sends it ({kind:"dca", symbol:"WETH", lookback:"90d", params:{usd:50, everyNDays:7}}) → 200 {lookback "90d", ret, maxDd ≤ 0, sharpe, trades 12–14 (one per 7 of ~91 daily closes), equity: ≥ 2 numbers, feed "live", source, disclaimer}. A grid around the current price ({kind:"grid", …, params:{lower, upper, steps:4, usdPerStep:25}}) → 200 with inRangePct in [0, 100], trades = buys + sells, unitsLeft ≥ 0, leftValue ≥ 0, leftCost ≥ 0 (> 0 exactly when units are left).',
+      'Read-only. As the backtest screen sends it ({kind:"dca", symbol:"XBTC", lookback:"90d", params:{usd:50, everyNDays:7}}) → 200 {lookback "90d", ret, maxDd ≤ 0, sharpe, trades 12–14 (one per 7 of ~91 daily closes), equity: ≥ 2 numbers, feed "live", source, disclaimer}. A grid around the current price ({kind:"grid", …, params:{lower, upper, steps:4, usdPerStep:25}}) → 200 with inRangePct in [0, 100], trades = buys + sells, unitsLeft ≥ 0, leftValue ≥ 0, leftCost ≥ 0 (> 0 exactly when units are left).',
   },
   async () => {
-    const dca = await post('/strategies/backtest', { kind: 'dca', symbol: 'WETH', lookback: '90d', params: { usd: 50, everyNDays: 7 } });
+    const dca = await post('/strategies/backtest', { kind: 'dca', symbol: 'XBTC', lookback: '90d', params: { usd: 50, everyNDays: 7 } });
     expectStatus(dca, 200, 'dca backtest');
     const d = dca.json;
     must(d.lookback === '90d' && isNum(d.ret) && d.maxDd <= 0 && isNum(d.sharpe) && d.trades >= 12 && d.trades <= 14, `dca ${clip(d)}`);
     must(Array.isArray(d.equity) && d.equity.length >= 2 && d.equity.every(isNum) && d.feed === 'live' && d.source && d.disclaimer, `dca fields ${clip(d)}`);
-    const spot = (await quotes('WETH')).WETH.price;
+    const spot = (await quotes('BTC')).BTC.price;
     const grid = await post('/strategies/backtest', {
-      kind: 'grid', symbol: 'WETH', lookback: '90d',
+      kind: 'grid', symbol: 'XBTC', lookback: '90d',
       params: { lower: Math.round(spot * 0.85), upper: Math.round(spot * 1.15), steps: 4, usdPerStep: 25 },
     });
     expectStatus(grid, 200, 'grid backtest');
@@ -3264,15 +3003,15 @@ check(
       'Bad bodies get a named 400: kind "momentum" → 400 invalid_request; lookback "2y" → 400 invalid_request; a grid whose lower is above its upper → 400 {error:"invalid_range"}; a symbol with no price history ("NOPE") → 400 or 404 named — an impossible request, not an upstream failure (no 5xx).',
   },
   async () => {
-    expectRefusal(await post('/strategies/backtest', { kind: 'momentum', symbol: 'WETH' }), 400, 'invalid_request', 'kind momentum');
-    expectRefusal(await post('/strategies/backtest', { kind: 'dca', symbol: 'WETH', lookback: '2y' }), 400, 'invalid_request', 'lookback 2y');
-    expectRefusal(await post('/strategies/backtest', { kind: 'grid', symbol: 'WETH', params: { lower: 5000, upper: 1000, steps: 4, usdPerStep: 25 } }), 400, 'invalid_range', 'lower above upper');
+    expectRefusal(await post('/strategies/backtest', { kind: 'momentum', symbol: 'XBTC' }), 400, 'invalid_request', 'kind momentum');
+    expectRefusal(await post('/strategies/backtest', { kind: 'dca', symbol: 'XBTC', lookback: '2y' }), 400, 'invalid_request', 'lookback 2y');
+    expectRefusal(await post('/strategies/backtest', { kind: 'grid', symbol: 'XBTC', params: { lower: 5000, upper: 1000, steps: 4, usdPerStep: 25 } }), 400, 'invalid_range', 'lower above upper');
     const nope = await post('/strategies/backtest', { kind: 'dca', symbol: 'NOPE', lookback: '90d', params: { usd: 50 } }, { retry: false });
     must([400, 404].includes(nope.status) && named(nope), `symbol NOPE → ${show(nope)}`);
     return `400 ×3; NOPE ${nope.status} ${named(nope)}`;
   },
 );
-unauthorized('POST', '/strategies/backtest', { body: { kind: 'dca', symbol: 'WETH' } });
+unauthorized('POST', '/strategies/backtest', { body: { kind: 'dca', symbol: 'XBTC' } });
 
 check(
   {
@@ -3284,7 +3023,7 @@ check(
       'Refused before anything is placed: amount "abc", amount "0", slippagePct 10 and a missing "to" → 400 invalid_request each; malformed JSON → 400 invalid_json. Happy path not executed: it swaps the wallet\'s tokens.',
   },
   async () => {
-    const good = { from: 'USDC', to: 'WETH', amount: '1' };
+    const good = { from: 'USDC', to: 'XBTC', amount: '1' };
     expectRefusal(await post('/swap', { ...good, amount: 'abc' }, { retry: false }), 400, 'invalid_request', 'amount abc');
     expectRefusal(await post('/swap', { ...good, amount: '0' }, { retry: false }), 400, 'invalid_request', 'amount 0');
     expectRefusal(await post('/swap', { ...good, slippagePct: 10 }, { retry: false }), 400, 'invalid_request', 'slippagePct 10');
@@ -3293,7 +3032,7 @@ check(
     return '400 invalid_request ×4, 400 invalid_json';
   },
 );
-unauthorized('POST', '/swap', { body: { from: 'USDC', to: 'WETH', amount: '1' } });
+unauthorized('POST', '/swap', { body: { from: 'USDC', to: 'XBTC', amount: '1' } });
 
 check(
   {
@@ -3302,26 +3041,26 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the swap screen asks (?in=USDC&out=WETH&amount=20&slippage=0.5, src/data/useSwapQuote.ts:62): 200 {inSymbol "USDC", outSymbol "WETH", inAmount 20, outAmount > 0, minimumOut = outAmount × (1 − slippagePct/100), slippagePct 0.5, venues: string[], route = "Direct" | the one venue | "Best of n venues", priceImpactPct: null or in [0, 5), gas: null or {paidBy "executor", …}}; the implied WETH price is within 3% of /market/quotes; without ?slippage the default 0.3 applies; ?out=nvdac quotes under "NVDAc". Each ask answers inside a screen\'s patience: a quote still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
+      'As the swap screen asks (?in=USDC&out=XBTC&amount=20&slippage=0.5, src/data/useSwapQuote.ts): 200 {inSymbol "USDC", outSymbol "XBTC", inAmount 20, outAmount > 0, minimumOut = outAmount × (1 − slippagePct/100), slippagePct 0.5, venues: string[], route = "Direct" | the one venue | "Best of n venues", priceImpactPct: null or in [0, 5), gas: null or {paidBy "executor", …}}; the implied XBTC price is within 3% of /market/quotes BTC; without ?slippage the default 0.3 applies; ?out=nvdax quotes under "NVDAx". Each ask answers inside a screen\'s patience: a quote still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
   },
   async () => {
-    const r = await get('/swap/quote?in=USDC&out=WETH&amount=20&slippage=0.5');
-    expectStatus(r, 200, 'USDC → WETH');
+    const r = await get('/swap/quote?in=USDC&out=XBTC&amount=20&slippage=0.5');
+    expectStatus(r, 200, 'USDC → XBTC');
     must(r.ms < 45_000, `/swap/quote took ${r.ms}ms on its last attempt`);
     const q = r.json;
-    must(q.inSymbol === 'USDC' && q.outSymbol === 'WETH' && q.inAmount === 20 && q.outAmount > 0 && q.slippagePct === 0.5, `header ${clip(q)}`);
+    must(q.inSymbol === 'USDC' && q.outSymbol === 'XBTC' && q.inAmount === 20 && q.outAmount > 0 && q.slippagePct === 0.5, `header ${clip(q)}`);
     must(near(q.minimumOut, q.outAmount * (1 - 0.005), 1e-12, 1e-9), `minimumOut ${q.minimumOut}`);
     const label = q.venues.length === 0 ? 'Direct' : q.venues.length === 1 ? q.venues[0] : `Best of ${q.venues.length} venues`;
     must(Array.isArray(q.venues) && q.route === label, `route "${q.route}" for venues ${clip(q.venues)}`);
     must(q.priceImpactPct === null || (q.priceImpactPct >= 0 && q.priceImpactPct < 5), `priceImpactPct ${q.priceImpactPct}`);
     must(q.gas === null || q.gas?.paidBy === 'executor', `gas ${clip(q.gas)}`);
-    const spot = (await quotes('WETH')).WETH.price;
-    must(Math.abs(20 / q.outAmount / spot - 1) < 0.03, `implied ${(20 / q.outAmount).toFixed(2)} vs spot ${spot}`);
-    const dflt = await get('/swap/quote?in=USDC&out=WETH&amount=20');
+    const spot = (await quotes('BTC')).BTC.price;
+    must(Math.abs(20 / q.outAmount / spot - 1) < 0.03, `implied ${(20 / q.outAmount).toFixed(2)} vs BTC spot ${spot}`);
+    const dflt = await get('/swap/quote?in=USDC&out=XBTC&amount=20');
     must(dflt.status === 200 && dflt.json.slippagePct === 0.3, `default slippage ${dflt.json?.slippagePct}`);
-    const equity = await get('/swap/quote?in=USDC&out=nvdac&amount=100');
-    must(equity.status === 200 && equity.json.outSymbol === 'NVDAc' && equity.json.outAmount > 0, `?out=nvdac → ${show(equity)}`);
-    return `20 USDC → ${q.outAmount.toFixed(6)} WETH via ${q.route}; NVDAc quotes`;
+    const equity = await get('/swap/quote?in=USDC&out=nvdax&amount=100');
+    must(equity.status === 200 && equity.json.outSymbol === 'NVDAx' && equity.json.outAmount > 0, `?out=nvdax → ${show(equity)}`);
+    return `20 USDC → ${q.outAmount.toFixed(8)} XBTC via ${q.route}; NVDAx quotes`;
   },
 );
 
@@ -3335,7 +3074,7 @@ check(
   },
   async () => {
     const problems = [];
-    for (const q of ['in=USDC&out=WETH&amount=20&slippage=10', 'in=USDC&out=WETH&amount=abc', 'in=NOPE&out=WETH&amount=20']) {
+    for (const q of ['in=USDC&out=XBTC&amount=20&slippage=10', 'in=USDC&out=XBTC&amount=abc', 'in=NOPE&out=XBTC&amount=20']) {
       const r = await get(`/swap/quote?${q}`, { retry: false });
       if (r.status !== 400 || !named(r)) problems.push(`?${q} → ${show(r)}`);
     }
@@ -3356,7 +3095,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public; as the verification screen sends it (?owner=<the wallet>): 200 {checks: [{id (unique), claim, status ∈ pass|fail|skip, observed, how, ms ≥ 0}], passed/failed/skipped counting those statuses, chain = /health chain, at: ISO within a minute}. base-fork: no failing check. base-sepolia: at most one, "audit-chain" — the permanent fork at entry 2 ("forks at entry 2 … the lock holds"). No how/observed carries a credential-shaped URL. Without ?owner the wallet checks (policy, venues, cap-agrees, audit, audit-anchor, audit-chain) skip.',
+      'Public; as the verification screen sends it (?owner=<the wallet>): 200 {checks: [{id (unique), claim, status ∈ pass|fail|skip, observed, how, ms ≥ 0}], passed/failed/skipped counting those statuses, chain = /health chain, at: ISO within a minute}. xlayer-fork and xlayer-testnet: no failing check (the X Layer trails began after the per-wallet append lock, so the Base build\'s fork at entry 2 is not theirs). No how/observed carries a credential-shaped URL. Without ?owner the wallet checks (policy, venues, cap-agrees, audit, audit-anchor, audit-chain) skip.',
   },
   async () => {
     const r = await get(`/verify?owner=${encodeURIComponent(ctx.owner)}`, { auth: false });
@@ -3379,10 +3118,7 @@ check(
     );
     must(leaks.length === 0, `credential-shaped URL in ${leaks.map((c) => c.id).join(', ')}`);
     const failing = v.checks.filter((c) => c.status === 'fail');
-    if (ctx.fork) must(failing.length === 0, `failing on base-fork: ${failing.map((c) => `${c.id} (${clip(c.observed, 160)})`).join('; ')}`);
-    if (ctx.sepolia) {
-      must(failing.length <= 1 && failing.every((c) => c.id === 'audit-chain' && /forks at entry 2/.test(c.observed)), `failing on base-sepolia: ${failing.map((c) => `${c.id} (${clip(c.observed, 160)})`).join('; ')}`);
-    }
+    if (ctx.fork || ctx.testnet) must(failing.length === 0, `failing on ${ctx.chain}: ${failing.map((c) => `${c.id} (${clip(c.observed, 160)})`).join('; ')}`);
     const anonymous = (await get('/verify', { auth: false })).json;
     const notSkipped = anonymous.checks.filter((c) => WALLET_CHECKS.includes(c.id) && c.status !== 'skip');
     must(notSkipped.length === 0, `without ?owner these did not skip: ${notSkipped.map((c) => c.id).join(', ')}`);
@@ -3494,7 +3230,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {owner = the wallet, chain = /health chain, usdc: {address = this chain\'s USDC, raw: integer string, amount = raw / 10^6}, eth: {raw: integer string, amount = raw / 10^18}, readAt within a minute}; usdc.amount = /wallet/balance cashUsd.',
+      '200 {owner = the wallet, chain = /health chain, usdc: {address = this chain\'s USDC, raw: integer string, amount = raw / 10^6}, eth: {the native balance — OKB on X Layer — raw: integer string, amount = raw / 10^18}, readAt within a minute}; usdc.amount = /wallet/balance cashUsd.',
   },
   async () => {
     const r = await get('/wallet/funds');
@@ -3506,7 +3242,7 @@ check(
     must(isMs(f.readAt) && Math.abs(f.readAt - Date.now()) < 120_000, `readAt ${f.readAt}`);
     const cash = (await get('/wallet/balance')).json.cashUsd;
     must(near(f.usdc.amount, cash, 0.01), `usdc ${f.usdc.amount} vs /wallet/balance cash ${cash}`);
-    return `${f.usdc.amount} USDC, ${f.eth.amount.toFixed(6)} ETH`;
+    return `${f.usdc.amount} USDC, ${f.eth.amount.toFixed(6)} OKB`;
   },
 );
 unauthorized('GET', '/wallet/funds');
@@ -3518,7 +3254,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      '200 {owner = the wallet, chain, source "chain" (off Base mainnet), tokens: [{symbol, address, decimals, units > 0, logo: https URL | null, usd: number|null, native only on ETH}] priced ones by usd descending then unpriced by symbol, undescribed: []}; the ETH row equals /wallet/funds ETH and the USDC row equals /wallet/funds USDC.',
+      '200 {owner = the wallet, chain, source "chain", tokens: [{symbol, address, decimals, units > 0, logo: https URL | null, usd: number|null, native only on OKB, X Layer\'s gas token}] priced ones by usd descending then unpriced by symbol, undescribed: []}; the OKB row equals /wallet/funds eth (the native balance) and the USDC row equals /wallet/funds USDC.',
   },
   async () => {
     const r = await get('/wallet/tokens');
@@ -3529,16 +3265,16 @@ check(
     t.tokens.forEach((x, i) => {
       must(typeof x.symbol === 'string' && ADDRESS.test(x.address) && Number.isInteger(x.decimals) && x.units > 0, `token ${clip(x)}`);
       must((x.logo === null || /^https:\/\//.test(x.logo)) && (x.usd === null || (isNum(x.usd) && x.usd >= 0)), `token ${x.symbol}: logo/usd ${clip(x)}`);
-      must((x.native === true) === (x.symbol === 'ETH'), `token ${x.symbol}: native ${x.native}`);
+      must((x.native === true) === (x.symbol === 'OKB'), `token ${x.symbol}: native ${x.native}`);
       if (i > 0) {
         const p = t.tokens[i - 1];
         const ordered = p.usd !== null && x.usd !== null ? p.usd >= x.usd : p.usd !== null || (x.usd === null && p.symbol.localeCompare(x.symbol) <= 0);
         must(ordered, `not sorted at ${p.symbol} → ${x.symbol}`);
       }
     });
-    const eth = t.tokens.find((x) => x.symbol === 'ETH');
+    const okb = t.tokens.find((x) => x.symbol === 'OKB');
     const usdc = t.tokens.find((x) => x.symbol === 'USDC');
-    must(funds.eth.amount > 0 ? eth && near(eth.units, funds.eth.amount, 1e-12, 1e-9) : !eth, `ETH ${eth?.units} vs funds ${funds.eth.amount}`);
+    must(funds.eth.amount > 0 ? okb && near(okb.units, funds.eth.amount, 1e-12, 1e-9) : !okb, `OKB ${okb?.units} vs funds ${funds.eth.amount}`);
     must(funds.usdc.amount > 0 ? usdc && near(usdc.units, funds.usdc.amount, 1e-9) : !usdc, `USDC ${usdc?.units} vs funds ${funds.usdc.amount}`);
     return t.tokens.map((x) => `${x.symbol} ${x.units}`).join(', ') || 'no tokens';
   },
@@ -3691,7 +3427,7 @@ check(
     auth: 'user',
     kind: 'refusal',
     correct:
-      'Refusals only; no transfer is built. A destination not on the allowlist → 409 {status:"blocked", reason:"not_allowlisted"}; one still cooling off → 409 {status:"blocked", reason:"cooling_off", label, usableAt}; {to:"nope", token:"USDC"} → 400 invalid_request; with a usable destination, token "NOPE" → 400 unknown_token and "ETH" → 400 native_token. Happy path not executed: it builds the transfer of a whole balance.',
+      'Refusals only; no transfer is built. A destination not on the allowlist → 409 {status:"blocked", reason:"not_allowlisted"}; one still cooling off → 409 {status:"blocked", reason:"cooling_off", label, usableAt}; {to:"nope", token:"USDC"} → 400 invalid_request; with a usable destination, token "NOPE" → 400 unknown_token and "OKB" (the native gas token) → 400 native_token. Happy path not executed: it builds the transfer of a whole balance.',
   },
   async () => {
     expectRefusal(await post('/withdrawals/prepare-all', { to: 'nope', token: 'USDC' }, { retry: false }), 400, 'invalid_request', '{to:"nope"}');
@@ -3707,7 +3443,7 @@ check(
     const usable = (await get('/withdrawal-addresses')).json.addresses.find((a) => a.usable);
     if (usable) {
       expectRefusal(await post('/withdrawals/prepare-all', { to: usable.address, token: 'NOPE' }, { retry: false }), 400, 'unknown_token', 'token NOPE');
-      expectRefusal(await post('/withdrawals/prepare-all', { to: usable.address, token: 'ETH' }, { retry: false }), 400, 'native_token', 'token ETH');
+      expectRefusal(await post('/withdrawals/prepare-all', { to: usable.address, token: 'OKB' }, { retry: false }), 400, 'native_token', 'token OKB');
     }
     return `400; 409 not_allowlisted; 409 cooling_off${usable ? '; 400 unknown_token; 400 native_token' : ''}`;
   },
@@ -3721,7 +3457,7 @@ check(
     auth: 'user',
     kind: 'refusal',
     correct:
-      'Refusals only; nothing is recorded. {txHash:"0xabc"} → 400 invalid_request; a hash no chain has seen → 404 {status:"unknown", detail}; a real transaction this wallet did not send (base-fork: the delegate\'s settlement from /history; base-sepolia: an unrelated transaction) → 403 {status:"blocked", reason:"not_your_transaction"}. Happy path not executed: it records a withdrawal the owner signed.',
+      'Refusals only; nothing is recorded. {txHash:"0xabc"} → 400 invalid_request; a hash no chain has seen → 404 {status:"unknown", detail}; a real transaction this wallet did not send (xlayer-fork: the delegate\'s settlement from /history; xlayer-testnet: an unrelated transaction) → 403 {status:"blocked", reason:"not_your_transaction"}. Happy path not executed: it records a withdrawal the owner signed.',
   },
   async () => {
     expectRefusal(await post('/withdrawals/record', { txHash: '0xabc' }, { retry: false }), 400, 'invalid_request', '{txHash:"0xabc"}');
@@ -3745,18 +3481,18 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'base-fork (Aave deployed): 200 {suppliedUsd ≥ 0, apy in (0, 0.5) = /yield/supply estimatedApy, pool = Aave v3 Pool 0xA238…d1c5, aToken (address), asset = Base USDC, available:true}. base-sepolia: 200 {suppliedUsd 0, available:false, reason saying Aave is not deployed on this network, apy, pool, aToken, asset}.',
+      'Mainnet state (Aave v3 deployed on X Layer): 200 {suppliedUsd ≥ 0, apy in (0, 0.5) = /yield/supply estimatedApy, symbol "USDT0" (tier 4 earns on USD₮0), pool = Aave v3 Pool 0xE3F3…f116, aToken (address), asset = X Layer USDT0 0x779D…3736, available:true}. xlayer-testnet: 200 {suppliedUsd 0, available:false, reason "There is no lending pool on …", apy, pool, aToken, asset} — mainnet\'s published rate shown for reference.',
   },
   async () => {
     const r = await get('/yield/position');
     const supply = (await get('/yield/supply', { auth: false })).json;
     expectStatus(r, 200, 'GET /yield/position');
     const p = r.json;
-    must(sameAddr(p.pool, AAVE_POOL) && ADDRESS.test(p.aToken) && sameAddr(p.asset, '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'), `addresses ${clip(p)}`);
+    must(p.symbol === 'USDT0' && sameAddr(p.pool, AAVE_V3_POOL) && ADDRESS.test(p.aToken) && sameAddr(p.asset, USDT0), `addresses ${clip(p)}`);
     must(p.apy > 0 && p.apy < 0.5 && Math.abs(p.apy - supply.estimatedApy) < 0.005, `apy ${p.apy} vs supply ${supply.estimatedApy}`);
-    must(p.available === ctx.fork, `available ${p.available} on ${ctx.chain}`);
+    must(p.available === ctx.mainnetState, `available ${p.available} on ${ctx.chain}`);
     if (p.available) must(isNum(p.suppliedUsd) && p.suppliedUsd >= 0 && p.reason === undefined, `available shape ${clip(p)}`);
-    else must(p.suppliedUsd === 0 && /not deployed/i.test(p.reason ?? ''), `unavailable shape ${clip(p)}`);
+    else must(p.suppliedUsd === 0 && /no lending pool/i.test(p.reason ?? ''), `unavailable shape ${clip(p)}`);
     return `${p.available ? `$${p.suppliedUsd} supplied` : p.reason} at ${(p.apy * 100).toFixed(2)}%`;
   },
 );
@@ -3769,15 +3505,16 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200 {symbol "USDC", estimatedApy in (0.001, 0.5), feed "live", source naming the Aave v3 Pool 0xA238…d1c5, note, availableHere = Aave exists on this chain (base-fork true, base-sepolia false), the note saying which}; a 503 rate_unavailable carries Retry-After and is waited out.',
+      'Public. 200 {symbol "USDT0" (what tier 4 earns on), estimatedApy in (0.001, 0.5), feed "live", source naming the Aave v3 Pool 0xE3F3…f116 on X Layer, reserves including USDT0, note, availableHere = Aave exists on this chain (mainnet state true, xlayer-testnet false), the note saying which}; a 503 rate_unavailable carries Retry-After and is waited out.',
   },
   async () => {
     const r = await get('/yield/supply', { auth: false });
     expectStatus(r, 200, 'GET /yield/supply');
     const y = r.json;
-    must(y.symbol === 'USDC' && y.estimatedApy > 0.001 && y.estimatedApy < 0.5 && y.feed === 'live' && y.source.includes(AAVE_POOL), `rate ${clip(y)}`);
-    must(y.availableHere === ctx.fork, `availableHere ${y.availableHere} on ${ctx.chain}`);
-    must(y.availableHere ? /Supplying USDC/.test(y.note) : /not deployed/.test(y.note), `note "${y.note}"`);
+    must(y.symbol === 'USDT0' && y.estimatedApy > 0.001 && y.estimatedApy < 0.5 && y.feed === 'live' && y.source.includes(AAVE_V3_POOL) && /X Layer/.test(y.source), `rate ${clip(y)}`);
+    must(Array.isArray(y.reserves) && y.reserves.some((x) => x.symbol === 'USDT0' && sameAddr(x.asset, USDT0)), `reserves ${clip(y.reserves)}`);
+    must(y.availableHere === ctx.mainnetState, `availableHere ${y.availableHere} on ${ctx.chain}`);
+    must(y.availableHere ? /supplied to Aave v3 on X Layer as USDT0/.test(y.note) : /no lending pool/.test(y.note), `note "${y.note}"`);
     return `${(y.estimatedApy * 100).toFixed(2)}% a year; availableHere ${y.availableHere}`;
   },
 );
@@ -3798,23 +3535,23 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'Read-only calldata, as the app sends it ({usd:null}). base-fork: 200 {to = Aave v3 Pool, data = withdraw(asset = Base USDC, amount = 2^256 − 1, to = the wallet) with selector 0x69328dec, isMax:true}; {usd:5} → amount 5,000,000 and isMax:false. Where Aave is not deployed (base-sepolia, where /yield/position says available:false) it refuses with a named 4xx rather than hand the wallet calldata for a pool with no code there.',
+      'Read-only calldata, as the app sends it ({usd:null}). Mainnet state: 200 {to = Aave v3 Pool 0xE3F3…f116, data = withdraw(asset = X Layer USDT0, amount = 2^256 − 1, to = the wallet) with selector 0x69328dec, isMax:true, asset "USDT0"}; {usd:5} → amount 5,000,000 (6 decimals) and isMax:false. Where Aave is not deployed (xlayer-testnet, where /yield/position says available:false) it refuses with a named 4xx (aave_not_deployed) rather than hand the wallet calldata for a pool with no code there.',
   },
   async () => {
     const max = await post('/yield/withdraw-calldata', { usd: null });
-    if (ctx.sepolia) {
-      must(max.status >= 400 && max.status < 500 && named(max), `base-sepolia, where Aave is not deployed → ${show(max)}`);
+    if (!ctx.mainnetState) {
+      must(max.status >= 400 && max.status < 500 && named(max), `${ctx.chain}, where Aave is not deployed → ${show(max)}`);
       return `${max.status} ${named(max)}`;
     }
     expectStatus(max, 200, '{usd:null}');
-    must(sameAddr(max.json.to, AAVE_POOL) && max.json.isMax === true, `answer ${clip(max.text)}`);
+    must(sameAddr(max.json.to, AAVE_V3_POOL) && max.json.isMax === true, `answer ${clip(max.text)}`);
     const all = decodeWithdraw(max.json.data);
-    must(sameAddr(all.asset, '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913') && all.amount === MAX_UINT256 && sameAddr(all.to, ctx.owner), `decoded ${clip({ ...all, amount: String(all.amount) })}`);
+    must(sameAddr(all.asset, USDT0) && all.amount === MAX_UINT256 && sameAddr(all.to, ctx.owner), `decoded ${clip({ ...all, amount: String(all.amount) })}`);
     const five = await post('/yield/withdraw-calldata', { usd: 5 });
     expectStatus(five, 200, '{usd:5}');
     const part = decodeWithdraw(five.json.data);
     must(five.json.isMax === false && part.amount === 5_000_000n && sameAddr(part.to, ctx.owner), `decoded ${clip({ ...part, amount: String(part.amount) })}`);
-    return 'max → withdraw(USDC, 2^256−1, owner); $5 → 5,000,000 units';
+    return 'max → withdraw(USDT0, 2^256−1, owner); $5 → 5,000,000 units';
   },
 );
 
@@ -3850,12 +3587,11 @@ const NOT_EXECUTED = [
   ['POST', '/panic/flatten', 'sells every holding'],
   ['POST', '/positions/close', 'sells a holding'],
   ['POST', '/strategies/:id/run', 'runs a strategy, which trades'],
-  ['POST', '/limit-orders/:hash/fill', 'takes an order, spending USDC through the permission'],
   ['POST', '/proposals/:id/decide', 'approve places the order a proposal describes (skip is exercised)'],
   ['POST', '/withdrawals/prepare-all', 'builds the transfer of a whole balance'],
   ['POST', '/withdrawals/record', 'records a withdrawal the owner signed'],
   ['POST', '/faucet', 'moves test funds'],
-  ['POST', '/audit/anchor', 'publishes the trail head to Base and spends gas'],
+  ['POST', '/audit/anchor', 'publishes the trail head to X Layer and spends gas (OKB)'],
   ['POST', '/wallet/create', 'binds a wallet and can send a first-time gas drip'],
   ['POST', '/wallet/connect', 'stamps the active wallet and can send a first-time gas drip'],
   ['POST', '/devices/register', 'registers a push target'],
@@ -3872,7 +3608,6 @@ const NOT_EXECUTED = [
   ['POST', '/privy/policy/prove', 'drives the demo wallet through Privy signing (operator key)'],
   ['POST', '/ops/mirror', 'starts a database copy (operator key)'],
   ['GET', '/ops/mirror', 'needs the operator key; the suite holds only a user session'],
-  ['POST', '/limit-orders', 'publishes an order (operator key)'],
   ['POST', '/agent/positions/close', 'sells for an owner (agent key)'],
   ['POST', '/agent/strategies/:id/run', 'runs a strategy (agent key)'],
   ['POST', '/agent/tick', 'runs every due strategy (agent key)'],

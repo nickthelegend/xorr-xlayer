@@ -8,12 +8,16 @@
  *
  *   1. an approval to the delegation, signed by Privy, mined on the fork, and the allowance read back;
  *   2. with `--transfer <address>`, a USDC transfer out of that wallet — a user-signed withdrawal on chain (4.9) — after
- *      moving it fork USDC from Aave's reserve by impersonation, as the rebuild and the faucet do.
+ *      moving it fork USDC from the fork-only reserve (server/src/fork/anvil.ts FORK_USDC_RESERVE, given its balance
+ *      with `dealErc20`) by impersonation, as the fork faucet and bootstrap do. X Layer has no well-known USDC holder to
+ *      borrow from, and taking USDC out of a Uniswap pool would move the prices the demo trades against.
  *
  *   set -a; . ./.env; . server/.env.fork; set +a
  *   PRIVY_PROOF_WALLET_ID=<reuse one> server/node_modules/.bin/tsx tools/prove-user-signing.ts [--transfer 0x…]
  *
- * Refuses any node that is not anvil. A wallet it creates is unowned, has no policy, and holds fork funds only; its id is
+ * FORK_RPC is an anvil fork of X Layer mainnet (chain 196) — a local one, or the hosted fork when that is deliberate: this
+ * SENDS transactions to it. DELEGATION_ADDRESS is that fork's delegation contract. Refuses any node that is not anvil, or
+ * that is not a copy of X Layer mainnet. A wallet it creates is unowned, has no policy, and holds fork funds only; its id is
  * printed so the next run can reuse it. What this cannot show is Privy's embedded-wallet sheet in a browser accepting
  * `eth_signTransaction`: that takes a person signed in.
  */
@@ -30,12 +34,12 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { base } from 'viem/chains';
+import { xLayer } from 'viem/chains';
+import { FORK_USDC_RESERVE as RESERVE, dealErc20 } from '../server/src/fork/anvil';
 import { sendAsUser, type WalletProvider } from '../src/wallet/userSigning';
 
-const USDC: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-/** Aave's aUSDC reserve on Base, which the rebuild and the faucet move fork USDC from. */
-const RESERVE: Address = '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB';
+/** Circle's native USDC on X Layer mainnet (server/src/evm/chains.ts) — what a fork of it holds too. */
+const USDC: Address = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
 
 let failures = 0;
 const check = (ok: boolean, what: string) => {
@@ -66,7 +70,7 @@ function privyApi(appId: string, secret: string): Privy {
  * switched to: the chain check (4.6) is proven by `userSigning.test.ts`, not here.
  */
 function privyWallet(privy: Privy, walletId: string): WalletProvider {
-  let chainId: number = base.id;
+  let chainId: number = xLayer.id;
   return {
     async request({ method, params }) {
       switch (method) {
@@ -116,12 +120,16 @@ async function main(): Promise<void> {
   const transferTo = transferAt === -1 ? undefined : getAddress(process.argv[transferAt + 1] ?? '');
   const privy = privyApi(appId, secret);
 
-  const pub = createPublicClient({ chain: { ...base, rpcUrls: { default: { http: [rpc] } } }, transport: http(rpc) });
+  // A fork of X Layer IS X Layer: its chain wholesale with the RPC replaced (src/chain.ts withRpc), so Multicall3 is known.
+  const chain = { ...xLayer, rpcUrls: { default: { http: [rpc] }, public: { http: [rpc] } } };
+  const pub = createPublicClient({ chain, transport: http(rpc) });
   const anvil = (method: string, params: unknown[]) => pub.request({ method: method as never, params: params as never });
 
   const node = String(await pub.request({ method: 'web3_clientVersion' }));
   if (!node.startsWith('anvil')) throw new Error(`refusing: the node is ${node}, not anvil`);
-  console.log(`fork ${new URL(rpc).host} · ${node} · chain ${await pub.getChainId()} · block ${await pub.getBlockNumber()}`);
+  const forkedChain = await pub.getChainId();
+  if (forkedChain !== xLayer.id) throw new Error(`refusing: the node is chain ${forkedChain}, not a fork of X Layer mainnet (${xLayer.id})`);
+  console.log(`fork ${new URL(rpc).host} · ${node} · chain ${forkedChain} · block ${await pub.getBlockNumber()}`);
 
   let walletId = process.env.PRIVY_PROOF_WALLET_ID;
   let from: Address;
@@ -138,7 +146,7 @@ async function main(): Promise<void> {
     console.log(`Privy wallet ${walletId} · ${from} (created; set PRIVY_PROOF_WALLET_ID to reuse it)`);
   }
   await anvil('anvil_setBalance', [from, toHex(10n ** 17n)]);
-  const signer = { provider: privyWallet(privy, walletId), from, chain: base, chainAccess: pub, signOnly: true };
+  const signer = { provider: privyWallet(privy, walletId), from, chain, chainAccess: pub, signOnly: true };
 
   console.log('1. an approval, signed by Privy through sendAsUser, broadcast to the fork by the app');
   const allowance = () => pub.readContract({ address: USDC, abi: erc20Abi, functionName: 'allowance', args: [from, delegation] });
@@ -161,6 +169,8 @@ async function main(): Promise<void> {
     const five = 5_000_000n;
     const usdcOf = (a: Address) => pub.readContract({ address: USDC, abi: erc20Abi, functionName: 'balanceOf', args: [a] });
     if ((await usdcOf(from)) < five) {
+      // The reserve holds exactly what is written into USDC's storage for it; the transfer out is an ordinary one.
+      if ((await usdcOf(RESERVE)) < 25_000_000n) await dealErc20({ rpc, token: USDC, holder: RESERVE, amount: 1_000_000_000_000n });
       await anvil('anvil_impersonateAccount', [RESERVE]);
       try {
         await anvil('anvil_setBalance', [RESERVE, toHex(10n ** 17n)]);
@@ -175,7 +185,7 @@ async function main(): Promise<void> {
           ] as never,
         })) as Hex;
         await pub.waitForTransactionReceipt({ hash: funding });
-        console.log(`  funded the wallet with 25 fork USDC from Aave's reserve: ${funding}`);
+        console.log(`  funded the wallet with 25 fork USDC from the fork-only reserve ${RESERVE}: ${funding}`);
       } finally {
         await anvil('anvil_stopImpersonatingAccount', [RESERVE]);
       }

@@ -52,10 +52,10 @@ const ROUTES = [
   ['14-watchlist', '/watchlist'],
   ['15-search', '/search'],
   ['16-asset', '/asset/BTC'],
-  ['17-asset-stock', '/asset/NVDAc'],
+  ['17-asset-stock', '/asset/NVDAx'],
   ['18-chart', '/chart/BTC'],
-  ['19-order', '/order/WETH'],
-  ['20-order-stock', '/order/NVDAc'],
+  ['19-order', '/order/XBTC'],
+  ['20-order-stock', '/order/NVDAx'],
   ['21-swap', '/swap'],
   ['22-perp', '/perp/BTC'],
   // A REAL position id, so these two screens are shot in their loaded state rather than their
@@ -111,15 +111,11 @@ const ROUTES = [
   ['57-system', '/system'],
   ['58-network', '/network'],
   ['59-rates', '/rates'],
-  ['60-graph', '/graph'],
-  ['61-graph-decision', '/graph/decision'],
-  ['62-graph-spends', '/graph/spends'],
   ['63-audit-chain', '/audit/chain'],
   ['64-runs', '/runs'],
   ['65-proposals', '/proposals'],
   ['66-pnl', '/pnl'],
   ['67-disposals', '/disposals'],
-  ['68-spend', '/spend'],
   ['69-schedule', '/schedule'],
   ['70-allocation', '/allocation'],
   ['71-sources', '/sources'],
@@ -139,22 +135,19 @@ const ROUTES = [
   ['85-notifications', '/notifications'],
   ['86-catchup', '/catchup'],
   ['87-export', '/export'],
-  ['88-basename', '/basename'],
   ['89-backtest', '/backtest'],
   ['90-sell-everything', '/sell-everything'],
   ['91-voice', '/voice'],
   ['92-not-found', '/no-such-screen-exists'],
-  ['93-oracle-equity', '/oracle/NVDAc'],
-  ['94-crosscheck', '/crosscheck/WETH'],
-  ['95-route', '/route/WETH'],
+  ['93-oracle-equity', '/oracle/NVDAx'],
+  ['94-crosscheck', '/crosscheck/BTC'],
+  ['95-route', '/route/XBTC'],
   ['96-audit-anchor', '/audit/anchor'],
   ['97-portfolio', '/portfolio'],
   ['98-agent', '/agent/momentum-scout'],
   // Money and markets screens the sweep never opened (docs/qa/SCREENS.md, "tools/shoot.mjs drift").
   ['99a-deposit', '/deposit'],
   ['99b-withdraw-everything', '/withdraw-everything'],
-  ['99c-limit-orders', '/limit-orders'],
-  ['99d-crosschain', '/crosschain'],
   ['99e-futures', '/futures'],
   ['46-dev-ui', '/_dev/ui'],
   ['46b-dev-ui-edge', '/_dev/ui-edge'],
@@ -186,18 +179,18 @@ const EXPECT = {
   '03-wallet': { must: [/Your wallet, your keys/, /Signed in/, /Wallet created/, /Connected/], never: [/Network ready/] },
   /*
    * The address and the network, and nothing invented around them: the presets, the payment methods, the
-   * "Free" fee and the arrival date affected nothing and are gone. A fork build has no code and says to use
-   * test funds, where a Base build names the chain.
+   * "Free" fee and the arrival date affected nothing and are gone. What may be sent is named with the chain it goes
+   * on — "Send USDC or USDT0 to your address on X Layer …" — and no other network is.
    */
   '04-fund': {
-    must: [/Fund the wallet/, /SEND USDC TO/, /0x[0-9a-fA-F]{40}/, /USDC on Base|Use test funds/],
-    never: [/USDT or SOL/, /^Deposit \$/m, /HOW YOU ARE PAYING/, /Transfer from an exchange/],
+    must: [/Fund the wallet/, /SEND USDC( OR USDT0)? TO/i, /0x[0-9a-fA-F]{40}/, /on X Layer/],
+    never: [/USDT or SOL/, /on Base/, /^Deposit \$/m, /HOW YOU ARE PAYING/, /Transfer from an exchange/],
   },
   '05-delegate': { must: [/It can place trades/, /cannot move your money out/, /expires on its own/, /\$[\d,]+/] },
   // The button says what it does. "Approve & fund" funded nothing, and "Portfolio approved" was a flag on the phone.
   '06-proposal': {
     must: [/draft portfolio/, /100%/, /Stable yield/, /Start rebalancing|Start watching|Balance to 100% first|Continue/],
-    never: [/Staked SOL/, /NVDAx/, /Approve & fund/, /Portfolio approved/],
+    never: [/Staked SOL/, /Approve & fund/, /Portfolio approved/],
   },
   // One balance on top, the Privy wallet above it, agents and gainers below (2026-09-12). The old
   // breakdown moved to the portfolio, so it must not creep back onto Home.
@@ -221,7 +214,7 @@ const EXPECT = {
   '17-asset-stock': { must: [/Nvidia|NVDA/, /\$[\d,]+/, /No chart yet/] },
   // The pills are the candle lengths the feed can cut (`CHART_PLAN`): 15m is gone, 4H is new.
   '18-chart': { must: [/\$[\d,]+/, /1H/, /4H/, /1D/], never: [/15m/] },
-  '19-order': { must: [/WETH/] },
+  '19-order': { must: [/XBTC|Bitcoin|BTC/] },
   '20-order-stock': { must: [/NVDA/] },
   '21-swap': { must: [/Swap|swap/] },
   '22-perp': { must: [/BTC/] },
@@ -250,7 +243,8 @@ const EXPECT = {
   '31-strategies': { must: [/Strategies/, /Running/, /Add new/] },
   '32-strategy-dca': { must: [/Recurring buy/, /Next three runs/i] },
   // Venue names left the money screens (2026-09-14): the sweep asserts the rate, the preview and who can withdraw.
-  '32b-strategy-yield': { must: [/USDC SUPPLY/i, /%/, /If it ran now/i, /Only you can withdraw/] },
+  // Tier 4 earns on USD₮0 on X Layer's Aave v3, with USDC's rate beside it.
+  '32b-strategy-yield': { must: [/(USDT0|USDC) SUPPLY/i, /%/, /If it ran now/i, /Only you can withdraw/] },
   '32c-strategy-grid': { must: [/Range accumulation/, /\$[\d,]+/, /leaves the range it stops/] },
   '32d-yield-position': { must: [/Earning/, /Only you can withdraw|No lending pool here/] },
   // "Doesn’t use your daily cap" since the money screens were distilled; either spelling of the same fact passes.
@@ -345,30 +339,32 @@ const EXPECT = {
   '56-metrics': { must: [/RUNS BY OUTCOME|STRATEGIES BY STATE/, /\d+/] },
   // A dependency's timestamp is an age now; the raw ISO stamp from the database probe must not be back.
   '57-system': {
-    must: [/EXECUTOR/, /base-sepolia|base-fork|base/, /postgres/],
+    must: [/EXECUTOR/, /xlayer-fork|xlayer-testnet|xlayer|localnet/, /postgres/],
     never: [/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/],
   },
-  '58-network': { must: [/CHAIN/, /BLOCK/, /[\d,]{6,}/] },
+  // The chain named as X Layer (mainnet, testnet or a fork of it), and the bot's gas stated in OKB, never ETH.
+  '58-network': { must: [/CHAIN/, /BLOCK/, /[\d,]{6,}/, /X Layer/, /OKB/], never: [/\bBase\b/, /\d ETH\b/] },
   /*
    * The rate and its caveat. Where it comes from is named on Sources and How it works; the screen itself stopped naming
    * the pool when the money screens were distilled, and asserting the name here failed a correct screen.
    */
   '59-rates': { must: [/Rate/, /\d+\.\d+%/, /not a promise/] },
-  '60-graph': { must: [/INDEXED TO/, /[\d,]{6,}/] },
-  '61-graph-decision': { must: [/Decision|router/i] },
-  '62-graph-spends': { must: [/Spend events|Reconstructed/i] },
   // A forked chain must say so rather than render as healthy.
   '63-audit-chain': { must: [/HASH CHAIN/, /Entry|Forked|unbroken/i] },
   '64-runs': { must: [/Runs/, /All/] },
   '65-proposals': { must: [/Proposals/, /All/] },
   '66-pnl': { must: [/Realised/] },
   '67-disposals': { must: [/Disposals/] },
-  '68-spend': { must: [/Spend/, /contract|day/i] },
   '69-schedule': { must: [/runs next|scheduled/i] },
   '70-allocation': { must: [/Allocation/] },
   // Our own database is a source, and the futures venue is named; "None of them are us" was false.
   '71-sources': { must: [/Sources/, /every number/i, /Hyperliquid/, /database/], never: [/None of them are us/] },
-  '72-sponsors': { must: [/How it works|Integrations|Sponsors/, /1inch/i] },
+  // Only what the code uses: X Layer is the chain, Uniswap v3 settles, OKX DEX competes, Aave v3 holds idle cash, the
+  // xStocks are Backed's, Privy holds the keys. Nothing from the Base build may be named.
+  '72-sponsors': {
+    must: [/How it works/, /X Layer/, /Uniswap v3/, /OKX DEX/, /Aave v3/, /xStocks/, /Privy/],
+    never: [/1inch/i, /Basename/i, /The Graph/i, /Coinbase/i],
+  },
   // The venues the grant allows, read from the contract, not the executor's current parameters.
   '73-venues': { must: [/Venues/, /trade can fill/i] },
   '74-tokens': { must: [/Tokens/, /traded/i] },
@@ -406,19 +402,17 @@ const EXPECT = {
    * around it: the address and balance on Deposit (and no raw locale timestamp for the faucet), the division of labour
    * on Withdraw everything, and the disclaimers on the quote-only and data-only screens.
    */
+  // The balance card lists USDC, USDT0 where the chain has it, and OKB for gas; the copy names X Layer and OKB.
   '99a-deposit': {
-    must: [/Deposit/, /0x[0-9a-fA-F]{40}/, /BALANCE/, /USDC/],
-    never: [/Available again \d{1,2}\/\d{1,2}\/\d{4}/],
+    must: [/Deposit/, /0x[0-9a-fA-F]{40}/, /BALANCE/, /USDC/, /OKB/, /X Layer/],
+    never: [/Available again \d{1,2}\/\d{1,2}\/\d{4}/, /\bBase\b/, /\bETH\b/],
   },
   '99b-withdraw-everything': { must: [/Withdraw everything/, /Only you can send/] },
-  '99c-limit-orders': { must: [/Limit orders/, /Take for|No limit orders|Look again/] },
-  '99d-crosschain': { must: [/Cross-chain quote/, /Quotes only/] },
   '99e-futures': { must: [/Futures/, /xorr does not trade futures/] },
   '85-notifications': { must: [/Notifications/] },
   '86-catchup': { must: [/Since you (looked|were)/i] },
   '87-export': { must: [/Export/, /audit trail/i] },
-  '88-basename': { must: [/Basename/i] },
-  '89-backtest': { must: [/Backtest/, /real past prices|WETH/i] },
+  '89-backtest': { must: [/Backtest/, /real past prices/i] },
   '90-sell-everything': { must: [/would sell|preview/i] },
   '91-voice': { must: [/Voice/] },
   /*
@@ -427,12 +421,12 @@ const EXPECT = {
    */
   '92-not-found': { must: [/There is nothing here/], never: [/Unmatched Route/, /Sitemap/] },
   // No oracle for a crypto symbol is a real answer; a retry on it is not.
-  '93-oracle-equity': { must: [/NVDAc/, /recorded/i] },
+  '93-oracle-equity': { must: [/NVDAx/, /recorded/i] },
   '94-crosscheck': { must: [/CROSS-CHECK/i, /agree|differ/i] },
   '95-route': { must: [/Route/, /USDC/, /SAME SIZE, EVERY WAY TO FILL/] },
   /*
    * The anchor screen's whole claim is that the reader can repeat the read without us, so it must
-   * show a state, the head Base holds, and the two addresses that reproduce it.
+   * show a state, the head the chain holds, and the two addresses that reproduce it.
    */
   '96-audit-anchor': {
     must: [/On-chain anchor/, /COMMITTED|DIVERGED|NOT YET ANCHORED/, /CHECK IT YOURSELF/, /0x[0-9a-fA-F]{40}/],
@@ -598,7 +592,7 @@ const resolveIds = async () => {
  * How long a screen may take to finish saying what it has to say, past the first six seconds.
  *
  * Sized on the slowest real screen rather than a round number: `/verify` runs its checks against
- * live chain, subgraph and Aave calls and lands around twenty seconds cold.
+ * live chain, price and Aave calls and lands around twenty seconds cold.
  */
 const SETTLE_BUDGET_MS = 30_000;
 
@@ -687,7 +681,7 @@ const main = async () => {
      * Then WAIT FOR THE CONTENT, rather than asserting once and hoping six seconds was enough.
      *
      * Two screens do real work before they can say anything: `/bot` asks the proposal engine for
-     * today's decision, and `/verify` runs twenty live checks against the chain, the subgraph and
+     * today's decision, and `/verify` runs twenty live checks against the chain, the price feeds and
      * Aave. Both finish well past six seconds, so the harness was screenshotting them mid-flight
      * and calling a slow screen a broken one — and on `/bot` it read yesterday's message and
      * reported the absence of today's as a defect in the app.
