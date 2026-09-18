@@ -328,7 +328,7 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
     },
     {
       id: 'audit-anchor',
-      claim: 'The trail\u2019s integrity is not our word: its head hash is published on Base.',
+      claim: 'The trail\u2019s integrity is not our word: its head hash is published on X Layer.',
       how: 'latest(botKey, owner) on XorrAuditAnchor, compared to the head we hold',
       run: async () => {
         if (!owner) skip('No wallet on this request.');
@@ -354,7 +354,7 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
         if (a.state === 'diverged') {
           throw new Error(
             `the trail no longer matches what was published at ${explorer(a.anchor.blockNo)}. ` +
-              `Base holds ${a.anchor.head.slice(0, 18)}\u2026 for entry ${a.anchor.entryCount}; ` +
+              `The chain holds ${a.anchor.head.slice(0, 18)}\u2026 for entry ${a.anchor.entryCount}; ` +
               'ours does not hash to it.',
           );
         }
@@ -367,7 +367,7 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
             ? `, plus ${a.entryCount - a.anchor.entryCount} written since`
             : '';
         return (
-          `${a.anchor.head.slice(0, 18)}\u2026 for ${a.anchor.entryCount} entries, held by Base ` +
+          `${a.anchor.head.slice(0, 18)}\u2026 for ${a.anchor.entryCount} entries, held on chain ` +
           `since ${explorer(a.anchor.blockNo)} (${since} UTC)${extra}`
         );
       },
@@ -485,11 +485,9 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
          */
         if (live.length === 0) {
           skip(
-            `No working equity tokens on ${CHAIN_KEY}. They are live on Base mainnet — measured ` +
-              `there: 4 of 8 answer totalSupply() and all 8 saw transfers within 4,000 blocks — ` +
-              `and not reproducible on a fork of it: they carry one byte of code, a fork copies ` +
-              `the byte, and nothing serves it. The tokens are real; this chain is the limit. ` +
-              `Re-check with: cd server && npx tsx src/equity-mainnet-proof.ts`,
+            `No working xStock wrappers on ${CHAIN_KEY}. They are X Layer mainnet contracts: they trade on ` +
+              `X Layer mainnet and on a fork of it, and do not exist on the testnet. The tokens are real; ` +
+              `this chain is the limit.`,
           );
         }
         return `${live.length} of ${entries.length} answer totalSupply(): ${live.map((s) => s.symbol).join(', ')}`;

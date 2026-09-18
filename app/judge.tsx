@@ -188,7 +188,7 @@ export default function Judge() {
       </View>
 
       <Text variant="body" color={colors.ink55} style={{ marginTop: space.s10 }}>
-        Every claim this app makes about itself, checked against the chain, the index and the
+        Every claim this app makes about itself, checked against the chain and the
         feeds right now — not when this was written.
       </Text>
 

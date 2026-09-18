@@ -93,7 +93,7 @@ export function humanFailure(error: string): string {
   if (e.includes('returnamountisnotenough')) return BY_SELECTOR['0x9a446475']!;
 
   if (e.includes('cannot fill on'))
-    return 'This network cannot settle trades. Prices are real; filling needs Base or a Base fork.';
+    return 'This network cannot settle trades. Prices are real; filling needs X Layer mainnet or a fork of it.';
   if (e.includes('transfer amount exceeds allowance') || e.includes('pull failed'))
     return 'The spending approval is too small or was withdrawn, so nothing could be pulled.';
   // The bot paying for gas and the user paying for the trade are different pockets, and saying

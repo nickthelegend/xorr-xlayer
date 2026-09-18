@@ -708,8 +708,8 @@ strategyRoutes.post('/strategies', async (c) => {
       {
         error: 'not_settleable_here',
         message:
-          `${canonicalSymbol(equity)} cannot be settled on ${CHAIN_KEY}. The tokenized ` +
-          'equities are live on Base mainnet and do not function on a fork of it, so a strategy ' +
+          `${canonicalSymbol(equity)} cannot be settled on ${CHAIN_KEY}. The wrapped xStocks ` +
+          'live on X Layer mainnet (and a fork of it), not on this chain, so a strategy ' +
           'for one would schedule forever and fill never.',
       },
       400,

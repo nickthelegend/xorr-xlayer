@@ -248,7 +248,7 @@ export async function anchorOnDemand(walletId: string, owner: Address): Promise<
       return {
         anchored: false,
         reason: 'rate_limited',
-        detail: `This trail was anchored to Base less than an hour ago. The next anchor can be published in ${minutes} minute${minutes === 1 ? '' : 's'}, and the hourly anchor will publish it anyway.`,
+        detail: `This trail was anchored on chain less than an hour ago. The next anchor can be published in ${minutes} minute${minutes === 1 ? '' : 's'}, and the hourly anchor will publish it anyway.`,
         retryAfterSec: wait,
       };
     }
