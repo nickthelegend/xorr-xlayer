@@ -54,7 +54,7 @@ export const onboarding = {
     },
     {
       "name": "Send crypto",
-      "detail": "USDC, USDT or SOL",
+      "detail": "USDC, USDT0 or OKB on X Layer",
       "tag": "On-chain",
       "feePct": 0,
       "lands": "After 1 confirmation"

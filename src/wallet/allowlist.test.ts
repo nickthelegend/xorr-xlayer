@@ -31,7 +31,7 @@ const entry = (over: Partial<AllowlistEntry> = {}): AllowlistEntry => ({
 });
 
 describe('a destination has to be an address on THIS chain', () => {
-  it('accepts a Base address', () => {
+  it('accepts an X Layer (EVM) address', () => {
     expect(isValidAddress('0x95A0b368588713011a15f4b1041423f31B08e615')).toBe(true);
     // Checksums are not case-sensitive here: an all-lowercase address is the same address.
     expect(isValidAddress('0x95a0b368588713011a15f4b1041423f31b08e615')).toBe(true);
@@ -40,8 +40,8 @@ describe('a destination has to be an address on THIS chain', () => {
 
   it('rejects a Solana address, which is what the screen used to REQUIRE', () => {
     /*
-     * The add screen validated base58, 32–44 characters — left over from before the pivot. Base58
-     * has no `0` and no `x`, so no Base address could pass it and the button never enabled. The
+     * The add screen once validated base58, 32–44 characters — left over from a Solana build. Base58
+     * has no `0` and no `x`, so no EVM address could pass it and the button never enabled. The
      * one screen that matters when someone is trying to get their money out rejected every real
      * destination and told them their own wallet "does not look like a Solana address".
      */
@@ -50,7 +50,7 @@ describe('a destination has to be an address on THIS chain', () => {
 
   it('accepts a 0X prefix, which is the same address', () => {
     /*
-     * The screen refused this with "That is not a Base address. It should start 0x and be 42
+     * The screen refused this with "That is not a valid address. It should start 0x and be 42
      * characters." — about a string that starts with 0x and is 42 characters. A confidently wrong
      * error on the screen someone reaches while trying to get their money out, and the second
      * time this screen has rejected valid destinations.

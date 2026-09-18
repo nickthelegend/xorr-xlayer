@@ -1,7 +1,7 @@
 /**
  * profitClose.ts — what a close actually realised, and whether that can be said at all.
  *
- * Closing a position said "Sold 0.0412 WETH for $104.20" and stopped there. The one thing the person wants to know —
+ * Closing a position said "Sold 0.0412 XBTC for $104.20" and stopped there. The one thing the person wants to know —
  * *did I make anything* — was left for them to work out against a cost basis they cannot see.
  *
  * ## The arithmetic is two recorded numbers, and nothing else

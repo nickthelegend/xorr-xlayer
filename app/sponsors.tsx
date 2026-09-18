@@ -1,21 +1,22 @@
 /**
- * What each sponsor's technology actually does here, with the evidence.
+ * What each piece of technology actually does here, with the evidence.
  *
- * Every hackathon project claims its integrations. The claim is worth nothing without a number
- * behind it, so this screen makes none it cannot show: the 1inch row counts fills that settled
- * through 1inch, read from the audit trail; the Graph row reports the index's own `_meta` and
- * whether it describes the contract this deployment actually spends through; the Privy row reports
- * what Privy is enforcing right now.
+ * Every hackathon project claims its integrations. The claim is worth nothing without a number behind it, so this screen
+ * makes none it cannot show. The venue rows count fills from `/metrics` `fillsByVenue`, which is the venue each filled run
+ * recorded when it settled (`server/src/executor/settle.ts` writes `uniswap-v3`, `okx-dex` or `aave`); the xStocks row
+ * counts the catalog the executor serves; the Privy row reports what Privy is enforcing right now.
  *
- * It is deliberately capable of saying an integration is NOT live here. A subgraph indexing a
- * different deployment is the honest state of the fork build, and a screen that painted it green
- * anyway would be exactly the overclaim this whole product argues against — and the first thing a
- * judge would catch.
+ * Only what the code uses (2026-09-19): X Layer is the chain, Uniswap v3 settles every trade, OKX DEX competes for a
+ * trade only on a deployment holding an OKX API key (`okxConfigured()`), Aave v3 is where idle cash is supplied, the
+ * xStocks are Backed's tokenized shares, and Privy holds the keys. No logos: the names are the claim.
  *
- * Each track stands on its own read. One `/metrics` failure used to replace the whole screen with
- * an error, taking the index and the wallet down with the fill count; now the track whose read
- * failed says so in place, and the others show what they read. A read that failed is "Unknown",
- * never "Not here".
+ * It is deliberately capable of saying an integration is NOT live here. Zero OKX fills is the honest state of a
+ * deployment without the key, and a screen that painted it green anyway would be exactly the overclaim this product
+ * argues against.
+ *
+ * Each track stands on its own read. One `/metrics` failure used to replace the whole screen with an error; now the
+ * track whose read failed says so in place, and the others show what they read. A read that failed is "Unknown", never
+ * "Not here".
  */
 import React from 'react';
 import { ScrollView, View } from 'react-native';
@@ -35,6 +36,7 @@ import {
   space,
 } from '@/ui';
 import { shortAddress } from '@/format';
+import { chainLabel } from '@/chain';
 import { useAsync } from '@/data/useAsync';
 import { repos } from '@/data';
 import { system } from '@/data/system';
@@ -58,17 +60,29 @@ function toneFor(level: Level): string {
   return colors.ink40;
 }
 
+/** "one fill", "3 fills". */
+function fills(n: number, noun = 'fill'): string {
+  return n === 1 ? `one ${noun}` : `${n} ${noun}s`;
+}
+
 export default function Sponsors() {
   const goBack = useGoBack();
   const router = useRouter();
 
   const metrics = useAsync(() => system.metrics(), []);
-  const graph = useAsync(() => system.graphHealth(), []);
+  const catalog = useAsync(() => system.xstocks(), []);
   const policy = useAsync(() => repos.wallet.privyPolicy(), []);
   const wallet = useAsync(() => repos.wallet.current(), []);
 
-  const oneInchFills = metrics.data?.fillsByVenue?.['1inch'] ?? 0;
-  const aquaFills = metrics.data?.fillsByVenue?.['aqua'] ?? 0;
+  const byVenue = metrics.data?.fillsByVenue ?? {};
+  const uniswapFills = byVenue['uniswap-v3'] ?? 0;
+  const okxFills = byVenue['okx-dex'] ?? 0;
+  const aaveFills = byVenue['aave'] ?? 0;
+  const metricsLoading = metrics.loading && !metrics.data;
+  const tradeFills = uniswapFills + okxFills;
+
+  const xstockRows = catalog.data?.rows ?? [];
+  const priced = xstockRows.filter((r) => r.feed === 'live').length;
 
   /* Signed out is an answer about this session — there is no wallet on it — not a read that failed. */
   const signedOut = wallet.error instanceof NotSignedIn;
@@ -93,71 +107,94 @@ export default function Sponsors() {
             gap: space.s12,
           }}
         >
-          {/* ── 1inch ─────────────────────────────────────────────────────────── */}
+          {/* ── X Layer ───────────────────────────────────────────────────────── */}
           <Track
-            name="1inch"
-            does="Every trade. The executor asks the Aggregation router for a route, fills against it, and the price you get is the route's price — not a feed's."
-            level={metrics.error ? 'unknown' : oneInchFills > 0 ? 'live' : 'partial'}
-            loading={metrics.loading && !metrics.data}
+            name="X Layer"
+            does="OKX's EVM chain, and where the money moves. The permission you sign, every trade and every withdrawal settle on it; gas is paid in OKB, by the bot for its own trades."
+            level={metrics.error ? 'unknown' : tradeFills + aaveFills > 0 ? 'live' : 'partial'}
+            loading={metricsLoading}
             error={metrics.error}
             onRetry={metrics.reload}
             evidence={
-              oneInchFills > 0
-                ? `${oneInchFills} fills settled through 1inch, counted from the audit trail.`
-                : 'No fills through 1inch on this deployment yet. Routes still quote live.'
+              tradeFills + aaveFills > 0
+                ? `${fills(tradeFills + aaveFills)} settled on ${chainLabel}, counted from the runs that filled.`
+                : `Nothing has settled on ${chainLabel} for this deployment yet.`
             }
-            extra={
-              aquaFills > 0
-                ? `${aquaFills} more settled against our own Aqua book, which is the alternative it is measured against.`
-                : undefined
-            }
-            onOpen={() => router.push('/route/WETH')}
-            openLabel="Inspect a live route"
+            onOpen={() => router.push('/network')}
+            openLabel="The network"
           />
 
-          {/* ── The Graph ─────────────────────────────────────────────────────── */}
+          {/* ── Uniswap v3 ────────────────────────────────────────────────────── */}
           <Track
-            name="The Graph"
-            does="What the chain recorded, as opposed to what we intended. The bot sizes a trade against spend the subgraph saw, not against our own database — reading our own records for that would be circular."
-            level={
-              graph.error
-                ? 'unknown'
-                : graph.data?.indexesThisDeployment && graph.data.healthy
-                  ? 'live'
-                  : 'partial'
-            }
-            loading={graph.loading && !graph.data}
-            error={graph.error}
-            onRetry={graph.reload}
+            name="Uniswap v3"
+            does="Every trade has a Uniswap v3 route. The executor quotes the pools, builds the swap, and the delegation contract enforces the quote's floor — the price is the pool's, not a feed's."
+            level={metrics.error ? 'unknown' : uniswapFills > 0 ? 'live' : 'partial'}
+            loading={metricsLoading}
+            error={metrics.error}
+            onRetry={metrics.reload}
             evidence={
-              graph.data
-                ? `Indexed to block ${graph.data.block.toLocaleString('en-US')}${graph.data.healthy ? ', no indexing errors' : ', with indexing errors'}.`
-                : ''
+              uniswapFills > 0
+                ? `${fills(uniswapFills)} settled through Uniswap v3.`
+                : 'No fills through Uniswap v3 on this deployment yet.'
             }
-            extra={
-              !graph.data
-                ? undefined
-                : /*
-                   * `indexedDelegation` is absent on an executor older than the field.
-                   *
-                   * That is not hypothetical — it is what a rolling deploy looks like, and it is
-                   * how this screen first crashed. Saying "this build cannot tell you" is both
-                   * true and more useful than a confident answer derived from a missing field.
-                   */
-                  graph.data.indexedDelegation === undefined
-                  ? 'This executor is older than the field that says which contract the index describes, so that cannot be checked from here.'
-                  : graph.data.indexesThisDeployment
-                    ? `Indexing ${shortAddress(graph.data.indexedDelegation)} — the contract this deployment spends through.`
-                    : `Indexing ${shortAddress(graph.data.indexedDelegation)}, but this deployment spends through ${shortAddress(graph.data.activeDelegation)}. The agent will not read permission from an index of a different contract, so on this build the chain itself is the only authority.`
+            onOpen={() => router.push('/venues')}
+            openLabel="Where fills may go"
+          />
+
+          {/* ── OKX DEX ───────────────────────────────────────────────────────── */}
+          <Track
+            name="OKX DEX API"
+            does="A second route. Where this deployment holds an OKX API key, the aggregator is asked too, and its route is taken only when it delivers more than Uniswap's."
+            level={metrics.error ? 'unknown' : okxFills > 0 ? 'live' : 'off'}
+            loading={metricsLoading}
+            error={metrics.error}
+            onRetry={metrics.reload}
+            evidence={
+              okxFills > 0
+                ? `${fills(okxFills)} settled through OKX DEX, where its route beat Uniswap's.`
+                : 'No fills through OKX DEX on this deployment.'
             }
-            onOpen={() => router.push('/graph')}
-            openLabel="Open the index"
+            extra={okxFills > 0 ? undefined : 'Either no key is set here, or Uniswap has delivered more every time.'}
+            onOpen={() => router.push('/venues')}
+            openLabel="Where fills may go"
+          />
+
+          {/* ── Aave v3 ───────────────────────────────────────────────────────── */}
+          <Track
+            name="Aave v3"
+            does="Where idle cash earns. A supply goes through the same permission and daily cap as a trade, and the receipt token is paid to you, never to us."
+            level={metrics.error ? 'unknown' : aaveFills > 0 ? 'live' : 'partial'}
+            loading={metricsLoading}
+            error={metrics.error}
+            onRetry={metrics.reload}
+            evidence={
+              aaveFills > 0 ? `${fills(aaveFills, 'supply')} to Aave v3.` : 'Nothing supplied to Aave v3 on this deployment yet.'
+            }
+            onOpen={() => router.push('/yield')}
+            openLabel="What idle cash earns"
+          />
+
+          {/* ── xStocks ───────────────────────────────────────────────────────── */}
+          <Track
+            name="xStocks by Backed"
+            does="The shares themselves: tokenized equities issued by Backed, each tracking a listed share. What the app buys and sells is the token, and a holding is a balance in your wallet."
+            level={catalog.error ? 'unknown' : priced > 0 ? 'live' : xstockRows.length > 0 ? 'partial' : 'off'}
+            loading={catalog.loading && !catalog.data}
+            error={catalog.error}
+            onRetry={catalog.reload}
+            evidence={
+              xstockRows.length > 0
+                ? `${xstockRows.length} xStocks listed, ${priced} priced right now.`
+                : 'No xStocks listed on this deployment.'
+            }
+            onOpen={() => router.push('/xstocks')}
+            openLabel="Every xStock"
           />
 
           {/* ── Privy ─────────────────────────────────────────────────────────── */}
           <Track
             name="Privy"
-            does="Keys and signing. You own the wallet; the executor never holds a key that can move funds, and a policy on Privy's side refuses a destination we did not name."
+            does="Sign-in, keys and signing. You own the wallet; the executor never holds a key that can move funds, and a policy on Privy's side refuses a destination we did not name."
             level={
               walletError
                 ? 'unknown'

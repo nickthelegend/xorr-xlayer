@@ -1,5 +1,5 @@
 /**
- * What Base has been told about this trail — the claim, and the block that holds it.
+ * What the chain has been told about this trail — the claim, and the block that holds it.
  *
  * `/audit/chain` answers "has this log been edited?" by re-hashing our own rows with our own code
  * and reporting the result. That is a real check with one honest limit: every part of it is ours.
@@ -7,9 +7,9 @@
  * operator's log is intact.
  *
  * This screen is the part that does not need trusting. The head hash was published to a contract
- * on Base at a named block by a named key, and everything needed to repeat the read without us —
+ * on X Layer at a named block by a named key, and everything needed to repeat the read without us —
  * contract, key, block — is on screen. Rewriting history stays possible; producing a rewrite that
- * hashes to a value Base has been holding since before the rewrite does not.
+ * hashes to a value the chain has been holding since before the rewrite does not.
  *
  * The four states are deliberately not four shades of green:
  *
@@ -59,7 +59,7 @@ const STATE: Record<
   { label: string; tone: string; line: (r: AnchorReport) => string }
 > = {
   /*
-   * "The chain", never "Base". A fork build anchors to a fork, and the screen said Base whatever
+   * "The chain", never a network's name. A fork build anchors to a fork, and the screen once named the network whatever
    * `data.chain` was; the one place the network is named is the check-it-yourself line, from the data.
    */
   match: {

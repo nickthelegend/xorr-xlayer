@@ -2,7 +2,7 @@
  * A refusal usually carries a sentence, and the screens were printing over it.
  *
  * The swap ticket rendered "No route available" on top of the executor's own "No route for USDC ->
- * WETH", and on top of whatever 1inch said when 1inch was the one refusing. A user who can see
+ * XBTC", and on top of whatever the venue said when the venue was the one refusing. A user who can see
  * which pair failed knows to change something; a user who cannot just taps again.
  */
 import { describe, expect, it } from 'vitest';
@@ -19,8 +19,8 @@ describe('the server’s own words survive to the screen', () => {
 
   it('falls back to `error` when that is all there is', () => {
     // Exactly what /swap/quote returns on a 502.
-    const e = new ApiError(502, '502 Bad Gateway', { error: 'No route for USDC -> WETH' });
-    expect(apiReason(e)).toBe('No route for USDC -> WETH');
+    const e = new ApiError(502, '502 Bad Gateway', { error: 'No route for USDC -> XBTC' });
+    expect(apiReason(e)).toBe('No route for USDC -> XBTC');
   });
 
   it('has nothing to say about a bare transport failure', () => {

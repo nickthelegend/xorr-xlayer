@@ -51,6 +51,14 @@ function fillBasis(q: NonNullable<MetricsReport['fillQuality']>): string {
   return parts.join(' · ');
 }
 
+/** The venue keys `server/src/executor/settle.ts` records, as a person reads them. An unknown key shows as itself. */
+const VENUE_LABEL: Record<string, string> = {
+  'uniswap-v3': 'Uniswap v3',
+  'okx-dex': 'OKX DEX',
+  aave: 'Aave v3',
+  unrecorded: 'Not recorded',
+};
+
 export default function Metrics() {
   const goBack = useGoBack();
   const { data, loading, error, reload } = useAsync(() => system.metrics(), []);
@@ -181,7 +189,7 @@ export default function Metrics() {
                 <Text variant="footnote" color={colors.ink55}>
                   WHERE FILLS SETTLED
                 </Text>
-                {/* The claim the 1inch integration rests on, counted from the runs that filled. */}
+                {/* The claim each venue integration rests on, counted from the runs that filled. */}
                 {Object.entries(data.fillsByVenue)
                   .sort((a, b) => b[1] - a[1])
                   .map(([venue, n]) => (
@@ -194,7 +202,7 @@ export default function Metrics() {
                       }}
                     >
                       <Text variant="secondarySm" color={colors.ink65}>
-                        {venue}
+                        {VENUE_LABEL[venue] ?? venue}
                       </Text>
                       <Text variant="secondarySm">{n}</Text>
                     </View>

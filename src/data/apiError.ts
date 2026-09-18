@@ -44,7 +44,7 @@ export class ApiError extends Error {
  *
  * `idempotent-replay: true` on a 200 means the executor had already run this key and is handing back what that
  * first attempt did — so the order filled once, a while ago, and this tap placed nothing. A screen that cannot
- * tell those apart shows "Bought 0.0412 WETH" twice for one fill.
+ * tell those apart shows "Bought 0.0412 XBTC" twice for one fill.
  *
  * A symbol and non-enumerable, so it travels on the parsed body without appearing in it: these bodies are
  * compared, spread and serialised all over the app, and a stray `replayed: true` key would show up in every
@@ -97,7 +97,7 @@ export function apiProse(e: unknown): string | undefined {
  * The server's own sentence, when it wrote one.
  *
  * Routes answer a refusal as `{ error, message }` or `{ error }` — the policy engine's wording,
- * the venue's reason, "No route for USDC -> WETH". Screens were rendering their own generic
+ * the venue's reason, "No route for USDC -> XBTC". Screens were rendering their own generic
  * substitute over the top of it: "No route available" where the executor had said which pair and
  * why. A stated reason is the difference between a user retrying pointlessly and a user knowing
  * to change something.
@@ -136,10 +136,10 @@ export function apiReason(e: unknown): string | undefined {
 /**
  * The sentence to put in front of a user, out of whatever the failure carried.
  *
- * `ApiError.message` keeps the raw wire form on purpose — `404 Not Found: {"error":"WETH is not a
+ * `ApiError.message` keeps the raw wire form on purpose — `404 Not Found: {"error":"XBTC is not a
  * tokenized equity"}` — because throwing information away at the boundary is how a screen ends up
  * with a status code and nothing else. But `ErrorState` was rendering exactly that string, so the
- * raw body, the braces and the quotes went on screen: /oracle/WETH showed the JSON verbatim.
+ * raw body, the braces and the quotes went on screen: /oracle/XBTC showed the JSON verbatim.
  *
  * The server already wrote the sentence. Prefer it; fall back to the status when the body carried
  * no prose, and leave non-HTTP errors alone — `TimedOut` and `NotSignedIn` write their own.
@@ -158,8 +158,8 @@ export function errorText(e: unknown): string {
  * Is trying the identical request again worth offering?
  *
  * A "Try again" button under a permanent refusal is a worse failure than no button: it invites a
- * user to keep pressing something that will answer the same way forever. /oracle/WETH offered a
- * retry on "WETH is not a tokenized equity", which is not going to change.
+ * user to keep pressing something that will answer the same way forever. /oracle/XBTC offered a
+ * retry on "XBTC is not a tokenized equity", which is not going to change.
  *
  * 4xx means the request was wrong, so repeating it unchanged gets the same answer — except 408 and
  * 429, which are explicitly "not now, try later". Everything else (5xx, timeouts, transport) is

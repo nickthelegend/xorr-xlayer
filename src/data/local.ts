@@ -1,8 +1,8 @@
 /**
  * Local repository implementation.
  *
- * Not a mock: market data is REAL — CoinGecko for crypto and a live 1inch route for the
- * tokenized equities, both through the executor (src/data/marketData.ts). What is local is
+ * Not a mock: market data is REAL — CoinGecko for crypto and a live Uniswap v3 quote for the
+ * wrapped xStocks, both through the executor (src/data/marketData.ts). What is local is
  * the *account* — positions, strategies, the audit trail — which lives in the executor's Postgres
  * once the server is reachable, and falls back to the on-device store when it is not.
  *
@@ -76,8 +76,8 @@ export const LocalRepositories: Repositories = {
        * `/market/quotes` already drops symbols it has no feed for, so asking for all of them
        * costs nothing — it is one cache hit on one URL — and everything genuinely unpriced
        * (silver, crude, the indices) still falls through to its indicative price and keeps the
-       * label. The tokenized equities come from a real 1inch route instead, because that is the
-       * venue that would actually fill them.
+       * label. The tokenized equities come from a real Uniswap v3 quote instead, because those
+       * are the pools that would actually fill them.
        *
        * A quote read that FAILED throws. It was `.catch(() => ({}))`, which turned an outage into
        * every live instrument at a dash under "no price feed" — and Home, finding nothing up, said
@@ -140,14 +140,14 @@ export const LocalRepositories: Repositories = {
 
     async quotes(symbols) {
       // Two feeds, one answer. Crypto is priced by CoinGecko; the tokenized equities have no
-      // CoinGecko listing and are priced off the 1inch route that would fill them. A screen asking
+      // CoinGecko listing and are priced off the Uniswap v3 pools that would fill them. A screen asking
       // for a price should not have to know which kind of asset it is holding.
       const needsStocks = symbols.some((s) => STOCK_SYMBOLS.has(s));
       let warming = false;
       const [live, stocks] = await Promise.all([
         /*
          * Still warming is an answer, and every symbol below says so. Any other failure throws, as `listClasses` does:
-         * `{}` made a feed that did not answer look like symbols with no feed, and a ticket then said "No live WETH
+         * `{}` made a feed that did not answer look like symbols with no feed, and a ticket then said "No live XBTC
          * price" about a price nobody had been able to ask for.
          */
         fetchQuotes(symbols).catch((e: unknown): Record<string, Quote> => {
@@ -429,7 +429,7 @@ export const LocalRepositories: Repositories = {
      *
      * This was `.catch(() => undefined) ?? []`, which turned every failure — a 500, a timeout, a
      * dropped connection — into a confident empty portfolio. On /swap that renders as "Balance
-     * 0.0000" and "You hold no WETH. There is nothing to swap." to someone holding 0.4890 WETH,
+     * 0.0000" and "You hold no XBTC. There is nothing to swap." to someone holding 0.0489 XBTC,
      * and `useAsync` never sees an error, so no screen can tell the two apart or offer a retry.
      * The whole app draws the absent-versus-not-known line carefully and this one line erased it
      * underneath every screen that reads positions.
@@ -574,7 +574,7 @@ export const LocalRepositories: Repositories = {
   yield: {
     async staking() {
       /*
-       * Reads the live USDC supply rate on Aave v3 (Base). No live rate means no rate — quoting
+       * Reads the live USDT0 supply rate on Aave v3 (X Layer). No live rate means no rate — quoting
        * the design's 12.6% would be advertising a yield nobody verified.
        *
        * And a rate that could not be READ is an error, not an absence. This swallowed every failure
@@ -602,10 +602,9 @@ export const LocalRepositories: Repositories = {
        * catalogue" of fixtures, defended in the old comment here as product config rather than a
        * stand-in for saved state. It was not either.
        *
-       *   - It listed `NVDAx earnings` and `SOL above $95`. This app's tokenized Nvidia is
-       *     `NVDAc`; `NVDAx` is the design prototype's spelling, which `fixtures/markets.ts` warns
-       *     about in its own header. SOL is not settleable on Base at all. So the catalogue
-       *     offered to watch two things that do not exist here.
+       *   - It listed `NVDAx earnings` and `SOL above $95` — fixtures, not anything this person
+       *     chose, and SOL is not settleable on X Layer at all. So the catalogue offered to watch
+       *     things nobody had asked about, one of which does not exist here.
        *   - The header counted them: "2 of 5 on", stated about alerts nobody had set.
        *   - The switches were live. Toggling one called `setEnabled` with a fixture id the server
        *     has never seen, and `setEnabled` swallows its own failure — so the row flipped, the

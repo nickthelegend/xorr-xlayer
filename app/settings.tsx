@@ -188,7 +188,7 @@ export default function Settings() {
 
           {/*
             One door to everything the app can show about itself — the verification report, the
-            approvals, the runs, the subgraph. Thirty-odd surfaces cannot each earn a row here, and
+            approvals, the runs, the network. Thirty-odd surfaces cannot each earn a row here, and
             a screen nobody can reach is worse than no screen.
           */}
           <Row

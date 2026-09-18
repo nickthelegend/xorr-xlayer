@@ -87,8 +87,8 @@ export function renderFact(f: FactSegment): string {
 /**
  * A sentence the executor wrote, as segments: each token carrying a number becomes a fact, the words around them voice.
  *
- * The executor answers a decision in whole sentences its own code formatted — "Bought 0.0020 WETH at $2,517.86. Your
- * existing exit on WETH stays as it is." The thread put that in one voice segment, which refuses any number, so every
+ * The executor answers a decision in whole sentences its own code formatted — "Bought 0.0020 XBTC at $117,240.00. Your
+ * existing exit on XBTC stays as it is." The thread put that in one voice segment, which refuses any number, so every
  * fill threw inside the same try as the request, and the chat told the person the approve "did not reach the executor,
  * so nothing was decided" about an order that had filled (Android emulator, 2026-09-15). Split, the words keep the voice
  * rule and each number keeps the executor's formatting as a raw fact that names its source. Rendered, it reads as sent.

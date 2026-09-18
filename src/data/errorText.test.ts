@@ -1,8 +1,8 @@
 /**
  * What a user is shown when a request fails, and whether they are invited to repeat it.
  *
- * Both of these were found on screen rather than in a test: /oracle/WETH rendered
- * `404 Not Found: {"error":"WETH is not a tokenized equity"}` — the raw wire body, braces and all
+ * Both of these were found on screen rather than in a test: /oracle/XBTC rendered
+ * `404 Not Found: {"error":"XBTC is not a tokenized equity"}` — the raw wire body, braces and all
  * — under a "Try again" button for a fact that will never change.
  */
 import { describe, expect, it } from 'vitest';
@@ -21,8 +21,8 @@ const wire = (status: number, body: unknown, text = JSON.stringify(body)) =>
 
 describe('errorText', () => {
   it('prefers the sentence the server wrote over the wire form', () => {
-    const e = wire(404, { error: 'WETH is not a tokenized equity' });
-    expect(errorText(e)).toBe('WETH is not a tokenized equity');
+    const e = wire(404, { error: 'XBTC is not a tokenized equity' });
+    expect(errorText(e)).toBe('XBTC is not a tokenized equity');
     // The raw form is still on the error for logs — it is only kept off the screen.
     expect(e.message).toContain('{"error"');
   });

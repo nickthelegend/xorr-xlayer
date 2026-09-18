@@ -6,12 +6,12 @@
  * transaction with no decision behind it.
  *
  * The rows are the delegation contract's own `Spent` and `Closed` events for this wallet, read from the chain this
- * build settles on by `GET /history` — and on Base mainnet, 1inch's history of the wallet beside them. A settlement
+ * build settles on by `GET /history`. A settlement
  * history the user cannot verify independently is not a settlement history, so every row carries its transaction.
  *
- * Until 3.14 it read spends alone, from The Graph, on the client. The subgraph indexes the Sepolia contract, so on the
- * fork — 33 filled runs, every one of them on chain — it said nothing had settled; and closes, half of what a
- * permission does, were never shown at all.
+ * Until 3.14 it read spends alone, from an index of another deployment, on the client, so on the fork — 33 filled runs,
+ * every one of them on chain — it said nothing had settled; and closes, half of what a permission does, were never shown
+ * at all. The Base build's index is gone; the chain is the only source.
  */
 import React from 'react';
 import { Linking, ScrollView, View } from 'react-native';
@@ -37,12 +37,6 @@ import { useAsync } from '@/data/useAsync';
 import { history, unitsOf, type HistoryItem } from '@/data/history';
 import { useRefreshControl } from '@/ui/useRefreshControl';
 
-/** `SwapExactInput` reads as "Swap exact input". */
-function eventWords(type: string): string {
-  const words = type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 /** What happened, in the chain's word for it — and, for a spend a run sent, what it bought. */
 function titleOf(item: HistoryItem): string {
   const symbol = item.token?.symbol ?? 'an unlisted token';
@@ -50,8 +44,7 @@ function titleOf(item: HistoryItem): string {
     const bought = item.run && item.run.symbol !== item.token?.symbol ? ` for ${item.run.symbol === 'PORTFOLIO' ? 'the portfolio' : item.run.symbol}` : '';
     return `Spent ${symbol}${bought}`;
   }
-  if (item.kind === 'closed') return `Closed ${symbol}`;
-  return item.oneinch ? eventWords(item.oneinch.type) : 'Trade';
+  return `Closed ${symbol}`;
 }
 
 /** Cents where the amount is dollars; more digits for an asset, where 0.0001 of it is a real amount. */

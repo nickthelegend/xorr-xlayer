@@ -40,7 +40,7 @@ afterEach(() => {
 describe('a money action carries its key to the executor', () => {
   it('an order', async () => {
     executorAnswers(200, { status: 'filled', units: 0.1, price: 2500 });
-    await LocalRepositories.orders.place({ symbol: 'WETH', usd: 250 }, { idempotencyKey: 'order-key' });
+    await LocalRepositories.orders.place({ symbol: 'XBTC', usd: 250 }, { idempotencyKey: 'order-key' });
     expect(sent).toHaveLength(1);
     expect(sent[0]?.url).toMatch(/\/orders$/);
     expect(sent[0]?.method).toBe('POST');
@@ -48,8 +48,8 @@ describe('a money action carries its key to the executor', () => {
   });
 
   it('a sale or a close', async () => {
-    executorAnswers(200, { status: 'closed', symbol: 'WETH', units: 0.1, usd: 250, txHash: '0xabc' });
-    await LocalRepositories.portfolio.close({ symbol: 'WETH', fraction: 0.5 }, { idempotencyKey: 'close-key' });
+    executorAnswers(200, { status: 'closed', symbol: 'XBTC', units: 0.1, usd: 250, txHash: '0xabc' });
+    await LocalRepositories.portfolio.close({ symbol: 'XBTC', fraction: 0.5 }, { idempotencyKey: 'close-key' });
     expect(sent[0]?.url).toMatch(/\/positions\/close$/);
     expect(sent[0]?.headers['idempotency-key']).toBe('close-key');
   });
@@ -58,14 +58,14 @@ describe('a money action carries its key to the executor', () => {
     executorAnswers(200, {
       status: 'filled',
       from: 'USDC',
-      to: 'WETH',
+      to: 'XBTC',
       sold: 100,
       received: 0.04,
       usd: 100,
       venue: null,
       txHash: '0xabc',
     });
-    await system.swap({ from: 'USDC', to: 'WETH', amount: '100', slippagePct: 0.3 }, { idempotencyKey: 'swap-key' });
+    await system.swap({ from: 'USDC', to: 'XBTC', amount: '100', slippagePct: 0.3 }, { idempotencyKey: 'swap-key' });
     expect(sent[0]?.url).toMatch(/\/swap$/);
     expect(sent[0]?.headers['idempotency-key']).toBe('swap-key');
   });
@@ -80,8 +80,8 @@ describe('a money action carries its key to the executor', () => {
   it('with the key a screen’s keys chose, sent again when the order is retried after a gateway timeout', async () => {
     const keys = intentKeys();
     const buy = () =>
-      keys.send({ side: 'buy', symbol: 'WETH', usd: 250 }, (idempotencyKey) =>
-        LocalRepositories.orders.place({ symbol: 'WETH', usd: 250 }, { idempotencyKey }),
+      keys.send({ side: 'buy', symbol: 'XBTC', usd: 250 }, (idempotencyKey) =>
+        LocalRepositories.orders.place({ symbol: 'XBTC', usd: 250 }, { idempotencyKey }),
       );
     executorAnswers(504, {});
     await expect(buy()).rejects.toMatchObject({ status: 504 });
@@ -104,9 +104,9 @@ describe('a money action carries its key to the executor', () => {
 
 describe('what the executor says about a key reaches the screen as its own sentence', () => {
   const calls: [string, () => Promise<unknown>][] = [
-    ['/orders', () => LocalRepositories.orders.place({ symbol: 'WETH', usd: 250 }, { idempotencyKey: 'k' })],
-    ['/positions/close', () => LocalRepositories.portfolio.close({ symbol: 'WETH', fraction: 1 }, { idempotencyKey: 'k' })],
-    ['/swap', () => system.swap({ from: 'USDC', to: 'WETH', amount: '100' }, { idempotencyKey: 'k' })],
+    ['/orders', () => LocalRepositories.orders.place({ symbol: 'XBTC', usd: 250 }, { idempotencyKey: 'k' })],
+    ['/positions/close', () => LocalRepositories.portfolio.close({ symbol: 'XBTC', fraction: 1 }, { idempotencyKey: 'k' })],
+    ['/swap', () => system.swap({ from: 'USDC', to: 'XBTC', amount: '100' }, { idempotencyKey: 'k' })],
     ['/faucet', () => requestFaucet({ idempotencyKey: 'k' })],
   ];
 

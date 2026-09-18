@@ -46,7 +46,7 @@ import {
  * The validator lives in the store, and there is exactly one of it.
  *
  * This screen had its own copy — base58, 32–44 characters, the shape a SOLANA address takes,
- * left over from before the pivot. Base58 has no `0` and no `x`, so every real Base address
+ * left over from before the pivot. Base58 has no `0` and no `x`, so every real EVM address
  * failed it: the button never enabled, and the screen told the user their own wallet "does not
  * look like a Solana address". The store's `add()` has validated `0x…` correctly the whole
  * time; this regex sat in front of it and never let a valid address through.

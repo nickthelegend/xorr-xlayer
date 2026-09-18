@@ -54,7 +54,7 @@ type Inputs = { symbol: RecurringBuySymbol; lookback: Lookback; usd: number };
 
 export default function Backtest() {
   const goBack = useGoBack();
-  const [symbol, setSymbol] = useState<RecurringBuySymbol>('WETH');
+  const [symbol, setSymbol] = useState<RecurringBuySymbol>(RECURRING_BUY_SYMBOLS[0]);
   const [lookback, setLookback] = useState<Lookback>('90d');
   const [usd, setUsd] = useState<number>(SIZES[1]);
 

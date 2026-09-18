@@ -35,9 +35,17 @@ export const DEPLOYMENTS: readonly Deployment[] = [];
 
 const bare = (url: string) => url.replace(/\/+$/, '');
 
-/** The deployment a chain key names, if xorr is deployed on it. */
-export function deploymentFor(key: string | undefined): Deployment | undefined {
-  return key ? DEPLOYMENTS.find((d) => d.key === key) : undefined;
+/**
+ * The deployment a chain key names, if xorr is deployed on it.
+ *
+ * `list` is for tests: the real list is empty until an X Layer executor is deployed, and the matching rule should be
+ * pinned before then rather than after.
+ */
+export function deploymentFor(
+  key: string | undefined,
+  list: readonly Deployment[] = DEPLOYMENTS,
+): Deployment | undefined {
+  return key ? list.find((d) => d.key === key) : undefined;
 }
 
 /**
@@ -47,6 +55,9 @@ export function deploymentFor(key: string | undefined): Deployment | undefined {
  * app" would put another executor's facts under it. A build no deployment serves — a developer's Metro against a local
  * executor — has none.
  */
-export function thisDeployment(apiBase: string = API_BASE): Deployment | undefined {
-  return DEPLOYMENTS.find((d) => bare(d.api) === bare(apiBase));
+export function thisDeployment(
+  apiBase: string = API_BASE,
+  list: readonly Deployment[] = DEPLOYMENTS,
+): Deployment | undefined {
+  return list.find((d) => bare(d.api) === bare(apiBase));
 }

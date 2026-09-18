@@ -11,8 +11,8 @@
  * The size steps rather than free-types. The interesting thing here is how the route CHANGES across
  * sizes, and a text field invites someone to type one number and learn nothing.
  *
- * No venue names: the three ways a fill can be sourced are named for what they are, and the provider
- * once, at the foot. A failed quote offers a retry wherever asking again could answer differently —
+ * The venues are X Layer's two — Uniswap v3, and OKX DEX where this deployment holds its API key — each with what it
+ * would deliver or why it could not say, and the pair named once more at the foot. A failed quote offers a retry wherever asking again could answer differently —
  * a timeout included, which used to leave this screen with no way back.
  */
 import React, { useState } from 'react';
@@ -57,7 +57,7 @@ export default function RouteInspector() {
 
   /*
    * The token the symbol actually settles as. Asking for a route into "BTC" would quote a market
-   * this chain does not have; the buy is cbBTC, and that is what the router is asked about.
+   * this chain does not have; the buy is XBTC, and that is what the router is asked about.
    */
   const into = settlementSymbol(symbol ?? '');
   // A route into what pays for it is USDC for USDC, and can only fail.
@@ -208,53 +208,45 @@ function FillComparison({
       <Text variant="footnote" color={colors.ink55}>
         SAME SIZE, EVERY WAY TO FILL
       </Text>
-      {data.quotes.map((q) => (
-        <View key={q.venue} style={{ marginTop: space.s10 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s10 }}>
-            {/* The winner in full ink, not green: green is profit and loss, and a better quote is neither. */}
-            <Text
-              variant="secondary"
-              color={q.venue === data.best ? colors.ink : colors.ink65}
-              style={{ flexShrink: 1 }}
-            >
-              {fillPath(q.venue)}
-            </Text>
-            <Text variant="secondary" color={q.served ? colors.ink : colors.ink55}>
-              {q.served ? `${quantity(q.outAmount)} ${outSymbol}` : 'Can’t fill this size'}
-            </Text>
+      {data.venues.map((q) => {
+        const served = q.outAmount !== null && q.outAmount > 0;
+        return (
+          <View key={q.venue} style={{ marginTop: space.s10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s10 }}>
+              {/* The winner in full ink, not green: green is profit and loss, and a better quote is neither. */}
+              <Text
+                variant="secondary"
+                color={q.venue === data.best ? colors.ink : colors.ink65}
+                style={{ flexShrink: 1 }}
+              >
+                {fillPath(q.venue)}
+              </Text>
+              <Text variant="secondary" color={served ? colors.ink : colors.ink55}>
+                {served ? `${quantity(q.outAmount!)} ${outSymbol}` : 'Can’t fill this size'}
+              </Text>
+            </View>
+            {/* Why a venue could not answer, in its own words — a missing key reads differently from a thin pool. */}
+            {!served && q.unavailable ? (
+              <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s2 }}>
+                {q.unavailable}
+              </Text>
+            ) : null}
           </View>
-          {/*
-            What is left after paying to send it. The path with the largest output is not always the
-            one that leaves you better off: a three-pool hop costs more to send than a single fill, and
-            on a small trade that gap can be larger than the price it bought. Absent rather than zero
-            when the cost could not be estimated — free is a claim.
-          */}
-          {q.served && q.netUsd !== undefined ? (
-            <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s2 }}>
-              {`${money(q.netUsd)} after gas`}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-      {/* Said only when it differs — otherwise it is the same sentence twice. */}
-      {data.bestNet && data.best && data.bestNet !== data.best ? (
-        <Text variant="footnote" color={colors.ink} style={{ marginTop: space.s10 }}>
-          {`After gas, the ${fillPath(data.bestNet).toLowerCase()} leaves more.`}
-        </Text>
-      ) : null}
+        );
+      })}
       {/*
-        The margin, only when there was something to beat. `edgeBps` is deliberately absent when a
-        single path answered, because "0% more" reads as a tie rather than as no competition.
+        The margin, only when there was something to beat. `edgeBps` is null when a single venue
+        answered, because "0% more" reads as a tie rather than as no competition.
       */}
       <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s12 }}>
-        {data.edgeBps !== undefined && data.best
-          ? `The ${fillPath(data.best).toLowerCase()} gives ${percent(data.edgeBps / 100, { digits: 2, explicitSign: false })} more.`
+        {data.edgeBps !== null && data.best
+          ? `${fillPath(data.best)} gives ${percent(data.edgeBps / 100, { digits: 2, explicitSign: false })} more.`
           : data.best
-            ? `Only the ${fillPath(data.best).toLowerCase()} can fill this size.`
+            ? `Only ${fillPath(data.best)} can fill this size.`
             : 'Nothing can fill this size right now.'}
       </Text>
       <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s10 }}>
-        Quotes from 1inch.
+        Quotes from Uniswap v3 and OKX DEX.
       </Text>
     </SheetCard>
   );

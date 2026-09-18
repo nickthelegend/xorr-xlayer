@@ -50,7 +50,7 @@ describe('Auto Close — screen 6 (mid 66000, size $2500)', () => {
 describe('order ticket — screen 14', () => {
   it('unit conversion is 4dp against $88.32', () => {
     expect(d.orderUnits(250, 88.32, 'SOL')).toBe('2.8306 SOL');
-    expect(d.orderUnits(250, 2500, 'WETH')).toBe('0.1000 WETH');
+    expect(d.orderUnits(250, 2500, 'XBTC')).toBe('0.1000 XBTC');
   });
 
   it('fee is 0.1%', () => {
@@ -58,10 +58,10 @@ describe('order ticket — screen 14', () => {
   });
 
   it('CTA reads as designed', () => {
-    // Defaults to the Base asset the executor can actually settle, not a chain we do not trade.
-    expect(d.orderCta('buy', '250')).toBe('Buy $250 of WETH');
-    expect(d.orderCta('sell', '1,000')).toBe('Sell $1,000 of WETH');
-    expect(d.orderCta('buy', '250', 'NVDAc')).toBe('Buy $250 of NVDAc');
+    // Defaults to the X Layer asset the executor can actually settle, not a chain we do not trade.
+    expect(d.orderCta('buy', '250')).toBe('Buy $250 of XBTC');
+    expect(d.orderCta('sell', '1,000')).toBe('Sell $1,000 of XBTC');
+    expect(d.orderCta('buy', '250', 'NVDAx')).toBe('Buy $250 of NVDAx');
   });
 
   describe('keypad rules — state.md', () => {
@@ -159,27 +159,27 @@ describe('position close — screen 22 (unrealised $318.40, margin $3800)', () =
 
 describe('swap — screen 19 (PLAN.md 3.9)', () => {
   it('sends the amount as typed, with the pair and the tolerance chosen', () => {
-    expect(d.swapRequest({ pay: 'WETH', receive: 'CBBTC', amount: '0.1', slippagePct: 0.5 })).toEqual({
-      from: 'WETH',
-      to: 'CBBTC',
+    expect(d.swapRequest({ pay: 'XBTC', receive: 'WOKB', amount: '0.1', slippagePct: 0.5 })).toEqual({
+      from: 'XBTC',
+      to: 'WOKB',
       amount: '0.1',
       slippagePct: 0.5,
     });
   });
 
   it('builds nothing the executor would only refuse: no amount, a zero, a bare point, or one token twice', () => {
-    expect(d.swapRequest({ pay: 'USDC', receive: 'WETH', amount: '0', slippagePct: 0.3 })).toBeNull();
-    expect(d.swapRequest({ pay: 'USDC', receive: 'WETH', amount: '0.', slippagePct: 0.3 })).toBeNull();
-    expect(d.swapRequest({ pay: 'USDC', receive: 'WETH', amount: '', slippagePct: 0.3 })).toBeNull();
-    expect(d.swapRequest({ pay: 'WETH', receive: 'weth', amount: '1', slippagePct: 0.3 })).toBeNull();
+    expect(d.swapRequest({ pay: 'USDC', receive: 'XBTC', amount: '0', slippagePct: 0.3 })).toBeNull();
+    expect(d.swapRequest({ pay: 'USDC', receive: 'XBTC', amount: '0.', slippagePct: 0.3 })).toBeNull();
+    expect(d.swapRequest({ pay: 'USDC', receive: 'XBTC', amount: '', slippagePct: 0.3 })).toBeNull();
+    expect(d.swapRequest({ pay: 'XBTC', receive: 'xbtc', amount: '1', slippagePct: 0.3 })).toBeNull();
   });
 
   it('pays USDC from cash and anything else from the holding, and knows unknown from none', () => {
-    const balance = { cash: 120.5, holdings: [{ symbol: 'WETH', units: 0.25 }] };
+    const balance = { cash: 120.5, holdings: [{ symbol: 'XBTC', units: 0.25 }] };
     expect(d.swapSpendable(balance, 'USDC')).toBe(120.5);
-    expect(d.swapSpendable(balance, 'WETH')).toBe(0.25);
-    expect(d.swapSpendable(balance, 'CBBTC')).toBe(0);
-    expect(d.swapSpendable(undefined, 'WETH')).toBeUndefined();
+    expect(d.swapSpendable(balance, 'XBTC')).toBe(0.25);
+    expect(d.swapSpendable(balance, 'WOKB')).toBe(0);
+    expect(d.swapSpendable(undefined, 'XBTC')).toBeUndefined();
   });
 
   it('offers only tolerances the executor accepts', () => {
@@ -566,14 +566,14 @@ describe('a stored record, as rows — /risk and /strategy/[id]', () => {
   it('flattens what is nested instead of printing [object Object]', () => {
     // The onboarding rebalance, as `app/(onboarding)/proposal.tsx` stores it.
     const rows = d.recordEntries({
-      targets: { WETH: 27.5, CBBTC: 27.5 },
+      targets: { XBTC: 27.5, WOKB: 27.5 },
       cashPct: 45,
       weights: [55, 30, 15],
       sleeves: ['Blue-chip crypto', 'Tokenized equities', 'Stable yield'],
     });
     expect(rows.map((r) => [r.label, r.value])).toEqual([
-      ['Target · WETH', '27.5%'],
-      ['Target · CBBTC', '27.5%'],
+      ['Target · XBTC', '27.5%'],
+      ['Target · WOKB', '27.5%'],
       ['Cash', '45%'],
       ['Weights', '55%, 30%, 15%'],
       ['Sleeves', 'Blue-chip crypto, Tokenized equities, Stable yield'],
@@ -589,13 +589,13 @@ describe('a stored record, as rows — /risk and /strategy/[id]', () => {
 
   it('says which values are money and which are prices, so hidden balances can tell them apart', () => {
     // A range's bounds are prices and stay while balances are hidden; what each rung buys is the person's money.
-    const rows = d.recordEntries({ lower: 2400, upper: 2600, steps: 4, usdPerStep: 50, targets: { WETH: 55 } });
+    const rows = d.recordEntries({ lower: 2400, upper: 2600, steps: 4, usdPerStep: 50, targets: { XBTC: 55 } });
     expect(rows.map((r) => [r.label, r.unit])).toEqual([
       ['Bottom of range', 'price'],
       ['Top of range', 'price'],
       ['Rungs', undefined],
       ['Each rung buys', 'money'],
-      ['Target · WETH', 'percent'],
+      ['Target · XBTC', 'percent'],
     ]);
   });
 
@@ -688,7 +688,7 @@ describe('trailing stop — the exit the engine could always run', () => {
   });
 
   it('a breached floor is what fired the real fill', () => {
-    // The live run: peak 2800, 5% trail, WETH at 2501.65 — sold, tx 0x47db5129…
+    // The live run: peak 2800, 5% trail, XBTC at 2501.65 — sold, tx 0x47db5129…
     expect(2501.65).toBeLessThan(floor(2800, 5));
     // And at the same peak with the price above the floor, it must not fire.
     expect(2700).toBeGreaterThan(floor(2800, 5));
@@ -751,10 +751,10 @@ describe('a position the wallet does not match — PLAN.md 2.7', () => {
   });
 
   it('says which way it runs, in units of the asset', () => {
-    const missing = d.driftSentence('WETH', { kind: 'missing', units: 0.802587 });
-    expect(missing).toContain('WETH on record isn’t in your wallet');
+    const missing = d.driftSentence('XBTC', { kind: 'missing', units: 0.802587 });
+    expect(missing).toContain('XBTC on record isn’t in your wallet');
     expect(missing).toMatch(/^0\.8026 /);
-    expect(d.driftSentence('WETH', { kind: 'unrecorded', units: 0.2 })).toContain('WETH in your wallet wasn’t bought here');
+    expect(d.driftSentence('XBTC', { kind: 'unrecorded', units: 0.2 })).toContain('XBTC in your wallet wasn’t bought here');
   });
 });
 
@@ -764,26 +764,27 @@ describe('the onboarding portfolio as a rebalance holds it — PLAN.md 2.17', ()
     { name: 'Tokenized equities', weight: 30 },
     { name: 'Stable yield', weight: 15 },
   ];
-  const equities = ['NVDAc', 'AAPLc', 'TSLAc', 'METAc', 'MSFTc', 'AMZNc', 'GOOGLc', 'MSTRc'];
+  const equities = ['NVDAx', 'AAPLx', 'TSLAx', 'METAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'MSTRx', 'COINx', 'SPYx', 'QQQx'];
 
   it('splits each sleeve across what it names, and leaves stable yield as cash', () => {
-    const { targets, cashPct } = d.targetsFromSleeves(sleeves, ['WETH', 'cbBTC', 'USDC', ...equities]);
-    expect(targets.WETH).toBe(27.5);
-    expect(targets.CBBTC).toBe(27.5);
-    for (const e of equities) expect(targets[e]).toBe(3.75);
+    const { targets, cashPct } = d.targetsFromSleeves(sleeves, ['XBTC', 'WOKB', 'USDC', ...equities]);
+    expect(targets.XBTC).toBe(27.5);
+    expect(targets.WOKB).toBe(27.5);
+    // 30% over eleven xStocks, rounded down to a hundredth each; the remainder stays cash.
+    for (const e of equities) expect(targets[e]).toBe(2.72);
     expect(targets.USDC).toBeUndefined();
-    expect(cashPct).toBe(15);
+    expect(cashPct).toBe(15.08);
   });
 
   it('a sleeve with nothing tradable on this chain stays cash rather than vanishing', () => {
-    const { targets, cashPct } = d.targetsFromSleeves(sleeves, ['WETH', 'cbBTC', 'USDC']);
-    expect(Object.keys(targets).sort()).toEqual(['CBBTC', 'WETH']);
+    const { targets, cashPct } = d.targetsFromSleeves(sleeves, ['XBTC', 'WOKB', 'USDC']);
+    expect(Object.keys(targets).sort()).toEqual(['WOKB', 'XBTC']);
     expect(cashPct).toBe(45);
   });
 
   it('rounds down, so the targets never add up past the whole portfolio', () => {
-    const { targets, cashPct } = d.targetsFromSleeves([{ name: 'Blue-chip crypto', weight: 33.33 }], ['WETH', 'cbBTC']);
-    expect(targets).toEqual({ WETH: 16.66, CBBTC: 16.66 });
+    const { targets, cashPct } = d.targetsFromSleeves([{ name: 'Blue-chip crypto', weight: 33.33 }], ['XBTC', 'WOKB']);
+    expect(targets).toEqual({ XBTC: 16.66, WOKB: 16.66 });
     expect(cashPct).toBe(66.68);
   });
 });
@@ -794,18 +795,18 @@ describe('what approving the onboarding proposal creates — PLAN.md 3.7', () =>
     { name: 'Tokenized equities', weight: 30 },
     { name: 'Stable yield', weight: 15 },
   ];
-  const crypto = ['ETH', 'WETH', 'USDC', 'CBBTC'];
+  const crypto = ['ETH', 'XBTC', 'USDC', 'WOKB'];
 
   it('is a live rebalance over what the network settles', () => {
-    expect(d.proposalRebalance(sleeves, crypto, [])).toEqual({ state: 'live', targets: { WETH: 27.5, CBBTC: 27.5 }, cashPct: 45 });
+    expect(d.proposalRebalance(sleeves, crypto, [])).toEqual({ state: 'live', targets: { XBTC: 27.5, WOKB: 27.5 }, cashPct: 45 });
   });
 
   it('where nothing settles, is watched over what the network can follow — not refused', () => {
-    expect(d.proposalRebalance(sleeves, [], crypto)).toEqual({ state: 'watch', targets: { WETH: 27.5, CBBTC: 27.5 }, cashPct: 45 });
+    expect(d.proposalRebalance(sleeves, [], crypto)).toEqual({ state: 'watch', targets: { XBTC: 27.5, WOKB: 27.5 }, cashPct: 45 });
   });
 
   it('never watches what it could trade: where fills settle, the followable list is not used', () => {
-    expect(d.proposalRebalance(sleeves, ['WETH'], crypto)).toEqual({ state: 'live', targets: { WETH: 55 }, cashPct: 45 });
+    expect(d.proposalRebalance(sleeves, ['XBTC'], crypto)).toEqual({ state: 'live', targets: { XBTC: 55 }, cashPct: 45 });
   });
 
   it('with nothing to trade or follow, targets nothing — which the screen refuses to create', () => {
@@ -818,7 +819,7 @@ describe('what approving the onboarding proposal creates — PLAN.md 3.7', () =>
     // Stable yield names nothing to swap on any chain: that is not this network's doing.
     expect(d.sleeveHeldAsCash('Stable yield', crypto)).toBe(false);
     // Where one of the equities settles, the sleeve is not cash.
-    expect(d.sleeveHeldAsCash('Tokenized equities', [...crypto, 'NVDAc'])).toBe(false);
+    expect(d.sleeveHeldAsCash('Tokenized equities', [...crypto, 'NVDAx'])).toBe(false);
     // Where nothing settles the screen says so on its own, and before the executor answers nothing is claimed.
     expect(d.sleeveHeldAsCash('Tokenized equities', [])).toBe(false);
     expect(d.sleeveHeldAsCash('Tokenized equities', undefined)).toBe(false);

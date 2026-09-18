@@ -7,8 +7,8 @@
  * screens that carry the detail: Activity, Permissions, Approvals and Settings.
  *
  * The identity still comes from two places, each the authority on its half: Privy for the email the
- * account was made with, the executor for the wallet the app is using, with its Basename when it has
- * one. The address is shortened on screen and copied whole.
+ * account was made with, the executor for the wallet the app is using. There is no name service on X Layer
+ * that this reads, so an address is shown as an address. It is shortened on screen and copied whole.
  */
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
@@ -33,7 +33,6 @@ import { Rise } from '@/ui/Rise';
 import { usePrivyIdentity } from '@/auth/usePrivyIdentity';
 import { useAsync } from '@/data/useAsync';
 import { repos } from '@/data';
-import { system } from '@/data/system';
 import { errorText } from '@/data/apiError';
 import { useStore } from '@/state/store';
 import {
@@ -63,11 +62,6 @@ export default function Profile() {
   const { email } = usePrivyIdentity();
   const wallet = useAsync(() => repos.wallet.current(), []);
   const address = wallet.data?.address;
-  /* Only once there is an address to resolve; most addresses have no Basename and answer null. */
-  const name = useAsync(
-    async () => (address ? (await system.basenameOf(address)).name : null),
-    [address],
-  );
   const [copied, setCopied] = useState(false);
 
   /*
@@ -81,7 +75,7 @@ export default function Profile() {
   const accounts = useAsync(() => repos.wallet.all(), []);
 
   const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : undefined;
-  const display = name.data ?? email ?? short;
+  const display = email ?? short;
   const initial = (display ?? 'x').replace(/^0x/i, '').charAt(0).toUpperCase();
 
   async function copy() {

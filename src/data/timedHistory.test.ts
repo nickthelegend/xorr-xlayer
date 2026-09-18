@@ -63,7 +63,7 @@ describe('a range that keeps its times', () => {
 
 describe('your fills of one token', () => {
   const run = (over: Partial<FillRun>): FillRun => ({
-    symbol: 'WETH',
+    symbol: 'XBTC',
     status: 'filled',
     side: 'buy',
     price: 2400,
@@ -73,14 +73,14 @@ describe('your fills of one token', () => {
 
   it('are its filled buys and sells, oldest first, at the time each settled and the price recorded', () => {
     const later = run({ side: 'sell', price: 2510.5, finishedAt: '2026-09-14T11:00:00.000Z' });
-    expect(fillsOf([later, run({})], 'WETH')).toEqual([
+    expect(fillsOf([later, run({})], 'XBTC')).toEqual([
       { at: Date.parse('2026-09-14T10:00:00.000Z'), side: 'buy', price: 2400, venue: null },
       { at: Date.parse('2026-09-14T11:00:00.000Z'), side: 'sell', price: 2510.5, venue: null },
     ]);
   });
 
-  it('match the token without regard to case — the registry spells cbBTC CBBTC', () => {
-    expect(fillsOf([run({ symbol: 'CBBTC' })], 'cbBTC')).toHaveLength(1);
+  it('match the token without regard to case — a route param may spell it xbtc', () => {
+    expect(fillsOf([run({ symbol: 'XBTC' })], 'xbtc')).toHaveLength(1);
   });
 
   it('leave out what is not a fill of this token: refusals, waits, other tokens, cash supplied, a rebalance', () => {
@@ -90,11 +90,11 @@ describe('your fills of one token', () => {
           run({ status: 'blocked' }),
           run({ status: 'skipped' }),
           run({ status: 'pending' }),
-          run({ symbol: 'CBBTC' }),
+          run({ symbol: 'WOKB' }),
           run({ side: 'supply' }),
           run({ symbol: 'PORTFOLIO' }),
         ],
-        'WETH',
+        'XBTC',
       ),
     ).toEqual([]);
   });
@@ -110,7 +110,7 @@ describe('your fills of one token', () => {
           run({ finishedAt: null }),
           run({ finishedAt: 'not a time' }),
         ],
-        'WETH',
+        'XBTC',
       ),
     ).toEqual([]);
   });
@@ -127,10 +127,10 @@ describe('where each fill happened, and which run recorded it (FEATURES.md #77)'
   });
 
   it('carries the recorded venue and the run id with the fill, unchanged', () => {
-    expect(fillsOf([run({ id: 'r1', venue: 'venue-vault' })], 'NVDAx')).toEqual([
-      { at: Date.parse('2026-09-17T10:00:00.000Z'), side: 'buy', price: 180, venue: 'venue-vault', id: 'r1' },
+    expect(fillsOf([run({ id: 'r1', venue: 'uniswap-v3' })], 'NVDAx')).toEqual([
+      { at: Date.parse('2026-09-17T10:00:00.000Z'), side: 'buy', price: 180, venue: 'uniswap-v3', id: 'r1' },
     ]);
-    expect(fillsOf([run({ venue: 'jupiter-route', side: 'sell' })], 'NVDAx')[0]!.venue).toBe('jupiter-route');
+    expect(fillsOf([run({ venue: 'okx-dex', side: 'sell' })], 'NVDAx')[0]!.venue).toBe('okx-dex');
   });
 
   it('records no venue as null — a run that wrote none is not given one', () => {

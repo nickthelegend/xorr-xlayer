@@ -14,8 +14,8 @@ import {
   type WalletProvider,
 } from './userSigning';
 
-const FORK = { id: 8453, name: 'Base (local fork)' };
-const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const FORK = { id: 196, name: 'X Layer (local fork)' };
+const USDC = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
 const DELEGATION = '0xc32dd8aeed3035d46c7c82a351fc5522c9d463f4';
 const DATA = encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [DELEGATION, 1_000_000n] });
 
@@ -43,7 +43,7 @@ function wallet(opts: WalletOptions = {}) {
           return null;
         case 'eth_chainId':
           if (opts.chainId === null) throw new Error('no answer');
-          return opts.chainId ?? '0x2105';
+          return opts.chainId ?? '0xc4';
         case 'eth_signTransaction': {
           const t = params![0] as Record<string, string | number>;
           const tx: TransactionSerializable = {
@@ -110,7 +110,7 @@ describe('on a fork build the wallet only signs, and the app broadcasts to the f
       to: USDC,
       data: DATA,
       value: '0x0',
-      chainId: 8453,
+      chainId: 196,
       type: 2,
       nonce: '0x7',
       gasLimit: toHex((55_819n * 125n) / 100n),
@@ -121,7 +121,7 @@ describe('on a fork build the wallet only signs, and the app broadcasts to the f
     expect(hash).toBe(keccak256(f.sent[0]!));
   });
 
-  it('never lets the wallet send or estimate: those go to Privy’s RPC, which is real Base', async () => {
+  it('never lets the wallet send or estimate: those go to Privy’s RPC, which is real X Layer', async () => {
     const w = wallet();
     await sendAsUser(signerOf(w, fork().access, true), USDC, DATA);
     expect(w.methods()).toEqual(['wallet_switchEthereumChain', 'eth_chainId', 'eth_signTransaction']);
@@ -143,9 +143,9 @@ describe('on a fork build the wallet only signs, and the app broadcasts to the f
   });
 });
 
-describe('on Base and Base Sepolia the wallet sends', () => {
+describe('on X Layer mainnet and testnet the wallet sends', () => {
   it('with a gas limit a quarter over the estimate', async () => {
-    const w = wallet({ chainId: '0x2105' });
+    const w = wallet({ chainId: '0xc4' });
     const f = fork();
     await sendAsUser(signerOf(w, f.access, false), USDC, DATA);
     const sent = w.calls.find((c) => c.method === 'eth_sendTransaction')!.params![0];
@@ -166,11 +166,11 @@ describe('on Base and Base Sepolia the wallet sends', () => {
 
 describe('the wallet is asked which network it is on before it signs (4.6)', () => {
   it('stops, with nothing signed, when the wallet stayed on another network', async () => {
-    const w = wallet({ chainId: '0x14a34' });
+    const w = wallet({ chainId: '0x7a0' });
     const f = fork();
     const sending = sendAsUser(signerOf(w, f.access, true), USDC, DATA);
     await expect(sending).rejects.toBeInstanceOf(WrongChainError);
-    await expect(sendAsUser(signerOf(w, f.access, true), USDC, DATA)).rejects.toThrow(/network 84532 and did not switch/);
+    await expect(sendAsUser(signerOf(w, f.access, true), USDC, DATA)).rejects.toThrow(/network 1952 and did not switch/);
     expect(w.methods()).not.toContain('eth_signTransaction');
     expect(f.sent).toHaveLength(0);
   });
@@ -182,7 +182,7 @@ describe('the wallet is asked which network it is on before it signs (4.6)', () 
 
   it('goes ahead when the switch errors but the wallet is already where it should be, and takes a numeric answer', async () => {
     await expect(sendAsUser(signerOf(wallet({ switchFails: true }), fork().access, true), USDC, DATA)).resolves.toMatch(/^0x/);
-    await expect(sendAsUser(signerOf(wallet({ chainId: 8453 }), fork().access, true), USDC, DATA)).resolves.toMatch(/^0x/);
+    await expect(sendAsUser(signerOf(wallet({ chainId: 196 }), fork().access, true), USDC, DATA)).resolves.toMatch(/^0x/);
   });
 });
 

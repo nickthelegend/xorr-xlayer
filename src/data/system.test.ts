@@ -1,34 +1,14 @@
 /**
- * The executor's answers, read the way the screens read them: an index day as a date, an export counted by its
+ * The executor's answers, read the way the screens read them: an export counted by its
  * records, and a daily limit drawn from one basis.
  *
  * Pure functions over response shapes. The transport is stubbed only because `system.ts` imports it — nothing here
  * makes a request — and the files are built the way `server/src/audit/log.ts` and `/pnl/disposals.csv` build them.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { exportRecords, indexDay, limitsView, type Limits } from './system';
+import { exportRecords, limitsView, type Limits } from './system';
 
 vi.mock('./api', () => ({ api: {}, ApiError: class ApiError extends Error {} }));
-
-describe('an index day reads as a date', () => {
-  it('turns the subgraph’s day number into the UTC day it counts', () => {
-    // The number the Spend screen printed, from `timestamp / 86400` in subgraph/src/mapping.ts.
-    expect(indexDay('20345')).toBe('Sep 14, 2025');
-    expect(indexDay('0')).toBe('Jan 1, 1970');
-    expect(indexDay(String(Date.UTC(2026, 8, 14) / 86_400_000))).toBe('Sep 14, 2026');
-  });
-
-  it('is the UTC day whatever zone the phone is in — the contract’s cap window is UTC', () => {
-    const lastSecond = Math.floor((Date.UTC(2026, 1, 28, 23, 59, 59) / 1000) / 86_400);
-    expect(indexDay(String(lastSecond))).toBe('Feb 28, 2026');
-  });
-
-  it('says it does not know rather than inventing a day', () => {
-    expect(indexDay('')).toBe('—');
-    expect(indexDay('soon')).toBe('—');
-    expect(indexDay('20345.5')).toBe('—');
-  });
-});
 
 describe('an export is counted by its records, not its lines', () => {
   const TRAIL_HEADER = 'seq,at,agent,action,detail,amount,kind,signature,prev_hash,hash';
@@ -38,7 +18,7 @@ describe('an export is counted by its records, not its lines', () => {
     const csv = [
       TRAIL_HEADER,
       '1,2026-09-14T09:00:00Z,xorr,Wallet connected,,,risk,,0x0,0x1',
-      '2,2026-09-14T09:05:00Z,xorr,Bought 0.1234 WETH,"$250 at $2,026.00. Weekly buy.",,trade,0xabc,0x1,0x2',
+      '2,2026-09-14T09:05:00Z,xorr,Bought 0.1234 XBTC,"$250 at $2,026.00. Weekly buy.",,trade,0xabc,0x1,0x2',
     ].join('\n');
     expect(exportRecords(`${csv}\n# chain_verified=true rows=2`, 'csv')).toBe(2);
   });
@@ -58,8 +38,8 @@ describe('an export is counted by its records, not its lines', () => {
   it('does not count the disposals file’s totals row as a sale', () => {
     const csv = [
       DISPOSALS_HEADER,
-      '2026-09-14T09:00:00.000Z,WETH,0.5,1250,1000,250,average_cost,yes',
-      '2026-09-14T10:00:00.000Z,CBBTC,0.001,95,0,0,average_cost,no',
+      '2026-09-14T09:00:00.000Z,XBTC,0.5,1250,1000,250,average_cost,yes',
+      '2026-09-14T10:00:00.000Z,WOKB,0.001,95,0,0,average_cost,no',
       ',,,,,250.00,,',
     ].join('\n');
     expect(exportRecords(csv, 'csv')).toBe(2);
@@ -67,7 +47,7 @@ describe('an export is counted by its records, not its lines', () => {
   });
 
   it('counts the pretty-printed trail’s rows, not its lines', () => {
-    const rows = [1, 2, 3].map((seq) => ({ seq, action: 'Skipped WETH', detail: 'The daily cap is spent.' }));
+    const rows = [1, 2, 3].map((seq) => ({ seq, action: 'Skipped XBTC', detail: 'The daily cap is spent.' }));
     const json = JSON.stringify({ walletId: 'w', verified: { ok: true, checked: 3, intact: 3 }, rows }, null, 2);
     expect(json.split('\n').length).toBeGreaterThan(20);
     expect(exportRecords(json, 'json')).toBe(3);

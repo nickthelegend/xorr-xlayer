@@ -34,14 +34,14 @@ export function humanWalletError(e: unknown): string {
     return 'You cancelled the signature, so nothing changed.';
   }
   /*
-   * The wallet has no ETH for the network fee on the chain the transaction goes to. On a fork build
-   * that used to be real Base whatever the screen showed — Privy sent there — and "have 0" was the
+   * The wallet has no OKB for the network fee on the chain the transaction goes to. On a fork build
+   * that used to be the real mainnet whatever the screen showed — Privy sent there — and "have 0" was the
    * truth about a chain the user was not looking at. A fork build now signs and the app sends to the
    * fork (`walletSignsOnly` in src/chain.ts), so this is the fork wallet's own balance, which the
    * faucet tops up.
    */
   if (/insufficient funds/i.test(raw)) {
-    return 'Your wallet has no ETH to pay the network fee, so the transaction was not sent.';
+    return 'Your wallet has no OKB to pay the network fee, so the transaction was not sent.';
   }
   if (/nonce too low|already known|replacement transaction underpriced/i.test(raw)) {
     return 'A transaction from this wallet is already in flight. Wait for it to settle, then try again.';

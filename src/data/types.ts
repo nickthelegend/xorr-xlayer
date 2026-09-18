@@ -29,8 +29,8 @@ export type Instrument = GradientStops & {
    * true (PLAN.md 3.18).
    */
   feed: 'live' | 'unavailable';
-  /** On-chain mint/market id where one exists — used by the price service and the executor. */
-  mint?: string;
+  /** The token contract where one exists on X Layer (a wrapped xStock's ERC-4626 wrapper) — used by the price service and the executor. */
+  address?: string;
 };
 
 export type AssetClass = {
@@ -99,7 +99,7 @@ export type ActivityEvent = {
   /**
    * A block-explorer URL, or a `fork:`/`local:` label when the chain has no explorer.
    *
-   * The label is deliberate: linking a fork transaction to BaseScan would 404, which reads as the
+   * The label is deliberate: linking a fork transaction to the OKLink explorer would 404, which reads as the
    * transaction not being real rather than the network not being public.
    */
   explorer?: string;
@@ -234,9 +234,9 @@ export type Wallet = {
   /**
    * The chain this wallet was created on — history, and left alone.
    *
-   * The union used to be `'devnet' | 'mainnet-beta'`, which are Solana clusters left over from
-   * before the pivot. The server has been sending `base-sepolia` and `base-fork` into it ever
-   * since, so the type was asserting something no value had ever satisfied.
+   * The union used to be `'devnet' | 'mainnet-beta'`, Solana clusters from an earlier build. The
+   * server sends its own chain keys into it (`xlayer`, `xlayer-testnet`, `xlayer-fork`), so the type
+   * is a string rather than a list no value would satisfy.
    */
   cluster: string;
   /** Where the executor is settling RIGHT NOW. This is what a user means by "which network". */
@@ -375,7 +375,7 @@ export type PrivyPolicyView = {
 };
 
 /**
- * What Base has been told about this wallet's audit trail.
+ * What X Layer has been told about this wallet's audit trail.
  *
  * `state` is the whole point and its three values are not degrees of one thing:
  *
@@ -383,7 +383,7 @@ export type PrivyPolicyView = {
  * - `ahead`    — more rows have been written since the last anchor. The ordinary state between
  *                anchors, and a pass only because the server re-hashes the row AT the anchored
  *                length before saying it.
- * - `diverged` — the trail changed underneath a commitment Base already holds. The alarm.
+ * - `diverged` — the trail changed underneath a commitment X Layer already holds. The alarm.
  * - `none`     — nothing has been anchored for this wallet yet.
  */
 export type AuditAnchor = {
@@ -407,33 +407,28 @@ export type AnchorReport = {
 };
 
 /**
- * What each settlement venue would give for the same trade.
+ * What each X Layer venue would give for the same trade — `GET /route/compare`, field for field.
  *
- * A refusal is an answer here, not an omission: "no maker book is deep enough at $2,500" is the
- * information, and a comparison that dropped the venues which could not serve would read as
- * "1inch is the only venue" — a different and false claim.
+ * A refusal is an answer here, not an omission: "this deployment has no OKX DEX API key" is the
+ * information, and a comparison that dropped the venues which could not answer would read as
+ * "Uniswap v3 is the only venue" — a different and false claim.
  */
-export type VenueQuote =
-  | {
-      venue: 'aqua' | 'swapvm' | '1inch';
-      served: true;
-      outAmount: number;
-      detail: string;
-      /** What the transaction costs to send, and what is left after paying it. Never zero for
-       *  "unknown" — a cost we could not measure is absent, not free. */
-      gasUsd?: number;
-      netUsd?: number;
-    }
-  | { venue: 'aqua' | 'swapvm' | '1inch'; served: false; reason: string };
+export type VenueQuote = {
+  /** The venue's display name: `Uniswap v3`, `OKX DEX`. */
+  venue: string;
+  /** What it would deliver, in the out token's units. Null when it could not answer. */
+  outAmount: number | null;
+  /** Why it could not answer, in the venue's own words. Null when it did. */
+  unavailable: string | null;
+};
 
 export type RouteComparison = {
   inSymbol: string;
   outSymbol: string;
   amount: number;
-  quotes: VenueQuote[];
-  best?: 'aqua' | 'swapvm' | '1inch';
-  /** The winner AFTER gas. Undefined unless every served venue could be costed. */
-  bestNet?: 'aqua' | 'swapvm' | '1inch';
-  /** Undefined when only one venue served — "better than nothing" is not a margin. */
-  edgeBps?: number;
+  venues: VenueQuote[];
+  /** The venue that delivers the most, or null when none answered. */
+  best: string | null;
+  /** How much more the best delivers than the next, in basis points. Null with fewer than two answers — "better than nothing" is not a margin. */
+  edgeBps: number | null;
 };

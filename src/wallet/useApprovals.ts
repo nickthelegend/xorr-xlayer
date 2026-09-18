@@ -40,12 +40,17 @@ export type TokenApproval = {
   unread?: boolean;
 };
 
-/** One spender and what the wallet lets it pull (PLAN.md 3.12). `tokens` is null when the spender could not be read. */
+/**
+ * One spender and what the wallet lets it pull (PLAN.md 3.12). `tokens` is null when the spender could not be read.
+ *
+ * On X Layer the `router` entries are the venue contracts a fill approves for one trade and resets: `Uniswap v3 router`,
+ * and — where mainnet state is — `OKX DEX approval contract`. Every allowance is read from the chain.
+ */
 export type ApprovalSpender = {
   role: 'delegation' | 'router';
   name: string;
   address: Address | null;
-  source: '1inch' | 'chain' | null;
+  source: 'chain' | null;
   tokens: TokenApproval[] | null;
   unread?: boolean;
 };

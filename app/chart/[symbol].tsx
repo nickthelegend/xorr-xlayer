@@ -93,7 +93,7 @@ export default function ProChart() {
   /** The OHLC of the chosen bar. Guarded, because a stale index must not read past the end. */
   const picked = sel !== null && sel >= 0 && sel < series.length ? series[sel]! : null;
 
-  // The token this market trades as — BTC buys cbBTC — asked of the executor, as on the asset screen.
+  // The token this market trades as — BTC buys XBTC — asked of the executor, as on the asset screen.
   const settleable = useSettleable(symbol);
   const into = settlementSymbol(symbol);
 

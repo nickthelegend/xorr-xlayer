@@ -18,7 +18,7 @@ type LogoResponse = Record<string, { url: string | null }>;
  * When to ask again for symbols the server left out (2026-09-16).
  *
  * A symbol the server could not resolve inside its deadline is absent from its answer, and it goes on resolving there. The
- * hook asked once, so an absent symbol stayed "still resolving" for as long as the screen was open: NVDAc and TSLAc sat on
+ * hook asked once, so an absent symbol stayed "still resolving" for as long as the screen was open: NVDAx and TSLAx sat on
  * Home's Stocks tab with no mark. Three more asks, further apart; after the last, those rows take their gradient for this
  * visit, and the next screen that asks starts over.
  */
@@ -135,7 +135,7 @@ export function useLogos(symbols: readonly string[]): Record<string, string | nu
  * The mark for a futures contract (2026-09-16): the registry's logo where one resolved, and otherwise the venue's own icon
  * for the contract it lists.
  *
- * The futures come from Hyperliquid, and nearly every contract there (REZ, INJ, SOPH…) is in neither the 1inch registry nor
+ * The futures come from Hyperliquid, and nearly every contract there (REZ, INJ, SOPH…) is in neither the token registry nor
  * the CoinGecko batch, so the list was a column of grey gradients. The venue publishes an icon per contract; one it has
  * none for fails to load and `AssetMark` keeps the gradient, with its skeleton while the icon is on its way.
  */

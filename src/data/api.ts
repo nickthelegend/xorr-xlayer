@@ -46,7 +46,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 const READ_TIMEOUT_MS = 45_000;
 /*
  * Deliberately above the slowest write this executor has actually produced — a `POST /orders`
- * measured at 153s while 1inch's lane was congested. A write that gives up EARLIER than the server
+ * measured at 153s while the venue's lane was congested (on the Base build). A write that gives up EARLIER than the server
  * answers is worse than no bound at all: the trade may well have executed, and a screen that says
  * "did not answer" invites a retry that spends twice. Hence the ceiling, and hence the wording of
  * the error, which never claims nothing happened.

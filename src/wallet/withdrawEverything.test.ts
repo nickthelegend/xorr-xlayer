@@ -18,7 +18,7 @@ const account = (seed: string) => privateKeyToAccount(keccak256(toHex(seed))).ad
 const OWNER = account('xorr/withdraw-everything/owner');
 const COLD = account('xorr/withdraw-everything/cold-storage');
 const STRANGER = account('xorr/withdraw-everything/stranger');
-const USDC: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const USDC: Address = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
 const POOL_ABI = parseAbi(['function withdraw(address asset, uint256 amount, address to) returns (uint256)']);
 const hash = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex;
 
@@ -56,8 +56,8 @@ function harness(over: (calls: string[]) => Partial<WithdrawEverythingDeps> = ()
       calls.push('preview');
       return {
         legs: [
-          { symbol: 'WETH', units: 0.5, usd: 1_200 },
-          { symbol: 'CBBTC', units: 0.001, usd: 95 },
+          { symbol: 'XBTC', units: 0.5, usd: 1_200 },
+          { symbol: 'WOKB', units: 0.001, usd: 95 },
         ],
         totalUsd: 1_295,
         dustBelowUsd: 1,
@@ -106,8 +106,8 @@ describe('withdraw everything', () => {
     expect(statuses(out.steps)).toEqual(['sell:done', 'aave:done', 'send:done']);
     expect(calls).toEqual([
       'preview',
-      'close WETH',
-      'close CBBTC',
+      'close XBTC',
+      'close WOKB',
       'aave position',
       'aave calldata',
       `sign ${AAVE_V3_POOL}`,
@@ -147,25 +147,25 @@ describe('withdraw everything', () => {
     expect(out.ok).toBe(false);
     expect(statuses(out.steps)).toEqual(['sell:failed', 'aave:waiting', 'send:waiting']);
     expect(out.steps[0]!.detail).toContain('The trading permission is revoked or expired');
-    expect(calls).toEqual(['preview', 'close WETH']);
+    expect(calls).toEqual(['preview', 'close XBTC']);
     expect(deps.sign).not.toHaveBeenCalled();
   });
 
   it('stops on a sale the venue could not fill, in the executor’s words', async () => {
     const { deps } = harness(() => ({
-      close: vi.fn(async (): Promise<CloseOutcome> => ({ status: 'failed', symbol: 'WETH', error: 'The price moved past your slippage.' })),
+      close: vi.fn(async (): Promise<CloseOutcome> => ({ status: 'failed', symbol: 'XBTC', error: 'The price moved past your slippage.' })),
     }));
     const out = await withdrawEverything(deps, quietly);
     expect(statuses(out.steps)).toEqual(['sell:failed', 'aave:waiting', 'send:waiting']);
-    expect(out.steps[0]!.lines).toEqual([{ tone: 'failed', text: 'WETH was not sold: The price moved past your slippage.' }]);
+    expect(out.steps[0]!.lines).toEqual([{ tone: 'failed', text: 'XBTC was not sold: The price moved past your slippage.' }]);
   });
 
   it('leaves a position already gone, or worth less than the gas, and carries on', async () => {
     const { deps } = harness(() => ({
       close: vi.fn(
         async (symbol: string): Promise<CloseOutcome> =>
-          symbol === 'WETH'
-            ? { status: 'blocked', reason: 'not_held', detail: 'No WETH to sell.' }
+          symbol === 'XBTC'
+            ? { status: 'blocked', reason: 'not_held', detail: 'No XBTC to sell.' }
             : { status: 'blocked', reason: 'dust', detail: 'Worth less than $1 — the gas would cost more than the sale returns.' },
       ),
     }));
@@ -179,7 +179,7 @@ describe('withdraw everything', () => {
     const { deps, calls } = harness((calls) => ({
       sellPreview: vi.fn(async () => {
         calls.push('preview');
-        return { legs: [], totalUsd: 0, dustBelowUsd: 1, skipped: ['CBBTC'] };
+        return { legs: [], totalUsd: 0, dustBelowUsd: 1, skipped: ['WOKB'] };
       }),
       aavePosition: vi.fn(async () => {
         calls.push('aave position');
@@ -190,7 +190,7 @@ describe('withdraw everything', () => {
 
     expect(out.ok).toBe(true);
     expect(out.steps[0]!.detail).toContain('Nothing to sell.');
-    expect(out.steps[0]!.detail).toContain('CBBTC stays');
+    expect(out.steps[0]!.detail).toContain('WOKB stays');
     expect(calls).toEqual(['preview', 'aave position', `prepare USDC to ${COLD}`, `sign ${USDC}`, `record ${hash(101)}`]);
     expect(deps.close).not.toHaveBeenCalled();
     expect(deps.aaveWithdrawCall).not.toHaveBeenCalled();

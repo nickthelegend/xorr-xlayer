@@ -27,7 +27,7 @@ const { useStore } = await import('./store');
 const WALLET: Wallet = {
   address: '0x95A0b368588713011a15f4b1041423f31B08e615',
   kind: 'embedded',
-  cluster: 'base-fork',
+  cluster: 'xlayer-fork',
 };
 
 describe('forgetAccount', () => {

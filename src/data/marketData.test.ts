@@ -136,7 +136,7 @@ describe('what each pill and range asks the executor for', () => {
       const url = String(input);
       asked.push(url);
       const body = url.includes('/market/symbols')
-        ? ['BTC', 'WETH']
+        ? ['BTC', 'XBTC']
         : url.includes('/market/ohlc')
           ? { rows: feedRows(url) }
           : {};
@@ -181,13 +181,15 @@ describe('what each pill and range asks the executor for', () => {
   });
 
   it('asks no history for a symbol nothing prices, and says so with null', async () => {
-    expect(await fetchHistory('SPYx', '1M')).toBeNull();
-    expect(await fetchChartCandles('NVDAc', '1H')).toBeNull();
+    expect(await fetchHistory('IWM', '1M')).toBeNull();
+    expect(await fetchChartCandles('NVDAx', '1H')).toBeNull();
     expect(ohlcDays()).toEqual([]);
   });
 
   it('knows a tokenized share by its suffix, and nothing else as one', () => {
-    expect(isStockSymbol('NVDAc')).toBe(true);
-    for (const s of ['BTC', 'CBBTC', 'WETH', 'SPYx']) expect(isStockSymbol(s)).toBe(false);
+    expect(isStockSymbol('NVDAx')).toBe(true);
+    // SPYx is a wrapped xStock on X Layer, a fund rather than a company, and priced the same way.
+    expect(isStockSymbol('SPYx')).toBe(true);
+    for (const s of ['BTC', 'XBTC', 'WOKB', 'USDC', 'WETH']) expect(isStockSymbol(s)).toBe(false);
   });
 });

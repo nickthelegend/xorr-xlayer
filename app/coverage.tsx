@@ -57,7 +57,7 @@ export default function Coverage() {
      * Through `settlementSymbol`, not by matching the ticker.
      *
      * This compared raw symbols and told the reader that BTC was "a chart, not an order" — while
-     * the app offers a Buy for it, because buying BTC here means buying cbBTC. `SETTLES_AS` exists
+     * the app offers a Buy for it, because buying BTC here means buying XBTC. `SETTLES_AS` exists
      * for exactly that: the market is real and the instrument representing it on this chain has a
      * different ticker. Saying a tradable market cannot be traded is the confidently-wrong answer
      * this screen was built to prevent, and it was the screen giving it.

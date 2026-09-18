@@ -31,7 +31,7 @@ export const newsFixtures: NewsItem[] = [
     "id": "news-2",
     "tag": "ON-CHAIN",
     "t": "5h",
-    "headline": "Solana staking yield ticks up",
+    "headline": "Aave supply rate on X Layer ticks up",
     "take": "Yield Keeper: moved $1,240 of idle cash in. Unlock is 3 days.",
     "tagBg": "rgba(73,227,155,.16)",
     "tagFg": "#49E39B"

@@ -3,7 +3,7 @@
  *
  * Opened from a position, and built on one rule: every line is a recorded value or an admission
  * that there is none. A field we could not read says "No record" in words rather than showing a
- * dash, because a dash in a column of numbers reads as zero — and "nobody can freeze this token"
+ * dash, because a dash in a column of numbers reads as zero — and "nobody can pause this token"
  * and "we could not find out who can" are opposite facts about a security.
  *
  * The attestation always carries its age. "1.0011x backed" with no time attached reads as "right
@@ -146,20 +146,22 @@ export function BackingDrawer({
             <Text variant="eyebrow" color={colors.ink30}>
               ISSUER CONTROLS
             </Text>
-            <Field label="CAN SEIZE (PERMANENT DELEGATE)" value={short(issuer.permanentDelegate)} />
-            <Field label="CAN FREEZE ACCOUNTS" value={short(issuer.freezeAuthority)} />
-            <Field label="CAN MINT" value={short(issuer.mintAuthority)} />
+            <Field label="OWNER (CAN REASSIGN EVERY ROLE)" value={short(issuer.owner)} />
+            <Field label="CAN MINT" value={short(issuer.minter)} />
             <Field
               label="CAN PAUSE ALL TRANSFERS"
+              value={issuer.pauser ? `${short(issuer.pauser)}${issuer.paused ? ' · PAUSED NOW' : ''}` : null}
+            />
+            <Field label="CAN CHANGE THE MULTIPLIER" value={short(issuer.multiplierUpdater)} />
+            <Field label="SANCTIONS LIST" value={short(issuer.sanctionsList)} />
+            <Field label="CAN UPGRADE THE CONTRACT" value={short(issuer.upgradeAdmin)} />
+            <Field
+              label="WRAPPER PAUSER"
               value={
-                issuer.pausable
-                  ? `${short(issuer.pausable.authority)}${issuer.pausable.paused ? ' · PAUSED NOW' : ''}`
+                detail.wrapper.pauser
+                  ? `${short(detail.wrapper.pauser)}${detail.wrapper.paused ? ' · PAUSED NOW' : ''}`
                   : null
               }
-            />
-            <Field
-              label="TRANSFER ALLOW-LIST"
-              value={issuer.transferHookProgram ? short(issuer.transferHookProgram) : 'None configured'}
             />
           </View>
 

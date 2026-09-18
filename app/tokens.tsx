@@ -7,7 +7,7 @@
  * ever fill — and the fix was a list nobody could see.
  *
  * Addresses in full. A token is identified by its address and nothing else, and a symbol is a label
- * anyone can reuse; a reader checking that `NVDAc` is the contract they think it is needs the whole
+ * anyone can reuse; a reader checking that `NVDAx` is the contract they think it is needs the whole
  * thing, not the first six characters of it.
  */
 import React, { useMemo } from 'react';

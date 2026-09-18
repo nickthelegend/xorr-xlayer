@@ -45,8 +45,8 @@ const CADENCES = [
 ] as const satisfies readonly { value: Cadence; label: string }[];
 
 /**
- * What a recurring buy can actually buy. These are the Base tokens the executor can route
- * through 1inch and settle through XorrDelegation — offering a symbol it cannot route would
+ * What a recurring buy can actually buy. These are the tokens the executor can route and
+ * settle through XorrDelegation — offering a symbol it cannot route would
  * let a user schedule a strategy that can never execute.
  *
  * The list is `RECURRING_BUY_SYMBOLS`, kept with the ladder and shared with the backtest, which had
@@ -65,7 +65,7 @@ export default function DcaSetup() {
   const goBack = useGoBack();
   const [amount, setAmount] = useState('50');
   const [cadence, setCadence] = useState<Cadence>('weekly');
-  const [symbol, setSymbol] = useState<Symbol>('WETH');
+  const [symbol, setSymbol] = useState<Symbol>(RECURRING_BUY_SYMBOLS[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const signedOut = useSignedOut();

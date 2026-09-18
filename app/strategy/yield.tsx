@@ -290,8 +290,8 @@ export default function YieldSetup() {
       {/*
         A sweep that cannot run is not worth creating.
         
-        The rate above is Base mainnet's, on every build, because asking Sepolia for it returns a
-        zeroed reserve and therefore a confident 0.00% — the yield module says so at length. But
+        The rate above is X Layer mainnet's, on every build, because the testnet has no lending pool
+        to ask — the yield module says so at length. But
         the executor's own planner checks `getCode` on the pool before it will supply anything and
         returns null when there is nothing there, so on a build without Aave this screen was
         offering to schedule a strategy guaranteed to do nothing on every run, for ever, silently.

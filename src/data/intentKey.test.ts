@@ -49,18 +49,18 @@ describe('a key', () => {
 
 describe('an intent', () => {
   it('is the same ask however its fields were put together', () => {
-    expect(intentOf({ from: 'USDC', to: 'WETH', amount: '100', slippagePct: 0.3 })).toBe(
-      intentOf({ slippagePct: 0.3, amount: '100', to: 'WETH', from: 'USDC' }),
+    expect(intentOf({ from: 'USDC', to: 'XBTC', amount: '100', slippagePct: 0.3 })).toBe(
+      intentOf({ slippagePct: 0.3, amount: '100', to: 'XBTC', from: 'USDC' }),
     );
   });
 
   it('is another ask when the amount, the token, the side or the tolerance changes', () => {
-    const buy = intentOf({ side: 'buy', symbol: 'WETH', usd: 250 });
-    expect(intentOf({ side: 'buy', symbol: 'WETH', usd: 251 })).not.toBe(buy);
-    expect(intentOf({ side: 'buy', symbol: 'CBBTC', usd: 250 })).not.toBe(buy);
-    expect(intentOf({ side: 'sell', symbol: 'WETH', usd: 250 })).not.toBe(buy);
-    const swap = intentOf({ from: 'USDC', to: 'WETH', amount: '100', slippagePct: 0.3 });
-    expect(intentOf({ from: 'USDC', to: 'WETH', amount: '100', slippagePct: 0.5 })).not.toBe(swap);
+    const buy = intentOf({ side: 'buy', symbol: 'XBTC', usd: 250 });
+    expect(intentOf({ side: 'buy', symbol: 'XBTC', usd: 251 })).not.toBe(buy);
+    expect(intentOf({ side: 'buy', symbol: 'WOKB', usd: 250 })).not.toBe(buy);
+    expect(intentOf({ side: 'sell', symbol: 'XBTC', usd: 250 })).not.toBe(buy);
+    const swap = intentOf({ from: 'USDC', to: 'XBTC', amount: '100', slippagePct: 0.3 });
+    expect(intentOf({ from: 'USDC', to: 'XBTC', amount: '100', slippagePct: 0.5 })).not.toBe(swap);
   });
 
   it('keeps its key when asked again, and gets a new one when anything else is asked', () => {
@@ -102,7 +102,7 @@ describe('whether an attempt’s outcome is known', () => {
 });
 
 describe('a screen’s keys', () => {
-  const buy = { side: 'buy', symbol: 'WETH', usd: 250 };
+  const buy = { side: 'buy', symbol: 'XBTC', usd: 250 };
 
   it('send the same key when the same order is tapped again after a timeout', async () => {
     const keys = numbered();

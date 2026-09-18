@@ -35,6 +35,13 @@ export function AppPrivyProvider({ children }: { children: React.ReactNode }) {
           theme: 'dark',
           accentColor: colors.ink,
           showWalletLoginFirst: false,
+          /*
+           * "Continue with a wallet" (P4.10, D17): OKX Wallet first — it is the wallet X Layer's own users hold — then
+           * whatever the browser has injected, then Privy's defaults. `okx_wallet` is Privy's own id for it
+           * (`WalletListEntry` in @privy-io/react-auth). EVM only: the app signs on X Layer, nothing else.
+           */
+          walletList: ['okx_wallet', 'detected_ethereum_wallets', 'metamask', 'coinbase_wallet', 'rainbow', 'wallet_connect'],
+          walletChainType: 'ethereum-only',
         },
       }}
     >

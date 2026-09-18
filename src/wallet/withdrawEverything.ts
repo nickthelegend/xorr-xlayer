@@ -47,12 +47,13 @@ import type {
 } from '@/data/withdrawals';
 
 /**
- * The Aave v3 Pool on Base.
+ * The Aave v3 Pool on X Layer mainnet — the address `AAVE_V3_POOL_MAINNET` in `server/src/evm/chains.ts`
+ * (read on chain 2026-09-19). The X Layer testnet has no lending pool, so there no exit is ever offered.
  *
  * Written here rather than taken from the executor: it is the one contract an exit from Aave may be
  * addressed to, and a signature is too late a place to learn that the executor thought otherwise.
  */
-export const AAVE_V3_POOL: Address = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
+export const AAVE_V3_POOL: Address = '0xE3F3Caefdd7180F884c01E57f65Df979Af84f116';
 
 const POOL_ABI = parseAbi(['function withdraw(address asset, uint256 amount, address to) returns (uint256)']);
 

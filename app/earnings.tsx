@@ -36,8 +36,8 @@ import {
 import { useAsync } from '@/data/useAsync';
 import { system } from '@/data/system';
 
-/** The tokenized equities, which are the only symbols the filing record can answer for. */
-const EQUITIES = ['NVDAc', 'AAPLc', 'TSLAc', 'METAc', 'MSFTc', 'AMZNc', 'GOOGLc', 'MSTRc'] as const;
+/** The tokenized equities that are companies (not funds), which are the only symbols the filing record can answer for. */
+const EQUITIES = ['NVDAx', 'AAPLx', 'TSLAx', 'METAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'MSTRx'] as const;
 type Equity = (typeof EQUITIES)[number];
 
 const day = (ms: number) => new Date(ms).toLocaleDateString('en-US', {

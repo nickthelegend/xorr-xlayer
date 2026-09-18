@@ -3,15 +3,16 @@
  *
  * The grant, the approvals, revoking and withdrawing are signed by the user's own Privy wallet, never by the executor.
  * Privy's embedded wallet previews and broadcasts `eth_sendTransaction` through Privy's own RPC for a chain it knows,
- * and a fork of Base is chain 8453 — indistinguishable from real Base. On a fork build every one of those transactions
- * was simulated against real Base, where the wallet holds nothing, and refused with a balance nobody was looking at.
+ * and a fork of X Layer is chain 196 — indistinguishable from real X Layer. On a fork build every one of those
+ * transactions would be simulated against the real mainnet, where the wallet holds nothing, and refused with a balance
+ * nobody was looking at.
  *
  * `eth_signTransaction` only signs. So where Privy's chain is not this build's chain, the nonce, gas and fees are read
  * from the fork, the wallet signs exactly that, the signed bytes are checked against what was asked — network, nonce,
  * destination, calldata, value and signer — and the app broadcasts them to the fork itself. Proven against Privy's
- * wallet API on the Railway fork (`tools/prove-user-signing.ts`): Privy signed for chain 8453 without consulting real
- * Base, and the fork mined the transaction. On Base and Base Sepolia the wallet still sends: there Privy's RPC is the
- * chain.
+ * wallet API on a fork (`tools/prove-user-signing.ts`, first proven on the Base build): Privy signed for the chain id
+ * without consulting the real chain, and the fork mined the transaction. On X Layer mainnet and testnet the wallet still
+ * sends: there Privy's RPC is the chain.
  *
  * Either way the wallet is put on this build's chain first, and then ASKED which chain it is on (4.6). The switch used
  * to fail quietly, leaving a grant signed for another network, which the executor then never saw.

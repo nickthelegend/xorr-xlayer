@@ -22,7 +22,7 @@ export interface TimedFill {
   at: number;
   side: MarkSide;
   price: number;
-  /** The recorded venue (`jupiter-route`, `venue-vault`, …). Null or absent: the run recorded none. */
+  /** The recorded venue (`uniswap-v3`, `okx-dex`, …). Null or absent: the run recorded none. */
   venue?: string | null;
   /** The run's id, for opening its receipt. */
   id?: string;
@@ -138,8 +138,8 @@ export function candleMarks(fills: readonly TimedFill[], spans: readonly Span[])
 /**
  * What a mark says when it is inspected: which way the fill went, and where it filled.
  *
- * The venue comes from `venueNaming`, the one place this app names a venue, so a `venue-vault` settlement reads
- * "Venue vault" and is never called a swap or a route — the vault settled it at a quoted price and executed no route.
+ * The venue comes from `venueNaming`, the one place this app names a venue, so an `aave` supply reads "Aave" and is
+ * never called a swap or a route — cash went into a lending pool and nothing was traded.
  * A fill whose run recorded no venue says so, rather than borrowing one.
  */
 export function markDetail(m: Pick<MarkedFill, 'side' | 'venue'>): { action: string; venue: string; routed?: boolean } {

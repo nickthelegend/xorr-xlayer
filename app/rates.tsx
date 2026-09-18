@@ -2,11 +2,11 @@
  * What idle cash earns, and where the number comes from.
  *
  * The yield screen offers the way out. This is the rate itself: read as `currentLiquidityRate` from
- * the Aave v3 pool on Base, which is a floating number that changes with utilisation and is not a
+ * the Aave v3 pool on X Layer, which is a floating number that changes with utilisation and is not a
  * promise. The distinction matters because a rate presented as a product feature reads as a
  * guarantee, and this one is neither ours to set nor stable.
  *
- * The rate is read from Base mainnet on every build, so it is real everywhere; a rate the executor
+ * The rate is read from X Layer mainnet (or the fork's own state) on every build, so it is real everywhere; a rate the executor
  * cannot read is a 503 with a sentence and a retry, never a number. It can be earned only where the
  * pool is deployed, which `availableHere` says. Where it is not, the card says so, and nothing below
  * offers to earn it.

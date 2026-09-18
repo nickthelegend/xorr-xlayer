@@ -6,13 +6,13 @@
  * would be sent with, the pools it routes through — and none of it was on screen. A ticket that
  * hides those asks somebody to agree to a number it has not shown them.
  *
- * Every figure here comes from a real Jupiter quote for the real size, re-asked as the size changes
- * and debounced so the aggregator is not queried on every keypress. A figure the venue did not
+ * Every figure here comes from a real Uniswap v3 quote for the real size, re-asked as the size changes
+ * and debounced so the quoter is not asked on every keypress. A figure the venue did not
  * report says "Not reported"; it never becomes a zero, which on this screen would read as a cost
  * that was measured and found to be nothing.
  *
  * The confirm is deliberately not here. `executor/place.ts` is the only path that can spend, and no
- * HTTP route reaches it for a Solana equity yet — so this screen says what the order would cost and
+ * HTTP route reaches it for an xStock yet — so this screen says what the order would cost and
  * says plainly that it cannot yet be placed from the phone. A button that did nothing would be the
  * worse answer, and a button that pretended would be the worst.
  */

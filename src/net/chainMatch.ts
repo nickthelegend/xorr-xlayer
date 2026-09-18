@@ -4,7 +4,7 @@
  * `src/chain.ts` says, in as many words, that the app and the executor "have to agree about which chain they
  * are on, and the only way to be sure is for both to read it from the same name in the same `.env`". Nothing
  * checked that they did. Two names in two files agreeing by convention is not agreement, and the ways they
- * come apart are ordinary: a build made for Base Sepolia with `EXPO_PUBLIC_API_URL` still pointed at the
+ * come apart are ordinary: a build made for the X Layer testnet with `EXPO_PUBLIC_API_URL` still pointed at the
  * fork executor, a fork executor redeployed onto mainnet, a web bundle cached across a redeploy.
  *
  * What goes wrong when they do is not subtle, and it is not recoverable by anything the user does:
@@ -22,7 +22,7 @@
  * show, and the kill switch would be signed on the wrong chain too.
  *
  * Pure, and keyed on the chain KEY rather than on a chain id, because the key is the contract. Two of the
- * four keys answer the same `eth_chainId` as Base — a fork of Base is 8453 — so an id comparison would call
+ * four keys answer the same `eth_chainId` as X Layer mainnet — a fork of X Layer is 196 — so an id comparison would call
  * a fork build talking to a mainnet executor a match, which is precisely the dangerous case.
  */
 

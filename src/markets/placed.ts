@@ -7,7 +7,7 @@
  * `intentKey.ts` makes the retry safe: the same ask tapped again after a timeout carries the same
  * `Idempotency-Key`, the executor answers it with what the first attempt did, and no second order is placed.
  * All of that works, and until now none of it was visible. The replayed answer is byte for byte the first
- * one, so the ticket rendered "Bought 0.0412 WETH" a second time, for a fill that happened minutes ago.
+ * one, so the ticket rendered "Bought 0.0412 XBTC" a second time, for a fill that happened minutes ago.
  *
  * That is the wrong sentence in the one place it matters most. Someone who tapped again because they were
  * not sure whether the first went through reads a second confirmation and concludes they bought twice. The

@@ -118,11 +118,11 @@ describe('an entry or exit, inspected (FEATURES.md #77)', () => {
   const times = [0, 10, 20];
 
   it('keeps the fill’s own recorded time, venue and run — not the time of the point it sits beside', () => {
-    const fill: TimedFill = { at: 13, side: 'sell', price: 101.5, venue: 'jupiter-route', id: 'run-1' };
+    const fill: TimedFill = { at: 13, side: 'sell', price: 101.5, venue: 'uniswap-v3', id: 'run-1' };
     const [onLine] = lineMarks([fill], times);
-    expect(onLine).toEqual({ position: 1.3, side: 'sell', price: 101.5, at: 13, venue: 'jupiter-route', id: 'run-1' });
+    expect(onLine).toEqual({ position: 1.3, side: 'sell', price: 101.5, at: 13, venue: 'uniswap-v3', id: 'run-1' });
     const [inCandle] = candleMarks([fill], [{ start: 10, end: 20 }]);
-    expect(inCandle).toEqual({ index: 0, side: 'sell', price: 101.5, at: 13, venue: 'jupiter-route', id: 'run-1' });
+    expect(inCandle).toEqual({ index: 0, side: 'sell', price: 101.5, at: 13, venue: 'uniswap-v3', id: 'run-1' });
   });
 
   it('adds no venue or run the fill did not have', () => {
@@ -131,15 +131,15 @@ describe('an entry or exit, inspected (FEATURES.md #77)', () => {
     expect(m).not.toHaveProperty('id');
   });
 
-  it('names a Jupiter route as routed, and a venue-vault settlement as the vault — never a swap', () => {
-    expect(markDetail({ side: 'buy', venue: 'jupiter-route' })).toEqual({
+  it('names a Uniswap v3 swap as routed, and an Aave supply as Aave — never a trade', () => {
+    expect(markDetail({ side: 'buy', venue: 'uniswap-v3' })).toEqual({
       action: 'Bought',
-      venue: 'Jupiter route',
+      venue: 'Uniswap v3',
       routed: true,
     });
-    const vault = markDetail({ side: 'sell', venue: 'venue-vault' });
-    expect(vault).toEqual({ action: 'Sold', venue: 'Venue vault', routed: false });
-    expect(`${vault.action} ${vault.venue}`).not.toMatch(/swap|route|jupiter/i);
+    const supply = markDetail({ side: 'sell', venue: 'aave' });
+    expect(supply).toEqual({ action: 'Sold', venue: 'Aave', routed: false });
+    expect(supply.venue).not.toMatch(/swap|route|uniswap/i);
   });
 
   it('says a venue was not recorded rather than borrowing one, and shows one it cannot name verbatim', () => {

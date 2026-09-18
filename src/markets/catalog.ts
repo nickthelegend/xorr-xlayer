@@ -19,7 +19,7 @@ export const ALL_SECTORS = 'All';
 /**
  * The filter's options: every sector the catalog uses, behind "All".
  *
- * The sectors come from the server, derived there from the tokens themselves, so a mint added under
+ * The sectors come from the server, derived there from the tokens themselves, so an xStock added under
  * a new sector reaches this filter without anyone editing a second list.
  */
 export function sectorOptions(sectors: readonly string[]): string[] {

@@ -20,17 +20,18 @@ import {
 const DAY = 86_400_000;
 const MAX = (1n << 256n) - 1n;
 const CONTRACT = '0x6c5528Fd8E74a047A85bAb413856A9239E73540e';
-const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const WETH = '0x4200000000000000000000000000000000000006';
-const CBBTC = '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf';
+// X Layer mainnet tokens (`server/src/evm/chains.ts`).
+const USDC = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
+const XBTC = '0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f';
+const WOKB = '0xe538905cf8410324e03A5A23C1c177a474D59b2b';
 
 const params: GrantParams = {
   contract: CONTRACT,
   token: USDC,
   tokens: [
     { symbol: 'USDC', address: USDC },
-    { symbol: 'WETH', address: WETH },
-    { symbol: 'CBBTC', address: CBBTC },
+    { symbol: 'XBTC', address: XBTC },
+    { symbol: 'WOKB', address: WOKB },
   ],
 };
 
@@ -42,8 +43,8 @@ function freshlyGranted(capUsd: number): OwnerAllowances {
     spender: CONTRACT,
     tokens: [
       { address: USDC, allowance: (usdc(capUsd) * 30n).toString() },
-      { address: WETH, allowance: MAX.toString() },
-      { address: CBBTC, allowance: MAX.toString() },
+      { address: XBTC, allowance: MAX.toString() },
+      { address: WOKB, allowance: MAX.toString() },
     ],
   };
 }
@@ -91,7 +92,7 @@ describe('the approvals a resume asks for', () => {
   });
 
   it('are exactly the one that was taken back', () => {
-    expect(ask(withAllowance(freshlyGranted(400), WETH, '0'))).toEqual([WETH]);
+    expect(ask(withAllowance(freshlyGranted(400), XBTC, '0'))).toEqual([XBTC]);
     expect(ask(withAllowance(freshlyGranted(400), USDC, '0'))).toEqual([USDC]);
   });
 
@@ -108,23 +109,23 @@ describe('the approvals a resume asks for', () => {
   });
 
   it('count a sold token as enough while it is unlimited, not only at max uint256', () => {
-    expect(ask(withAllowance(freshlyGranted(400), WETH, (MAX - 10n ** 18n).toString()))).toEqual([]);
-    // The fork tooling's 2^255, after a sale took one WETH of it.
-    expect(ask(withAllowance(freshlyGranted(400), WETH, ((1n << 255n) - 10n ** 18n).toString()))).toEqual([]);
-    expect(ask(withAllowance(freshlyGranted(400), WETH, EFFECTIVELY_UNLIMITED.toString()))).toEqual([]);
-    expect(ask(withAllowance(freshlyGranted(400), WETH, (EFFECTIVELY_UNLIMITED - 1n).toString()))).toEqual([
-      WETH,
+    expect(ask(withAllowance(freshlyGranted(400), XBTC, (MAX - 10n ** 18n).toString()))).toEqual([]);
+    // The fork tooling's 2^255, after a sale took one XBTC of it.
+    expect(ask(withAllowance(freshlyGranted(400), XBTC, ((1n << 255n) - 10n ** 18n).toString()))).toEqual([]);
+    expect(ask(withAllowance(freshlyGranted(400), XBTC, EFFECTIVELY_UNLIMITED.toString()))).toEqual([]);
+    expect(ask(withAllowance(freshlyGranted(400), XBTC, (EFFECTIVELY_UNLIMITED - 1n).toString()))).toEqual([
+      XBTC,
     ]);
   });
 
   it('ask for an allowance nobody could read, or one the read did not list', () => {
-    expect(ask(withAllowance(freshlyGranted(400), CBBTC, null))).toEqual([CBBTC]);
+    expect(ask(withAllowance(freshlyGranted(400), WOKB, null))).toEqual([WOKB]);
     const granted = freshlyGranted(400);
-    expect(ask({ ...granted, tokens: granted.tokens.filter((t) => t.address !== WETH) })).toEqual([WETH]);
+    expect(ask({ ...granted, tokens: granted.tokens.filter((t) => t.address !== XBTC) })).toEqual([XBTC]);
   });
 
   it('ask for everything when the allowances were read for another contract', () => {
-    expect(ask({ ...freshlyGranted(400), spender: WETH })).toEqual([USDC, WETH, CBBTC]);
+    expect(ask({ ...freshlyGranted(400), spender: XBTC })).toEqual([USDC, XBTC, WOKB]);
   });
 
   it('match addresses whatever their case', () => {
@@ -158,10 +159,10 @@ describe('a resume', () => {
     const plan = planResume({
       permission: { dailyCapUsd: 2_400, grantedAt: NOON - DAY, expiresAt: NOON },
       params,
-      allowances: withAllowance(allowances, CBBTC, '0'),
+      allowances: withAllowance(allowances, WOKB, '0'),
       now: NOON,
     });
-    expect(plan).toEqual({ kind: 'resume', dailyCapUsd: 2_400, durationMs: DAY, approvals: [CBBTC] });
+    expect(plan).toEqual({ kind: 'resume', dailyCapUsd: 2_400, durationMs: DAY, approvals: [WOKB] });
   });
 
   it('asks the user to choose when there is no record of how long the last grant ran', () => {

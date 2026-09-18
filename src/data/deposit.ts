@@ -8,12 +8,15 @@
 import { api, ApiError } from './api';
 import type { Keyed } from './intentKey';
 
-/** The two things a deposit lands as: USDC to trade with, and ETH or SOL to sign with. */
+/**
+ * The two things a deposit lands as: USDC to trade with, and OKB — X Layer's gas token — to sign with. The executor
+ * names the native balance `eth` (its field name from the EVM build); on X Layer that amount is OKB.
+ */
 export type WalletFunds = {
   owner: string;
   chain: string;
   usdc: { address: string; raw: string; amount: number };
-  sol?: { raw: string; amount: number };
+  /** Native OKB, in wei-scaled raw units and whole OKB. */
   eth: { raw: string; amount: number };
   /** When the executor read them, in milliseconds. */
   readAt: number;
@@ -32,7 +35,7 @@ export type FaucetStatus = {
   /** USDC one request sends. */
   usdc: number | null;
   usdcRaw: string | null;
-  /** The ETH a fork wallet is raised to for gas. Null on a testnet. */
+  /** The OKB a fork wallet is raised to for gas. Null on a testnet. */
   ethFloor: number | null;
   windowHours: number;
   /** Null for an account with no wallet registered yet. */
@@ -45,7 +48,7 @@ export type FaucetStatus = {
   } | null;
 };
 
-/** How raising a fork wallet's ETH went: what it held, what was added and what it holds — or why nothing was added. */
+/** How raising a fork wallet's OKB (the `eth` field) went: what it held, what was added and what it holds — or why nothing was added. */
 export type EthTopUp =
   | { floor: number; before: number; added: number; after: number | null }
   | { floor: number; failed: string };
@@ -84,7 +87,7 @@ export function faucetStatus(): Promise<FaucetStatus> {
 
 /**
  * Ask the faucet. A refusal (409) or a failure (502) carries the executor's own sentence in its body, so it is returned for
- * the screen to show rather than thrown as a status code, as `fillLimitOrder` does.
+ * the screen to show rather than thrown as a status code.
  *
  * `write` is the claim's `Idempotency-Key` (FEATURES.md #29). Optional only because onboarding's Fund screen still claims
  * without one.

@@ -13,7 +13,6 @@ export const PUBLIC_PATHS: readonly string[] = [
   '/health',
   '/metrics',
   '/verify',
-  '/basename',
   '/market/quotes',
   '/market/sparklines',
   '/market/ohlc',
@@ -29,6 +28,7 @@ export const PUBLIC_PATHS: readonly string[] = [
   '/market/stocks/history',
   '/market/xstocks',
   '/market/crosscheck',
+  '/market/corporate-action',
   '/market/futures',
   '/yield/supply',
 ];

@@ -4,7 +4,7 @@
  * Everything here already existed on the executor and had nowhere to be looked at. That is not an
  * accident of scheduling — the app grew screens for what a user *does* (buy, hold, watch) and left
  * the surfaces that let them *check* it in the API. The approvals a delegation holds, the hash
- * chain over the audit trail, the policy engine, the subgraph's lag, the price a second source
+ * chain over the audit trail, the policy engine, the price a second source
  * disagrees with: all of it real, none of it visible from the phone.
  *
  * These types mirror the executor's responses exactly, field for field. Where the server sends a
@@ -143,64 +143,6 @@ export type DelegationParams = {
   tokens?: { symbol: string; address: string }[];
 };
 
-/* ──────────────────────────────────────────────────────────────── the graph */
-
-/**
- * `_meta` from the subgraph, plus whether the index is about THIS deployment.
- *
- * A perfectly synced index of a different contract is worse than no index: it answers confidently
- * about somebody else's policy. `indexesThisDeployment` is what lets a screen tell those apart, and
- * it is the same flag the agent uses to decide whether to trust the index at all.
- */
-export type GraphHealth = {
-  block: number;
-  healthy: boolean;
-  /* Optional: an executor older than these fields simply does not send them. */
-  endpoint?: string;
-  indexedDelegation?: string;
-  activeDelegation?: string;
-  indexesThisDeployment?: boolean;
-};
-
-/** One `Spend` event as the subgraph indexed it. Amounts are raw units, as strings. */
-export type GraphSpend = {
-  id: string;
-  amount: string;
-  spentToday: string;
-  venue: string;
-  token: string;
-  txHash: string;
-  /** Unix seconds, as a string — it is a GraphQL BigInt. */
-  timestamp: string;
-};
-
-/** `day` is the index's key for a UTC day — `timestamp / 86400` — not a date. See `indexDay`. */
-export type GraphDailySpend = { day: string; total: string; tradeCount: string };
-
-export type GraphActivity = { spends: GraphSpend[]; daily: GraphDailySpend[] };
-
-const DAY_MS = 86_400_000;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-
-/**
- * An index day, as a date someone can read.
- *
- * The subgraph keys its daily rollup by `timestamp / 86400` (`subgraph/src/mapping.ts`), the contract's
- * own UTC cap window, and two screens printed the key as it came: "20345" is not a day. Built from the
- * UTC fields rather than a locale formatter for the same reason the key is UTC — in a local zone, a day
- * that began at midnight UTC is the day before for everyone west of Greenwich — and so the label does not
- * depend on which date library an engine ships. A key that is not a number is a dash, not a guess.
- */
-export function indexDay(day: string): string {
-  const n = Number(day);
-  if (day.trim() === '' || !Number.isInteger(n)) return '—';
-  const d = new Date(n * DAY_MS);
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-}
-
-/** Which venue the router would pick for a size, and what it compared. */
-export type GraphDecision = Record<string, unknown>;
-
 /* ─────────────────────────────────────────────────────────────── the system */
 
 export type HealthDependency = {
@@ -258,9 +200,10 @@ export type Catchup = {
  */
 export type CrossCheck = {
   symbol: string;
-  /** Null when that source could not be reached. Never zero — zero is a price. */
-  oneinch: number | null;
+  /** The feed the screens use. Null when it could not be reached. Never zero — zero is a price. */
   coingecko: number | null;
+  /** Derived from the X Layer pools a fill would actually touch. Null when they could not be quoted. */
+  pool: number | null;
   agree: boolean;
   compared: boolean;
   /** How far apart, as a percentage. Absent when only one side answered. */
@@ -458,7 +401,7 @@ export type StrategyBacktest = {
  * moved is the market, a revoked permission is the user, a venue that could not fill is us.
  *
  * `fillsByVenue` counts where trades actually settled, from the venue each filled run recorded — closes
- * and flattens included. It is the claim the 1inch integration rests on, as a number.
+ * and flattens included. It is the claim the venue integration rests on, as a number.
  */
 export type AgentsStopped = { stopped: boolean; since: number | null };
 
@@ -543,7 +486,7 @@ export type FlattenPreview = {
   dustBelowUsd: number;
 };
 
-/** One tokenized equity, priced by a live 1inch probe rather than a feed. */
+/** One wrapped xStock, priced by a live Uniswap v3 probe rather than a feed. */
 export type StockRow = {
   symbol: string;
   name: string;
@@ -556,7 +499,7 @@ export type StockRow = {
 /**
  * One tokenized equity in the xStocks catalog, with both prices that exist for it.
  *
- * `price` is what one token costs in the Solana pools — what a buy actually pays. `underlyingPrice`
+ * `price` is what one wrapped token costs in the X Layer Uniswap v3 pools — what a buy actually pays. `underlyingPrice`
  * is what the issuer's feed marks the listed share at. They are near each other and not equal, and
  * the gap is the spread the pool charges, so the screen shows which is which rather than picking one.
  *
@@ -565,6 +508,9 @@ export type StockRow = {
 export type XStockRow = {
   symbol: string;
   name: string;
+  /** The listed share it tracks (`TSLA` for TSLAx), for filings and market hours. */
+  ticker: string;
+  /** The ERC-4626 wrapper on X Layer — what trades, what a wallet holds. */
   address: string;
   decimals: number;
   sector: string;
@@ -584,15 +530,27 @@ export type XStockCatalog = {
   unpriced: number;
 };
 
-/** One hop of a Jupiter route: the AMM, and how much of the order it carries. */
+/**
+ * One pool of a Uniswap v3 route, in order. Routes are sequential, not split: the whole order passes
+ * through every hop, so `percent` is 100 on each. `USDC → TSLAx` is one hop; `USDC → USDG → NVDAx` is two.
+ */
 export type RouteHop = {
+  /** A readable name for the hop: `Uniswap v3 USDC→USDG 0.01%`. */
   label: string;
-  /** Null when the venue did not say. A split route has several hops summing to 100. */
+  /** How much of the order this hop carries. Always 100 on a sequential path; null when the venue did not say. */
   percent: number | null;
+  /** The venue: `Uniswap v3`. */
+  venue: string;
+  /** The token going into this pool. */
+  from: string;
+  /** The token coming out of it. */
+  to: string;
+  /** The pool's fee tier, as a percent: 0.05 for the 500 tier, 0.01 for 100. */
+  feePct: number;
 };
 
 /**
- * What an xStock order costs, read off the Jupiter quote that would fill it.
+ * What an xStock order costs, read off the Uniswap v3 quote that would fill it.
  *
  * Every number is the venue's, for the size actually asked. A figure the venue did not report
  * arrives as null and is rendered as "not reported" — never as a zero, which on this screen would
@@ -613,13 +571,18 @@ export type XStockQuote = {
   /** The venue's measured impact at this size, as a percent. */
   priceImpactPct: number | null;
   priceImpactUsd: number | null;
-  /** The tolerance the quote was taken at, as the venue echoed it back. */
+  /** The tolerance the quote was taken at — the one requested (default 30 bps). */
   slippageBps: number;
   /** The worst that tolerance allows, in USD. */
   slippageWorstUsd: number;
   hops: RouteHop[];
-  /** Null means the aggregator takes nothing, which is this deployment's case. */
+  /**
+   * Always null on X Layer: xorr routes straight to Uniswap's router and nothing is taken beyond each pool's own
+   * fee tier (listed per hop). Kept so a screen can say "no platform fee" rather than assume it.
+   */
   platformFeeUsd: number | null;
+  /** The quoter's gas estimate for the swap, in gas units. Null when it gave none — not zero. */
+  estimatedGas: number | null;
   /** What this order works out to per token, once impact is in it. */
   effectivePrice: number;
   /** The pool mark for one token, to read `effectivePrice` against. */
@@ -649,7 +612,7 @@ export const system = {
     api.get<RouteComparison>(
       `/route/compare?in=${encodeURIComponent(inSymbol)}&out=${encodeURIComponent(outSymbol)}&amount=${amount}`,
     ),
-  /* What Base holds about this trail, and whether we still agree with it. */
+  /* What X Layer holds about this trail, and whether we still agree with it. */
   auditAnchor: () => api.get<AnchorReport>('/audit/anchor'),
   /*
    * The trail itself, for re-hashing on the device (FEATURES.md #12). The JSON export, because every row's hash commits
@@ -671,11 +634,6 @@ export const system = {
    */
   limits: () => api.get<Limits>('/limits'),
   delegationParams: () => api.get<DelegationParams>('/delegation/params'),
-
-  /* the graph */
-  graphHealth: () => api.get<GraphHealth>('/graph/health'),
-  graphActivity: () => api.get<GraphActivity>('/graph/activity'),
-  graphDecision: (usd: number) => api.get<GraphDecision>(`/graph/decision?usd=${usd}`),
 
   /* the system */
   health: () => api.get<Health>('/health'),
@@ -715,16 +673,6 @@ export const system = {
     }
   },
 
-  /* identity */
-  basenameOf: (address: string) =>
-    api.get<{ address: string; name: string | null }>(
-      `/basename?address=${encodeURIComponent(address)}`,
-    ),
-  addressOf: (name: string) =>
-    api.get<{ name: string; address: string | null }>(
-      `/basename?name=${encodeURIComponent(name)}`,
-    ),
-
   /* strategies */
   runs: (limit = 100) => api.get<StrategyRunRow[]>(`/runs?limit=${limit}`),
   disposals: () => api.get<Disposal[]>('/disposals'),
@@ -737,9 +685,9 @@ export const system = {
     ),
   flattenPreview: () => api.get<FlattenPreview>('/panic/preview'),
   stocks: () => api.get<StockRow[]>('/market/stocks'),
-  /** The tokenized-equity catalog: every mint, its sector, and what it costs (PLAN.md §8.4). */
+  /** The tokenized-equity catalog: every wrapped xStock, its sector, and what it costs (PLAN.md §8.4). */
   xstocks: () => api.get<XStockCatalog>('/market/xstocks'),
-  /** What one xStock order costs, before it is placed: impact, tolerance and route, from Jupiter. */
+  /** What one xStock order costs, before it is placed: impact, tolerance and route, from Uniswap v3. */
   xstockQuote: (params: { symbol: string; side: 'buy' | 'sell'; usd: number; slippageBps?: number }) =>
     api.get<XStockQuote>(
       `/market/xstocks/quote?symbol=${encodeURIComponent(params.symbol)}&side=${params.side}&usd=${params.usd}` +

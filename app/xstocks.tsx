@@ -2,18 +2,19 @@
  * The xStocks catalog — what tokenized equities exist here, and what each one costs.
  *
  * The app could buy an xStock by name and could never show you the list. `XSTOCKS` was the
- * executor's private register: eleven Solana mints reachable only if you already knew the symbol to
+ * executor's private register: eleven wrapped tokens reachable only if you already knew the symbol to
  * type. This is that register, browsable, filtered by the sector of the underlying listing.
  *
  * Each row carries two prices because two exist and they are not the same number:
  *
- *   the large one  — what a token costs in the Solana pools. This is what a buy actually pays.
- *   the small one  — what the issuer's feed marks the listed share at, on its exchange.
+ *   the large one  — what a token costs in the Uniswap v3 pools on X Layer. This is what a buy actually pays.
+ *   the small one  — what the listed share is marked at on its exchange. Null on X Layer, where no source of that
+ *                    mark exists (`server/src/venues/xstocks-catalog.ts`), so the row shows the pool price alone.
  *
  * The gap between them is the pool's spread. Collapsing them into one "price" would hide the part a
  * buyer is charged, so both are on the row and the secondary line says which is which.
  *
- * `No price` is a row, never a placeholder number. On a cluster where these mints do not exist every
+ * `No price` is a row, never a placeholder number. On a network where these tokens do not exist every
  * row reads that way, and that IS the answer to "can I trade these here" — a screen that dropped
  * them would answer "there is nothing to trade", which is a different and untrue thing.
  */
@@ -71,7 +72,7 @@ export default function XStocks() {
       <View style={{ paddingHorizontal: space.gutter }}>
         <HeaderBar onBack={goBack} title={<Text variant="screenTitle">xStocks</Text>} />
         <Text variant="secondary" color={colors.ink55} style={{ marginTop: space.s8 }}>
-          Tokenized shares on Solana, priced by the pools that hold them.
+          Tokenized shares, priced by the pools that hold them.
         </Text>
       </View>
 
@@ -102,7 +103,7 @@ export default function XStocks() {
               <Text variant="secondarySm" color={colors.warn} style={{ paddingVertical: space.s10 }}>
                 {/*
                   Said out loud rather than left to be counted. Every row unpriced means the feed is
-                  unreachable or these mints are not the ones this deployment knows — two different
+                  unreachable or these tokens are not the ones this deployment knows — two different
                   faults that look identical from a quiet list.
                 */}
                 {note}

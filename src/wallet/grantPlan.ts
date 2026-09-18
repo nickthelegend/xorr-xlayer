@@ -40,9 +40,9 @@ export const SETTLEMENT_APPROVAL_DAYS = 30;
  * down is still unlimited for every purpose, and a wallet prompt to restore the last few units
  * would be noise.
  *
- * 2^254, not 2^255. The fork tooling approves exactly 2^255 (`fork-grant.ts`), and WETH counts any
+ * 2^254, not 2^255. The fork tooling approves exactly 2^255 (`fork-grant.ts`), and a token that counts any
  * allowance short of max uint256 down with every sale, so a bar at 2^255 asked the Railway fork's
- * wallet to approve WETH again after its first sell. Half of that is still more than any token will
+ * wallet to approve that token again after its first sell. Half of that is still more than any token will
  * ever move. `server/src/evm/allowances.ts` calls an allowance unlimited from the same bar.
  */
 export const EFFECTIVELY_UNLIMITED = 1n << 254n;

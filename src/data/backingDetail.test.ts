@@ -49,15 +49,23 @@ describe('fetchBackingDetail', () => {
   it('passes a real detail through intact, nulls included', async () => {
     const detail = {
       symbol: 'NVDAx',
-      name: 'NVIDIA Corporation xStock',
-      mint: 'Xsc9',
+      name: 'NVIDIA Corporation',
+      address: '0xa8ddb5cd96b5222afe198316e9a57caa642850d5',
+      raw: '0xc845b2894dBddd03858fd2D643B4eF725fE0849d',
       issuer: {
-        permanentDelegate: '5aMN',
-        freezeAuthority: 'JDq1',
-        mintAuthority: '7pt9',
-        pausable: { authority: 'JDq1', paused: false },
-        transferHookProgram: null,
+        owner: null,
+        minter: null,
+        burner: null,
+        pauser: null,
+        multiplierUpdater: null,
+        sanctionsList: null,
+        upgradeAdmin: null,
+        canMint: null,
+        canPause: null,
+        paused: null,
       },
+      wrapper: { owner: null, pauser: null, upgradeAdmin: null, paused: false },
+      supply: { raw: null, wrapped: null, wrappedAssets: null },
       reserves: { verified: false, reason: 'unreachable' },
       multiplier: { current: null, effectiveAt: null, pending: null, history: [] },
       attestationHistory: [],
@@ -66,7 +74,9 @@ describe('fetchBackingDetail', () => {
 
     const d = await fetchBackingDetail('NVDAx');
     // The nulls have to survive: they are what the screen renders as "No record".
-    expect(d?.issuer.transferHookProgram).toBeNull();
+    expect(d?.issuer.minter).toBeNull();
+    expect(d?.supply.wrapped).toBeNull();
+    expect(d?.wrapper.paused).toBe(false);
     expect(d?.multiplier.current).toBeNull();
   });
 });

@@ -12,8 +12,8 @@ const RECORD: DecisionRecord = {
   price: 216.5,
   stopPrice: 205,
   targetPrice: 240,
-  signature: '5K3ySig',
-  slot: 289412950,
+  signature: '0x5a3f9c21e7b04d68a1c2f3e4d5b6a7980c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f',
+  runId: 'run-7f2c',
   opening: 'The band held, so it took the break.',
   reason: 'NVDAx is trading in the top quarter of the recorded band.',
   marketCondition: 'Upper band, 95th percentile of observed range',
@@ -50,7 +50,7 @@ describe('explainLines', () => {
 
   it('states the drift it measured, against the session it measured it in', () => {
     expect(lineFor(RECORD, 'Where it was priced')).toBe(
-      'Nasdaq was open, and the pool was within 12 bps of the Base listing',
+      'Nasdaq was open, and the pool was within 12 bps of the issuer’s reference price',
     );
   });
 

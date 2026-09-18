@@ -2,7 +2,7 @@
  * The tokenized equities, priced by probing a real route.
  *
  * There is no market-data feed behind these. Every price here is the answer to "what would a
- * hundred dollars of USDC actually buy right now", asked of 1inch — which is a stranger and more
+ * hundred dollars of USDC actually buy right now", asked of the Uniswap v3 pools — which is a stranger and more
  * honest number than a quote, because it is the price you would get rather than the price someone
  * says the stock is at.
  *

@@ -139,7 +139,7 @@ export function kindLabel(kind: string): string {
 
 /**
  * What a strategy's label is while balances are hidden (FEATURES.md #47). A label is written when the strategy is made,
- * and a recurring buy's carries its size — "$50 of WETH, weekly" — which is the person's money. A range's carries the
+ * and a recurring buy's carries its size — "$50 of XBTC, weekly" — which is the person's money. A range's carries the
  * prices it trades between, which say nothing of how much is held, so those stay.
  */
 export function labelFigure(kind: string): FigureKind {
@@ -147,19 +147,22 @@ export function labelFigure(kind: string): FigureKind {
 }
 
 /**
- * What a recurring buy can buy: the two the executor can route, settle and replay.
+ * What a recurring buy can buy: the two the executor can route on X Layer, settle and replay.
  *
  * Shared by the creator (`app/strategy/dca.tsx`) and the backtest (`app/backtest.tsx`), because the two
  * drifted. The backtest offered every tradable symbol, including ones a recurring buy can never be:
  *
  *  - USDC is what a buy is PAID IN, so "Buy $50 of USDC, weekly" is a swap from USDC to USDC, which
- *    1inch rejects outright — `src and dst should be different`, HTTP 400. The creator removed it for
+ *    no venue will route — the executor refuses a pair whose two sides are the same token. The creator removed it for
  *    that reason, and the executor refuses it at creation. Idle USDC has its own rung, "Move idle cash
  *    to yield", which supplies it instead of swapping it for itself.
- *  - The tokenized equities have no price history to replay (`server/src/backtest/engine.ts` answers
- *    "No price history for …"), so a backtest of one could only fail.
+ *  - The wrapped xStocks have no price history to replay (`server/src/backtest/engine.ts` reads history
+ *    from the crypto feed and answers "No price history for …"), so a backtest of one could only fail.
+ *  - WETH is held on X Layer but no pool holds real liquidity against a stablecoin, so nothing routes it.
  *
- * ETH settles as WETH, so offering both would be one asset twice.
+ * XBTC is OKX's wrapped bitcoin and WOKB the wrapped gas token: both route to USDC through Uniswap v3
+ * pools with real liquidity. The market symbols BTC and OKB settle as these, so offering both would be one
+ * asset twice.
  */
-export const RECURRING_BUY_SYMBOLS = ['WETH', 'CBBTC'] as const;
+export const RECURRING_BUY_SYMBOLS = ['XBTC', 'WOKB'] as const;
 export type RecurringBuySymbol = (typeof RECURRING_BUY_SYMBOLS)[number];

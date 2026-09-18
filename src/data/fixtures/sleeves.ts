@@ -12,13 +12,13 @@ export const sleeveFixtures: Sleeve[] = [
   {
     "name": "Blue-chip crypto",
     "weight": 55,
-    "note": "WETH and cbBTC, the liquid core the bot rebalances.",
+    "note": "Bitcoin and OKB, the liquid core the bot rebalances.",
     "color": "#5B93FF"
   },
   {
     "name": "Tokenized equities",
     "weight": 30,
-    "note": "NVDAc, AAPLc and six more tokenized stocks.",
+    "note": "NVDAx, AAPLx and nine more tokenized stocks.",
     "color": "#F0BE55"
   },
   {

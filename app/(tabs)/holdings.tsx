@@ -259,9 +259,9 @@ export default function Assets() {
         {/*
           The chain's word, beside the ledger's (PLAN.md 3.10).
 
-          Holdings above are the book the executor keeps from its own fills. A wallet holds more than that — the ETH
-          that pays for gas, a deposit, a token sent in — so this lists what is actually at the address: 1inch's
-          Balance API on Base, the chain itself on a fork or a testnet. Where the two disagree, this one is the wallet.
+          Holdings above are the book the executor keeps from its own fills. A wallet holds more than that — the OKB
+          that pays for gas, a deposit, a token sent in — so this lists what is actually at the address, read from the
+          chain itself on every network. Where the two disagree, this one is the wallet.
         */}
         <Text variant="cardTitle" style={{ marginTop: space.s26, marginBottom: space.s6 }}>
           Tokens

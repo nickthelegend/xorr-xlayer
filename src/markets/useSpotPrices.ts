@@ -3,7 +3,7 @@
  *
  * `usePrices` prices every symbol in one request, and a request that includes a share waits for the
  * share snapshot — eight seconds on the hosted executor, signed in or not — so on the watchlist SOL and
- * HYPE sat at "· · ·" behind TSLAc. It also answers a failed request with no prices. Here the crypto
+ * HYPE sat at "· · ·" behind TSLAx. It also answers a failed request with no prices. Here the crypto
  * feed and the snapshot are separate reads, and a failure is reported.
  */
 import {

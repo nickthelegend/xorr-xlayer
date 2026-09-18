@@ -40,7 +40,7 @@ export type OnChainPolicy = { delegate: Address; dailyCap: bigint; expiresAt: bi
 
 const NO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-/** How long a stop waits for its receipt before saying it could not confirm. The fork mines at once; Base in seconds. */
+/** How long a stop waits for its receipt before saying it could not confirm. The fork mines at once; X Layer in seconds. */
 const RECEIPT_TIMEOUT_MS = 60_000;
 
 const hasCode = (code: Hex | undefined) => Boolean(code && code !== '0x');

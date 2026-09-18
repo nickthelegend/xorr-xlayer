@@ -49,7 +49,7 @@ describe('the strategy ladder — PLAN.md §1.2', () => {
   it('names no venue or chain in what the library shows', () => {
     for (const e of STRATEGY_LADDER) {
       const copy = [e.label, e.what, e.available ? e.cta : ''].join(' ');
-      expect(copy, e.label).not.toMatch(/Aave|1inch|Aqua|SwapVM|Privy|Base|Sepolia/);
+      expect(copy, e.label).not.toMatch(/Aave|Uniswap|OKX DEX|Privy|X Layer|testnet/);
     }
   });
 
@@ -87,5 +87,10 @@ describe('kind labels', () => {
 describe('what a recurring buy can buy', () => {
   it('never offers the token a buy is paid in', () => {
     expect(RECURRING_BUY_SYMBOLS).not.toContain('USDC');
+  });
+
+  it('offers only what routes on X Layer — never WETH, which no pool there holds against a stablecoin', () => {
+    expect([...RECURRING_BUY_SYMBOLS]).toEqual(['XBTC', 'WOKB']);
+    expect(RECURRING_BUY_SYMBOLS).not.toContain('WETH' as never);
   });
 });

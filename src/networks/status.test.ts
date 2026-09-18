@@ -3,32 +3,40 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Health } from '@/data/system';
-import { DEPLOYMENTS } from './deployments';
+import type { Deployment } from './deployments';
 import { blockOf, networkStatus } from './status';
 
-const fork = DEPLOYMENTS.find((d) => d.key === 'base-fork')!;
+/** An example row: the real list is empty until an X Layer executor is deployed. */
+const fork: Deployment = {
+  key: 'xlayer-fork',
+  name: 'X Layer fork',
+  chainId: 196,
+  api: 'https://executor-fork.example',
+  explorer: null,
+  test: true,
+};
 
 const health = (over: Partial<Health> = {}): Health => ({
   ok: true,
   status: 'degraded',
-  chain: 'base-fork',
+  chain: 'xlayer-fork',
   version: 'f4dda8a151809f4d9a4a2e88ec21e7b60829a85f',
   delegation: '0xc32dd8aeed3035d46c7c82a351fc5522c9d463f4',
   uptimeSec: 60,
   dependencies: [
     { name: 'postgres', status: 'up', critical: true, detail: 'responded' },
-    { name: 'rpc', status: 'up', critical: true, detail: 'base-fork at block 51242381' },
-    { name: 'subgraph', status: 'degraded', critical: false, detail: 'indexing another deployment' },
+    { name: 'rpc', status: 'up', critical: true, detail: 'xlayer-fork at block 51242381' },
+    { name: 'okx-dex', status: 'degraded', critical: false, detail: 'no API key' },
   ],
   ...over,
 });
 
-const tokens = [{ symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 }];
+const tokens = [{ symbol: 'USDC', address: '0xB6CEceAB302E2E4948951eE7843FC24E92933061', decimals: 6 }];
 
 describe('networkStatus', () => {
   it('is up when every critical dependency is, whatever a non-critical one says, and reads the block', () => {
     const s = networkStatus(fork, { health: health(), tradable: tokens, yieldSupply: { availableHere: true } });
-    expect(s).toMatchObject({ state: 'up', block: 51242381, chain: 'base-fork', mismatch: false, trades: 'fill', earn: true });
+    expect(s).toMatchObject({ state: 'up', block: 51242381, chain: 'xlayer-fork', mismatch: false, trades: 'fill', earn: true });
   });
 
   it('is degraded when a critical dependency is not up, and down when the executor says so', () => {
@@ -58,7 +66,7 @@ describe('networkStatus', () => {
   });
 
   it('flags an executor serving another chain than its deployment names', () => {
-    expect(networkStatus(fork, { health: health({ chain: 'base-sepolia' }), tradable: [], yieldSupply: null }).mismatch).toBe(true);
+    expect(networkStatus(fork, { health: health({ chain: 'xlayer-testnet' }), tradable: [], yieldSupply: null }).mismatch).toBe(true);
   });
 });
 

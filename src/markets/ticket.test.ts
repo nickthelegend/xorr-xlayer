@@ -5,17 +5,17 @@ import { describe, expect, it } from 'vitest';
 import { sellMax, ticketLimit } from './ticket';
 
 const sell = (held: number | 'loading' | 'unread', amountUsd = 250) =>
-  ticketLimit({ side: 'sell', symbol: 'WETH', amountUsd, cashUsd: 5_000, held });
+  ticketLimit({ side: 'sell', symbol: 'XBTC', amountUsd, cashUsd: 5_000, held });
 
 describe('a sale is checked against the holding', () => {
   it('refuses a sale of something the wallet does not hold', () => {
-    expect(sell(0)).toEqual({ state: 'refused', reason: 'You hold no WETH.' });
+    expect(sell(0)).toEqual({ state: 'refused', reason: 'You hold no XBTC.' });
     // A sale's leftover dust is not a holding.
-    expect(sell(0.004)).toEqual({ state: 'refused', reason: 'You hold no WETH.' });
+    expect(sell(0.004)).toEqual({ state: 'refused', reason: 'You hold no XBTC.' });
   });
 
   it('refuses more than is held, and says how much is', () => {
-    expect(sell(120.5)).toEqual({ state: 'refused', code: 'insufficient', reason: 'You hold $120.50 of WETH.' });
+    expect(sell(120.5)).toEqual({ state: 'refused', code: 'insufficient', reason: 'You hold $120.50 of XBTC.' });
   });
 
   it('lets a sale up to the whole holding through', () => {
@@ -29,13 +29,13 @@ describe('a sale is checked against the holding', () => {
   });
 
   it('never ignores the holding because cash would cover the amount', () => {
-    expect(ticketLimit({ side: 'sell', symbol: 'CBBTC', amountUsd: 10, cashUsd: 1e6, held: 0 }).state).toBe('refused');
+    expect(ticketLimit({ side: 'sell', symbol: 'WOKB', amountUsd: 10, cashUsd: 1e6, held: 0 }).state).toBe('refused');
   });
 });
 
 describe('a buy is checked against cash, where cash is known', () => {
   it('refuses more than the cash', () => {
-    expect(ticketLimit({ side: 'buy', symbol: 'WETH', amountUsd: 500, cashUsd: 320, held: 0 })).toEqual({
+    expect(ticketLimit({ side: 'buy', symbol: 'XBTC', amountUsd: 500, cashUsd: 320, held: 0 })).toEqual({
       state: 'refused',
       code: 'insufficient',
       reason: 'You have $320.00.',
@@ -43,7 +43,7 @@ describe('a buy is checked against cash, where cash is known', () => {
   });
 
   it('does not refuse on a balance it has not read, and never on the holding', () => {
-    expect(ticketLimit({ side: 'buy', symbol: 'WETH', amountUsd: 500, cashUsd: undefined, held: 'unread' })).toEqual({
+    expect(ticketLimit({ side: 'buy', symbol: 'XBTC', amountUsd: 500, cashUsd: undefined, held: 'unread' })).toEqual({
       state: 'ok',
     });
   });
@@ -59,7 +59,7 @@ describe('Max on a sale', () => {
 
 describe('the amount itself, before any balance', () => {
   const buy = (text: string, cashUsd: number | undefined = 5_000) =>
-    ticketLimit({ side: 'buy', symbol: 'WETH', amountUsd: Number(text) || 0, cashUsd, held: 0, text });
+    ticketLimit({ side: 'buy', symbol: 'XBTC', amountUsd: Number(text) || 0, cashUsd, held: 0, text });
 
   it('refuses under the executor’s floor rather than sending it', () => {
     expect(buy('0.001')).toEqual({
@@ -84,13 +84,13 @@ describe('the amount itself, before any balance', () => {
 
   it('holds a sale to the same rules once the position is read', () => {
     expect(
-      ticketLimit({ side: 'sell', symbol: 'WETH', amountUsd: 0.001, cashUsd: 5_000, held: 400, text: '0.001' }),
+      ticketLimit({ side: 'sell', symbol: 'XBTC', amountUsd: 0.001, cashUsd: 5_000, held: 400, text: '0.001' }),
     ).toMatchObject({ code: 'below-minimum' });
   });
 
   it('still works for a caller that has only the number', () => {
     // `text` is optional, so the screens that pass a parsed amount keep the behaviour they had.
-    expect(ticketLimit({ side: 'buy', symbol: 'WETH', amountUsd: 500, cashUsd: 320, held: 0 })).toMatchObject({
+    expect(ticketLimit({ side: 'buy', symbol: 'XBTC', amountUsd: 500, cashUsd: 320, held: 0 })).toMatchObject({
       code: 'insufficient',
     });
   });

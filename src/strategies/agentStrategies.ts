@@ -22,7 +22,7 @@ import { money } from '@/format';
 import type { Strategy } from '@/data/types';
 
 export type StrategyGroup = 'buys' | 'trading' | 'protect' | 'cash';
-export type PricedSymbol = 'WETH' | 'CBBTC';
+export type PricedSymbol = 'XBTC' | 'WOKB';
 export type Marks = Partial<Record<PricedSymbol, number>>;
 
 export type StrategyTemplate = {
@@ -44,9 +44,9 @@ export type Replay = { ret: number; trades: number } | { failed: string };
 /** The one window every replay covers, so the returns can be read against each other. */
 export const LOOKBACK = '90d' as const;
 /** The assets priced for ranges and stops. A module constant, so the price hook is asked the same question each draw. */
-export const PRICED: string[] = ['WETH', 'CBBTC'];
+export const PRICED: string[] = ['XBTC', 'WOKB'];
 
-const NAMES: Record<PricedSymbol, string> = { WETH: 'ETH', CBBTC: 'Bitcoin' };
+const NAMES: Record<PricedSymbol, string> = { XBTC: 'Bitcoin', WOKB: 'OKB' };
 /** What a replay spends a run: returns are percentages, so the size only has to be real. */
 const REPLAY_USD = 50;
 /** The band either side of today's price — the one the range screen suggests (`app/strategy/grid.tsx`). */
@@ -178,16 +178,16 @@ function stops(sym: PricedSymbol): StrategyTemplate {
 }
 
 export const STRATEGY_TEMPLATES: readonly StrategyTemplate[] = [
-  weeklyBuy('WETH'),
-  weeklyBuy('CBBTC'),
-  dailyBuy('WETH'),
-  dailyBuy('CBBTC'),
-  breakout('WETH'),
-  breakout('CBBTC'),
-  range('WETH'),
-  range('CBBTC'),
-  stops('WETH'),
-  stops('CBBTC'),
+  weeklyBuy('XBTC'),
+  weeklyBuy('WOKB'),
+  dailyBuy('XBTC'),
+  dailyBuy('WOKB'),
+  breakout('XBTC'),
+  breakout('WOKB'),
+  range('XBTC'),
+  range('WOKB'),
+  stops('XBTC'),
+  stops('WOKB'),
   {
     key: 'yield-USDC',
     group: 'cash',
@@ -208,15 +208,15 @@ export const STRATEGY_TEMPLATES: readonly StrategyTemplate[] = [
   {
     key: 'rebalance-mix',
     group: 'cash',
-    title: 'ETH and Bitcoin mix',
-    what: 'Keeps 50% in ETH and 30% in Bitcoin; the rest stays cash.',
+    title: 'Bitcoin and OKB mix',
+    what: 'Keeps 50% in Bitcoin and 30% in OKB; the rest stays cash.',
     note: 'Trades only the drift from the mix',
     build: (usd) => ({
       kind: 'rebalance',
       state: 'live',
-      label: 'Rebalance to 50% ETH, 30% Bitcoin',
+      label: 'Rebalance to 50% Bitcoin, 30% OKB',
       symbol: 'PORTFOLIO',
-      params: { targets: { WETH: 50, CBBTC: 30 } },
+      params: { targets: { XBTC: 50, WOKB: 30 } },
       cadence: 'weekly',
       nextRunAt: Date.now(),
       dailyAllocationUsd: usd,
@@ -290,8 +290,8 @@ const inflight = new Set<string>();
  */
 export function useStrategyReplays(marks: Marks, enabled: boolean): void {
   const record = useAgentStrategies((s) => s.record);
-  const weth = marks.WETH;
-  const cbbtc = marks.CBBTC;
+  const xbtc = marks.XBTC;
+  const wokb = marks.WOKB;
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
@@ -299,7 +299,7 @@ export function useStrategyReplays(marks: Marks, enabled: boolean): void {
       for (const t of STRATEGY_TEMPLATES) {
         if (!alive) return;
         if (!t.replay || inflight.has(t.key) || useAgentStrategies.getState().replays[t.key]) continue;
-        const now: Marks = { WETH: weth, CBBTC: cbbtc };
+        const now: Marks = { XBTC: xbtc, WOKB: wokb };
         if (t.needs && !now[t.needs]) continue;
         inflight.add(t.key);
         try {
@@ -315,5 +315,5 @@ export function useStrategyReplays(marks: Marks, enabled: boolean): void {
     return () => {
       alive = false;
     };
-  }, [enabled, weth, cbbtc, record]);
+  }, [enabled, xbtc, wokb, record]);
 }

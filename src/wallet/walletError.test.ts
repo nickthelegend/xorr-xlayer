@@ -21,7 +21,7 @@ describe('a wallet failure reads as a sentence, not a request log', () => {
   it('says what went wrong and nothing about the transport', () => {
     const message = humanWalletError(new Error(VIEM_DUMP));
     expect(message).toBe(
-      'Your wallet has no ETH to pay the network fee, so the transaction was not sent.',
+      'Your wallet has no OKB to pay the network fee, so the transaction was not sent.',
     );
   });
 
@@ -48,8 +48,8 @@ describe('a wallet failure reads as a sentence, not a request log', () => {
   });
 
   it('does not replace an unrecognised message with a generic apology', () => {
-    expect(humanWalletError(new Error('Chain 8453 is not configured.'))).toBe(
-      'Chain 8453 is not configured.',
+    expect(humanWalletError(new Error('Chain 196 is not configured.'))).toBe(
+      'Chain 196 is not configured.',
     );
   });
 

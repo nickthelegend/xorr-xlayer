@@ -15,11 +15,11 @@ export function routesInto(symbol: string): boolean {
 }
 
 /**
- * The three ways a fill can be sourced, named for what each one is. The screens carry no venue names;
- * the route screen names its provider once, in a footnote.
+ * The ways a fill can be sourced on X Layer, named for what each one is, keyed by the venue name
+ * `/route/compare` answers with. The screens carry no venue names; the route screen names its
+ * providers once, in a footnote. A venue not listed here is shown as the executor named it.
  */
 export const FILL_PATH: Readonly<Record<string, string>> = {
-  aqua: 'Maker book',
-  swapvm: 'Swap program',
-  '1inch': 'Aggregator',
+  'Uniswap v3': 'Pool swap',
+  'OKX DEX': 'Aggregator',
 };

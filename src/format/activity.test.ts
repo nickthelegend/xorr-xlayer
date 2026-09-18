@@ -6,17 +6,15 @@ import { plainAction, plainDetail } from './activity';
 
 describe('an activity line on a main screen', () => {
   it('says what the bot did, without the venue it settled on', () => {
-    expect(plainAction("Bought 0.0020 WETH against a maker's SwapVM program")).toBe('Bought 0.0020 WETH');
-    expect(plainAction('Bought 0.0020 WETH against a maker’s SwapVM program')).toBe('Bought 0.0020 WETH');
-    expect(plainAction('Sold 0.0040 WETH on an Aqua book')).toBe('Sold 0.0040 WETH');
-    expect(plainAction('Bought 0.0565 WETH through 1inch Aqua')).toBe('Bought 0.0565 WETH');
-    expect(plainAction('Supplied $100 USDC to Aave')).toBe('Supplied $100 USDC to savings');
+    expect(plainAction('Bought 0.0020 XBTC on Uniswap v3')).toBe('Bought 0.0020 XBTC');
+    expect(plainAction('Sold 0.0040 NVDAx through OKX DEX')).toBe('Sold 0.0040 NVDAx');
+    expect(plainAction('Supplied $100 USDT0 to Aave')).toBe('Supplied $100 USDT0 to savings');
   });
 
   it('leaves every other line as it was written', () => {
     for (const line of [
-      'Bought 0.0079 WETH',
-      'Sold 50% of WETH',
+      'Bought 0.0079 XBTC',
+      'Sold 50% of XBTC',
       'Trading permission granted',
       'Withdrawal address added',
       'Transfer out refused',
@@ -41,6 +39,6 @@ describe('an activity detail on a main screen', () => {
     const line = 'Up to $50 a day, expiring Tue Sep 22 2026.';
     expect(plainDetail(line)).toBe(line);
     // An amount that happens to start with 0x-like digits is not an address.
-    expect(plainDetail('Sold 0.0020 WETH for $5.01.')).toBe('Sold 0.0020 WETH for $5.01.');
+    expect(plainDetail('Sold 0.0020 XBTC for $5.01.')).toBe('Sold 0.0020 XBTC for $5.01.');
   });
 });

@@ -2,7 +2,7 @@
  * What counts as an amount, before anything is sent.
  *
  * The ticket checked one thing — is it more than the wallet has — and let everything else through to the
- * executor. So `$0.001` of WETH went out as a real order and came back a refusal from the venue; `$12.3456`
+ * executor. So `$0.001` of XBTC went out as a real order and came back a refusal from the venue; `$12.3456`
  * went out as a number of dollars that does not exist and settled to a rounded one; and the keypad would
  * happily compose `$9999999`, past the executor's own ceiling, with the button live the whole time.
  *

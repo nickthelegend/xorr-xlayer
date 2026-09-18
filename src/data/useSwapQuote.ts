@@ -1,7 +1,7 @@
 /**
  * A real swap quote — PLAN.md 12.16.
  *
- * Screen 19's "Best of 3 venues" was a fixed string. This asks the aggregator and reports what it
+ * Screen 19's "Best of 3 venues" was a fixed string. This asks the venue and reports what it
  * actually routed through, what the minimum received is at the user's slippage, and the real
  * price impact. Debounced, because the amount stepper fires on every tap.
  */
@@ -24,13 +24,13 @@ export type SwapQuoteResult = {
   venues: string[];
   route: string;
   /**
-   * What the route costs to send (PLAN.md 3.13): the gas price, and 1inch's estimate for the route in dollars where
-   * ETH can be priced. The executor's delegate sends every swap and order, so none of it is charged to the user.
+   * What the route costs to send (PLAN.md 3.13): the chain's gas price, and the quoter's gas estimate for the route
+   * in dollars where OKB can be priced. The executor's delegate sends every swap and order, so none of it is charged to the user.
    * Null when the executor could not read a gas price; absent from an executor older than the field.
    */
   gas?: {
     priceGwei: number;
-    source: '1inch' | 'chain';
+    source: 'chain';
     units: number | null;
     feeUsd: number | null;
     paidBy: 'executor';
@@ -53,7 +53,7 @@ export function useSwapQuote(inSymbol: string, outSymbol: string, amount: number
     let alive = true;
     const t = setTimeout(() => {
       /*
-       * A quote the executor could not get inside a screen's patience is `warming`: the aggregator's answer is still on
+       * A quote the executor could not get inside a screen's patience is `warming`: the venue's answer is still on
        * its way, and asking again joins it (E187). It is waited out rather than shown as a failure.
        */
       waitOutWarming(() =>

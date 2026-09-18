@@ -6,7 +6,7 @@
  *
  * Each row names a real dependency and what it is authoritative for, and the live ones are probed
  * rather than asserted: the chain row reads the executor's RPC probe, the database row its Postgres
- * probe, the subgraph row reads `_meta`. A page that listed its sources without checking any of them
+ * probe. A page that listed its sources without checking any of them
  * would be making the same unfalsifiable claim it exists to replace.
  *
  * Our own database is one of them, and says so. The header read "None of them are us" and the chain
@@ -33,7 +33,6 @@ import {
   radius,
   space,
 } from '@/ui';
-import { NotSignedIn } from '@/data/apiError';
 import { useAsync } from '@/data/useAsync';
 import { system } from '@/data/system';
 
@@ -48,7 +47,7 @@ type Source = {
 const SOURCES: Source[] = [
   {
     name: 'The chain',
-    owns: 'Balances, the permission, approvals, names and every transaction',
+    owns: 'Balances, the permission, approvals and every transaction',
     how: 'Read directly over RPC.',
   },
   {
@@ -57,9 +56,14 @@ const SOURCES: Source[] = [
     how: 'The executor’s own database. The audit trail in it is hash-chained and anchored on the chain.',
   },
   {
-    name: '1inch',
-    owns: 'Swap routes, fill prices, stock prices, limit orders and cross-chain quotes',
-    how: 'Routes from its aggregator; the stocks are priced by quoting a real buy, because they have no feed.',
+    name: 'Uniswap v3',
+    owns: 'Swap routes, fill prices and xStock prices',
+    how: 'Quoted from the pools that would fill the trade; the xStocks are priced by quoting a real buy, because they have no feed.',
+  },
+  {
+    name: 'OKX DEX',
+    owns: 'A second route for a trade, where this deployment has an API key',
+    how: 'Its aggregator is asked alongside Uniswap, and its route is used only when it delivers more.',
   },
   {
     name: 'CoinGecko',
@@ -82,11 +86,6 @@ const SOURCES: Source[] = [
     how: "The regulator's own filing record. The next date is a projection from the cadence, and says so.",
   },
   {
-    name: 'The Graph',
-    owns: 'Spend history, independently of our records',
-    how: 'A subgraph over the delegation contract — a second account of the same money, kept by someone else.',
-  },
-  {
     name: 'Privy',
     owns: 'Keys, signing, and the policy that refuses a bad destination',
     how: 'Enforced by their signer. A compromised executor cannot widen it.',
@@ -99,21 +98,10 @@ export default function Sources() {
   /* Probed, not asserted. A list of sources that checked none of them would be the same
      unfalsifiable claim this screen exists to replace. */
   const health = useAsync(() => system.health(), []);
-  const graph = useAsync(() => system.graphHealth(), []);
 
   /* Undefined until `/health` answers: a probe nobody has read is not a dependency that is down. */
   const up = (name: string): boolean | undefined =>
     health.data ? health.data.dependencies.find((d) => d.name === name)?.status === 'up' : undefined;
-
-  /*
-   * The index needs a session to ask about. Signed out it was never asked, which is no label at all —
-   * not "not answering", which is what a request that failed earns.
-   */
-  const graphLive: boolean | undefined = graph.error
-    ? graph.error instanceof NotSignedIn
-      ? undefined
-      : false
-    : graph.data?.healthy;
 
   return (
     <Screen gutter="none">
@@ -130,7 +118,7 @@ export default function Sources() {
           contentContainerStyle={{ paddingBottom: space.s30, gap: space.s10 }}
         >
           {SOURCES.map((s) => {
-            /* Only the three the app can actually probe get a live state. Claiming to know
+            /* Only the two the app can actually probe get a live state. Claiming to know
                CoinGecko is up because a price rendered ten minutes ago would be a guess. The
                executor not answering `/health` at all is its database not answering us. */
             const live =
@@ -140,9 +128,7 @@ export default function Sources() {
                   ? health.error
                     ? false
                     : up('postgres')
-                  : s.name === 'The Graph'
-                    ? graphLive
-                    : undefined;
+                  : undefined;
 
             return (
               <SheetCard key={s.name} bordered borderRadius={radius.panel} padding={space.s16}>

@@ -20,7 +20,7 @@ export const watchlistGroups: WatchlistGroup[] = [
     "tab": "Conviction List",
     "rows": [
       {
-        "sym": "TSLAc",
+        "sym": "TSLAx",
         "px": "—",
         "chg": "",
         "up": true,
@@ -47,21 +47,21 @@ export const watchlistGroups: WatchlistGroup[] = [
     "tab": "Stocks",
     "rows": [
       {
-        "sym": "NVDAc",
+        "sym": "NVDAx",
         "px": "—",
         "chg": "",
         "up": true,
         "spark": "0,24 14,19 28,21 42,13 56,15 72,8 90,5"
       },
       {
-        "sym": "AAPLc",
+        "sym": "AAPLx",
         "px": "—",
         "chg": "",
         "up": true,
         "spark": "0,17 16,15 32,16 48,13 64,14 78,11 90,12"
       },
       {
-        "sym": "MSTRc",
+        "sym": "MSTRx",
         "px": "—",
         "chg": "",
         "up": false,

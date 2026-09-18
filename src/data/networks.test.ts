@@ -9,7 +9,7 @@ import { readNetwork } from './networks';
 const report = {
   ok: false,
   status: 'down',
-  chain: 'base-sepolia',
+  chain: 'xlayer-testnet',
   delegation: '0x6c5528Fd8E74a047A85bAb413856A9239E73540e',
   uptimeSec: 5,
   dependencies: [{ name: 'postgres', status: 'down', critical: true, detail: 'no answer in 5000ms' }],
@@ -34,7 +34,7 @@ describe('readNetwork', () => {
     );
 
     const read = await readNetwork('https://api.xorr.finance/');
-    expect(read.health).toMatchObject({ status: 'down', chain: 'base-sepolia' });
+    expect(read.health).toMatchObject({ status: 'down', chain: 'xlayer-testnet' });
     expect(read.tradable).toEqual([]);
     expect(read.yieldSupply).toBeInstanceOf(ApiError);
     expect((read.yieldSupply as ApiError).status).toBe(502);

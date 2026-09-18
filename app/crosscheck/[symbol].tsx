@@ -76,7 +76,7 @@ export default function Crosscheck() {
             </SheetCard>
 
             <View style={{ flexDirection: 'row', gap: space.s10 }}>
-              <Source label="On-chain" note="what a trade would pay" value={data.oneinch} />
+              <Source label="On-chain" note="what a trade would pay" value={data.pool} />
               <Source label="Reference" note="the market feed" value={data.coingecko} />
             </View>
 
@@ -100,7 +100,7 @@ export default function Crosscheck() {
             ) : null}
 
             <Text variant="footnote" color={colors.ink55}>
-              On-chain price from 1inch. Reference from CoinGecko.
+              On-chain price from the Uniswap v3 pools. Reference from CoinGecko.
             </Text>
           </>
         )}

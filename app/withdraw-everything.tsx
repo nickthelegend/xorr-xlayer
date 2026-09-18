@@ -234,7 +234,7 @@ export default function WithdrawEverything() {
                 {preview.data?.skipped && preview.data.skipped.length > 0 && preview.data.dustBelowUsd !== undefined
                   ? `${preview.data.skipped.join(', ')} ${preview.data.skipped.length === 1 ? 'stays' : 'stay'}: under ${money(preview.data.dustBelowUsd)}. `
                   : ''}
-                ETH stays, for network fees.
+                OKB stays, for network fees.
               </Text>
 
               {confirming && destination ? (

@@ -23,7 +23,7 @@ import { plainAction } from '@/format/activity';
 /** What a grant from here allows: a small daily cap, for a week. The contract enforces both. */
 const CAP_USD = 50;
 const DAYS = 7;
-const BUY = { symbol: 'WETH', usd: 5 } as const;
+const BUY = { symbol: 'NVDAx', usd: 5 } as const;
 
 type Action = 'create' | 'fund' | 'grant' | 'buy' | 'revoke' | 'prove';
 type Act = (action: Action, run: (write: Keyed) => Promise<TreasuryAnswer>) => Promise<void>;

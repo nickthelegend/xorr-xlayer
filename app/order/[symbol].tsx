@@ -3,7 +3,7 @@
  *
  * Title + close. Buy/Sell segmented on `sheet.fill`. 52/700 amount + unit conversion.
  * Quick pills $100 / $500 / Max. 3×4 numeric keypad. Minimum received and network fee, from the
- * route. CTA "{side} ${amount} of WETH" in `candleUp` / `candleDown`, with the reason under it when
+ * route. CTA "{side} ${amount} of NVDAx" in `candleUp` / `candleDown`, with the reason under it when
  * the wallet cannot cover the order.
  *
  * Keypad rules live in state.md and are implemented in state/derived.ts#keypadPress:
@@ -85,7 +85,7 @@ export default function OrderTicket() {
    * directly and happily said "Buy $250 of NOPE".
    *
    * Asked of the EXECUTOR, not of the static list. The two disagree on the tokenized equities:
-   * their addresses are real on Base and they do not function on a fork of it, so the constant said
+   * their addresses are real on X Layer mainnet and do not exist on the testnet, so the constant said
    * tradable while the chain said otherwise, and this screen rendered a live price and an enabled
    * Buy for a fill that reverts.
    *
@@ -150,17 +150,17 @@ export default function OrderTicket() {
    * The REAL cost of this trade, from the route that would fill it.
    *
    * This row said "Fee (0.1%)" and showed `amount * 0.001` — a number nobody charges. xorr takes
-   * no fee, and 1inch's cost is whatever the route costs, which varies by size and by venue.
+   * no fee, and the venue's cost is whatever the route costs, which varies by size and by venue.
    * A confident $0.25 on the ticket is the same class of invention as a stale price: specific,
    * plausible and untrue.
    *
-   * `/swap/quote` is a real 1inch v6 quote. It is asked for the amount actually entered, so the
+   * `/swap/quote` is a real Uniswap v3 quote, read from the pools. It is asked for the amount actually entered, so the
    * number moves with the size the way a real cost does — and when it cannot be answered the row
    * says so rather than falling back to arithmetic.
    */
   /*
-   * Debounced, and that is not a nicety — see useDebounced. Every keypress fired a real 1inch
-   * quote, and the executor serialises 1inch in one lane, so the swap the ORDER needed queued
+   * Debounced, and that is not a nicety — see useDebounced. Every keypress fired a real venue
+   * quote, and the executor serialised them in one lane, so the swap the ORDER needed queued
    * behind the quotes drawn for the "At worst" line. One measured buy waited 153 seconds and then
    * failed on slippage, because the price had moved while it waited for its own decoration.
    */
@@ -412,7 +412,7 @@ export default function OrderTicket() {
       ) : (
         <View style={{ paddingVertical: space.s14, alignItems: 'center' }}>
           <Text variant="secondary" color={colors.sheet.muted} align="center">
-            {/* "Here", not a chain's name: an equity trades on Base and not on a fork of it, and no network is named off the money screens. */}
+            {/* "Here", not a chain's name: an equity trades on X Layer mainnet and its fork but not on the testnet, and no network is named off the money screens. */}
             Not tradable here
           </Text>
         </View>

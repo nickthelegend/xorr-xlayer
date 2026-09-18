@@ -14,7 +14,7 @@ export type HistoryToken = { symbol: string; decimals: number; address: string }
 export type HistoryRun = {
   /** The strategy's kind — `dca`, `exit-rules`, `swap`. */
   kind: string;
-  /** Where the executor settled it: `1inch`, `aqua`, `swapvm`, `aave`. */
+  /** Where the executor settled it: `uniswap-v3`, `okx-dex`, `aave`. */
   venue: string | null;
   side: string | null;
   units: number | null;
@@ -24,8 +24,8 @@ export type HistoryRun = {
 };
 
 export type HistoryItem = {
-  /** `spent` and `closed` are the delegation contract's own events; `1inch` is 1inch's history of the wallet, on Base. */
-  kind: 'spent' | 'closed' | '1inch';
+  /** The delegation contract's own events: `Spent` for a buy, `Closed` for a sale. */
+  kind: 'spent' | 'closed';
   txHash: string;
   block: number;
   /** The block's time, or null when the executor could not read that block. */
@@ -34,13 +34,11 @@ export type HistoryItem = {
   venue: string | null;
   /** Null for a token the executor's registry does not list. */
   token: HistoryToken | null;
-  /** Base units, exactly. Null only for a 1inch event that moved no token. */
+  /** Base units, exactly. Null where the chain carried no amount. */
   amount: string | null;
   /** Dollars only where the amount is the settlement token itself. */
   usd: number | null;
   run?: HistoryRun;
-  /** What 1inch calls the event, and which way its token moved for this wallet. */
-  oneinch?: { type: string; direction: 'in' | 'out' | null };
   /** A block-explorer URL, or a `fork:` or `local:` label where no explorer has seen the transaction. */
   explorer: string;
 };
@@ -48,11 +46,11 @@ export type HistoryItem = {
 export type HistoryResponse = {
   owner: string;
   chain: string;
-  source: 'chain' | 'chain+1inch';
+  source: 'chain';
   /** The blocks the chain read covered. The read is bounded, so an empty list means empty in here. */
   window: { fromBlock: number; toBlock: number; since: string | null };
   /** A part of the history that could not be read, and why. The rest is still true. */
-  unavailable: { source: '1inch'; reason: string } | null;
+  unavailable: { source: string; reason: string } | null;
   /** Newest first. */
   items: HistoryItem[];
 };

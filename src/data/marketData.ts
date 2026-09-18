@@ -50,7 +50,7 @@ export function resetPricedSymbols(): void {
   feedSymbolsInFlight = undefined;
 }
 
-export type Quote = { price: number; change24h: number; source: 'coingecko' | '1inch' };
+export type Quote = { price: number; change24h: number; source: 'coingecko' | 'uniswap-v3' };
 
 /**
  * A short client-side cache on top of the server's own. Two components mounting on the same screen
@@ -147,11 +147,11 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Quo
    * `/market/symbols` lists what CoinGecko covers, which is crypto — so every equity was filtered
    * out here and `usePrice` returned nothing for them. The market list did not show it, because
    * it merges `/market/stocks` itself; every other screen did. The order ticket read **"No live
-   * NVDAc price"** directly above "At worst, via Elfomofi — 1.0738 NVDAc", quoting a real route
-   * for an asset it had just called unpriced, on the buy screen for the whole stocks track.
+   * NVDAx price"** directly above the route's minimum out in NVDAx, quoting a real route for an
+   * asset it had just called unpriced, on the buy screen for the whole stocks track.
    *
-   * `/market/stocks` derives its price from a real 1inch route, which is the right number anyway:
-   * what the user pays is what routes on Base, not the NYSE print.
+   * `/market/stocks` derives its price from a real Uniswap v3 quote, which is the right number
+   * anyway: what the user pays is what the X Layer pools give, not the NYSE print.
    */
   const wantsStocks = symbols.some((s) => !priced.has(s) && STOCK_SUFFIX.test(s));
   const [live, stocks] = await Promise.all([
@@ -170,14 +170,14 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Quo
     if (!out[sym] && s?.price != null) {
       // No 24h change: a swap quote is one observation, and deriving a delta from it would be
       // the same invention the rest of this file exists to avoid.
-      out[sym] = { price: s.price, change24h: 0, source: '1inch' };
+      out[sym] = { price: s.price, change24h: 0, source: 'uniswap-v3' };
     }
   }
   return out;
 }
 
-/** `NVDAc`, `TSLAc` — a ticker with the lowercase suffix that marks the tokenized form. */
-const STOCK_SUFFIX = /^[A-Z]{1,6}c$/;
+/** `NVDAx`, `TSLAx` — a ticker with the lowercase `x` that marks the wrapped xStock. */
+const STOCK_SUFFIX = /^[A-Z]{1,6}x$/;
 
 /**
  * Is this a tokenized share — priced by the route that would fill it, not by the crypto feed?
@@ -435,7 +435,7 @@ export type FillRun = {
   side?: string | null;
   price: number | null;
   finishedAt: string | null;
-  /** Where it filled — `jupiter-route`, `venue-vault`, or an older run's EVM venue. Absent or null: not recorded. */
+  /** Where it filled — `uniswap-v3`, `okx-dex`, `aave`, or an older run's venue. Absent or null: not recorded. */
   venue?: string | null;
 };
 
@@ -444,8 +444,8 @@ export type FillRun = {
  *
  * Filled runs only, a buy or a sell only, and only with a price and the time the fill settled: without any one of
  * those there is nothing true to place, and a mark put somewhere near is a guess drawn on a price chart. `symbol` is
- * the token a market settles as — ETH's fills are WETH's — matched without case, since the registry spells cbBTC
- * `CBBTC`. Manual buys and sales are here as well: the executor records each as a one-off strategy's run.
+ * the token a market settles as — BTC's fills are XBTC's — matched without case, since a route param may spell
+ * `xbtc` or `NVDAX`. Manual buys and sales are here as well: the executor records each as a one-off strategy's run.
  *
  * A rebalance's legs are not. Its runs carry the strategy's own symbol, `PORTFOLIO`, rather than the token each leg
  * traded, so no asset's chart can claim them.
@@ -488,7 +488,7 @@ export type StockQuote = {
   symbol: string;
   name: string;
   address: string;
-  /** USD per share, derived from a real 1inch route. Null when nothing routes right now. */
+  /** USD per share, derived from a real Uniswap v3 quote. Null when nothing routes right now. */
   price: number | null;
   venues: string[];
   feed: 'live' | 'unavailable';
@@ -498,7 +498,7 @@ export type StockQuote = {
  * Tokenized equities, priced off the venue that would fill the trade.
  *
  * These have no CoinGecko feed, and the NYSE print would be the wrong number anyway: what a user
- * pays is what 1inch routes on Base. The executor derives the price from a real quote.
+ * pays is what the Uniswap v3 pools on X Layer give. The executor derives the price from a real quote.
  */
 export async function fetchStockQuotes(): Promise<Record<string, StockQuote>> {
   const rows = await getJson<StockQuote[]>('/market/stocks', 30_000);

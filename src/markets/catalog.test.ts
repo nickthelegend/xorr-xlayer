@@ -20,8 +20,9 @@ import type { XStockRow } from '@/data/system';
 function row(over: Partial<XStockRow> & Pick<XStockRow, 'symbol' | 'sector'>): XStockRow {
   return {
     name: `${over.symbol} xStock`,
-    address: `mint-${over.symbol}`,
-    decimals: 8,
+    ticker: over.symbol.replace(/x$/, ''),
+    address: `0x${'0'.repeat(40)}`,
+    decimals: 18,
     price: 100,
     underlyingPrice: null,
     change24hPct: null,
@@ -52,7 +53,7 @@ describe('the sector filter', () => {
   });
 
   it('keeps an unpriced row inside its own sector', () => {
-    // AAPLx has no price and is still an Apple share tokenized on Solana. Hiding it here would
+    // AAPLx has no price and is still an Apple share tokenized on X Layer. Hiding it here would
     // make a feed outage look like a shorter catalog.
     const tech = bySector(ALL, 'Technology');
     expect(tech.map((r) => r.symbol)).toEqual(['NVDAx', 'AAPLx']);

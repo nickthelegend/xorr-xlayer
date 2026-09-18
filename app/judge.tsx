@@ -309,7 +309,7 @@ function Tally({ d }: { d: Report }) {
             This said "those need a wallet address, and none was given" for every skip, whatever
             caused it. Signed in with a real wallet, the summary read "19/20 · 1 skipped — those
             need a wallet address, and none was given" while the only skipped row was the tokenized
-            equities check, which skips because the tokens do not function on Sepolia and says so at
+            equities check, which skips because the tokens do not exist on the testnet and says so at
             length on its own line. Nineteen of the checks had used the wallet to get their answer.
             
             A screen whose entire purpose is that its claims can be trusted cannot afford a

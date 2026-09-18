@@ -2,19 +2,19 @@
  * FillReceipt.tsx — what a confirmed fill leaves behind.
  *
  * A fill used to end with a signature in a card and nothing else. The signature proves *a* transaction happened; it
- * does not say where it happened, and where is the part that decides what the signature even means. A `jupiter-route`
- * fill and a `venue-vault` fill produce equally valid signatures for two different events, and the app was showing
+ * does not say where it happened, and where is the part that decides what the transaction even means. A `uniswap-v3`
+ * swap and an `aave` supply produce equally valid transactions for two different events, and the app was showing
  * them identically.
  *
- * So the receipt says all three: **the venue**, the signature, and the slot it landed in.
+ * So the receipt says all three: **the venue**, the transaction hash, and the block it landed in.
  *
  * ## Nothing here is ever stood in for
  *
- * Each of the three is drawn only from a real recorded value. A missing slot draws no slot; an unrecognised venue is
+ * Each of the three is drawn only from a real recorded value. A missing block draws no block; an unrecognised venue is
  * printed verbatim rather than given a friendly name this build cannot justify; a run that reached no venue at all
  * says so in words, because "blocked before it reached a venue" and "we could not read the venue" are different facts
- * and a blank space says neither. The naming rules, including the one forbidding a vault settlement from being called
- * a Jupiter swap, are `fillVenue.ts` and are tested there.
+ * and a blank space says neither. The naming rules, including the one forbidding an Aave supply from being called a
+ * trade, are `fillVenue.ts` and are tested there.
  *
  * ## The motion
  *
@@ -30,7 +30,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { shortSignature, slotLabel, venueNaming } from './fillVenue';
+import { blockLabel, shortSignature, venueNaming } from './fillVenue';
 import { arrival, duration, useReducedMotion } from './motion';
 import { SheetCard } from './SheetCard';
 import { Text, Value } from './Text';
@@ -44,8 +44,8 @@ export interface FillReceiptProps {
   signature: string;
   /** The venue that filled it (`strategy_runs.venue`). Null for a run that never reached one. */
   venue?: string | null;
-  /** The slot it landed in, where the executor kept it. Absent draws no slot rather than a zero. */
-  slot?: number | null;
+  /** The block it landed in, where the executor kept it. Absent draws no block rather than a zero. */
+  block?: number | null;
   /**
    * Play the arrival. Off for a receipt that was already on screen when it opened — a fill from last week did not just
    * happen, and animating it in would say that it did.
@@ -54,10 +54,10 @@ export interface FillReceiptProps {
   testID?: string;
 }
 
-export function FillReceipt({ signature, venue, slot, animate = true, testID }: FillReceiptProps) {
+export function FillReceipt({ signature, venue, block, animate = true, testID }: FillReceiptProps) {
   const reduced = useReducedMotion();
   const naming = venueNaming(venue);
-  const slotShown = slotLabel(slot);
+  const blockShown = blockLabel(block);
 
   /* 0 before it arrives, 1 in place. Seeded at 1 when there is no arrival to play. */
   const landed = useSharedValue(animate ? 0 : 1);
@@ -119,13 +119,13 @@ export function FillReceipt({ signature, venue, slot, animate = true, testID }: 
           {signature}
         </Text>
 
-        {slotShown ? (
+        {blockShown ? (
           <>
             <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s12 }}>
-              SLOT
+              BLOCK
             </Text>
             <Value variant="footnoteSm" color={colors.ink65} style={{ marginTop: space.s4 }}>
-              {slotShown}
+              {blockShown}
             </Value>
           </>
         ) : null}
@@ -134,4 +134,4 @@ export function FillReceipt({ signature, venue, slot, animate = true, testID }: 
   );
 }
 
-export { shortSignature, slotLabel, venueNaming };
+export { blockLabel, shortSignature, venueNaming };

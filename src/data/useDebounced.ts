@@ -3,9 +3,9 @@
  *
  * `useSwapQuote` has always debounced its own request by 350ms — "the amount stepper fires on
  * every tap" — but the order ticket asks for its route quote through `useAsync` and had no such
- * delay, so a real 1inch call went out on every keypress of the amount.
+ * delay, so a real venue quote went out on every keypress of the amount.
  *
- * That is not merely wasteful. 1inch is rate limited and the executor serialises calls to it in
+ * That is not merely wasteful. The venue is rate limited and the executor serialises calls to it in
  * one lane, so composing "$25" queued five or six quotes ahead of the swap the ORDER then needed
  * to build. A measured `POST /orders` took **153 seconds** and came back 502 — the price had moved
  * past the slippage limit while the trade waited behind quotes drawn for a row of text.

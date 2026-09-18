@@ -7,8 +7,8 @@
  * position rows, from the real book. Sell / Buy.
  *
  * Rebuilt on `src/ui`. Everything that used to be invented is gone: the position rows were
- * hardcoded (1,750.30 SOL, avg cost $81.14, +$12,566), and the chart fell back to
- * `areaSeries.SOL`, drawing Solana's shape under whatever symbol you had opened.
+ * hardcoded (1,750.30 of one token, avg cost $81.14, +$12,566), and the chart fell back to one
+ * fixture series, drawing its shape under whatever symbol you had opened.
  *
  * The price and the history are read through `src/markets` and `src/data/marketData`, where a failed read throws.
  * Through the repository both failures came back as "no feed", so the error state this screen carried could never show.
@@ -294,7 +294,7 @@ export default function AssetDetail() {
             The mark does not depend on the instrument being in a market class.
 
             It used to: `i ? <AssetMark …>` meant the header was bare for anything the market list
-            does not carry — including WETH, which is the app's own default buy, sits on Home and in
+            does not carry — including WETH, which was the app's own default buy, sat on Home and in
             Holdings wearing its real logo, and lost it on the one screen dedicated to it. The
             instrument only ever supplied two gradient colours, and `assetGradient` derives those
             from the symbol, so there is nothing to wait for.
@@ -592,7 +592,7 @@ export default function AssetDetail() {
       {/*
         A Buy button on a market this chain cannot settle is a promise the app cannot keep.
         These instruments are real markets, but nothing prices them on this build and none carries
-        a price here; what does not exist is a token on Base to route into. Saying so is better than a button that
+        a price here; what does not exist is a token on this chain to route into. Saying so is better than a button that
         leads to an order ticket which can never be filled.
       */}
       <View style={{ paddingHorizontal: space.gutter }}>
@@ -618,7 +618,7 @@ export default function AssetDetail() {
         ) : (
           <View style={{ marginTop: space.s14, paddingVertical: space.s14, alignItems: 'center' }}>
             <Text variant="secondary" align="center">
-              {/* "Here", not a chain's name: an equity trades on Base and not on a fork of it, and no network is named off the money screens. */}
+              {/* "Here", not a chain's name: an equity trades on X Layer mainnet and its fork but not on the testnet, and no network is named off the money screens. */}
               Not tradable here
             </Text>
           </View>

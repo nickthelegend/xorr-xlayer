@@ -132,7 +132,7 @@ export default function Proposal() {
        */
       const tradable = (await system.tradable()).map((t) => t.symbol);
       /*
-       * Where nothing settles — Base Sepolia, where 1inch has no deployment — the tradable list is empty (PLAN.md
+       * Where nothing settles — X Layer testnet, where no DEX has pools — the tradable list is empty (PLAN.md
        * 3.7) and approving refused with "nothing to rebalance", so a new user could not finish. There the
        * portfolio is created watched, over what the chain can price and read: it reports what it would trade,
        * moves nothing, and the screen says so.
@@ -239,7 +239,7 @@ export default function Proposal() {
                 </View>
                 {/* Indented to the dot's text column, so the rationale reads as belonging to
                     the sleeve above it rather than to the card. A sleeve nothing here can settle, like the
-                    equities on a fork or on Base Sepolia, is held as cash and says that instead. */}
+                    equities on the testnet, is held as cash and says that instead. */}
                 <Text variant="secondarySm" color={colors.ink55} style={{ paddingLeft: space.s18 }}>
                   {sleeveHeldAsCash(s.name, tradable) ? 'Held as cash on this network.' : s.note}
                 </Text>

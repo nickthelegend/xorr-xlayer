@@ -270,7 +270,7 @@ function StrategyRow({ s, onChanged }: { s: Strategy; onChanged: () => void }) {
        * The server's sentence, not the wire.
        *
        * This was `e.message.slice(0, 90)`, and `ApiError.message` is the raw response — so
-       * pressing Run now on a chain 1inch cannot fill printed this under the row:
+       * pressing Run now on a chain no venue can fill printed this under the row:
        *
        *   502 : {"status":"failed","runId":"040c4097-84a3-41bc-a203-3dd30a20d523","error":"This netw
        *

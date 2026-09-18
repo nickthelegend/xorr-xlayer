@@ -1,14 +1,15 @@
 /**
  * The split or dividend an equity has queued, and the sentence that says so.
  *
- * Backed's xStocks are Token-2022 mints carrying the Scaled UI Amount extension, and a corporate
- * action lives there as a NEW MULTIPLIER with the timestamp it takes effect. The server reads it
- * off the mint; this turns the reading into words.
+ * Backed's xStocks on X Layer are rebasing ERC-20s behind an ERC-4626 wrapper, and a corporate
+ * action lives on the raw token as a NEW MULTIPLIER (`newMultiplier`) with the time it takes effect
+ * (`newMultiplierActivationTime`). The server reads it off the token; this turns the reading into
+ * words.
  *
  * ## Why the wording is careful
  *
- * The extension records THAT the multiplier changes, not WHY. A forward split and a dividend paid
- * as extra units both raise it, and nothing in the account data separates them. So the sentence
+ * The token records THAT the multiplier changes, not WHY. A forward split and a dividend paid
+ * as extra units both raise it, and nothing in the contract state separates them. So the sentence
  * says what is about to happen to the holding — units multiplied, price per unit divided — and
  * never names the event. Calling a dividend a split on an asset screen would be exactly the sort of
  * invention the on-chain read was chosen to avoid.
@@ -85,10 +86,10 @@ export function actionSentence(
   if (!notice) return null;
 
   if (notice.status === 'unavailable') {
-    // Nothing to say about an asset that was never a Token-2022 equity — it has no multiplier to move.
+    // Nothing to say about an asset that was never an xStock — it has no multiplier to move.
     if (notice.reason === 'not_tokenized') return null;
     return {
-      text: 'The mint did not answer, so whether a split or dividend is scheduled is unknown right now.',
+      text: 'The token did not answer, so whether a split or dividend is scheduled is unknown right now.',
       kind: 'blocked',
     };
   }

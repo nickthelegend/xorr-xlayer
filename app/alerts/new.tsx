@@ -72,9 +72,9 @@ export default function NewAlert() {
 
   /*
    * NOT `.toUpperCase()`. Rule 3 in `venues/oneinch.ts`: no boundary may uppercase a caller's
-   * symbol, because the tokenized equities carry a lowercase suffix and `NVDAc` becoming `NVDAC`
+   * symbol, because the tokenized equities carry a lowercase suffix and `NVDAx` becoming `NVDAX`
    * is how three separate production bugs started. `resolvePriceable` returns the canonical
-   * spelling from the list, so typing `nvdac` produces `NVDAc`.
+   * spelling from the list, so typing `nvdax` produces `NVDAx`.
    */
   const sym = resolvePriceable(symbol, known) ?? symbol.trim();
   const unpriceable = known !== undefined && symbol.trim().length > 0 && !resolvePriceable(symbol, known);

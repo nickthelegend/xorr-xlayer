@@ -78,7 +78,7 @@ export interface BotRepository {
   generateProposal(): Promise<{ proposal: Proposal | null; declined?: string }>;
   /** Approve places the order for real; the answer says what happened. See `ProposalDecision`. */
   decideProposal(id: string, decision: 'approve' | 'skip'): Promise<ProposalDecision>;
-  /** `symbol` is what the replay buys, where the agent trades more than one; the executor defaults to WETH. */
+  /** `symbol` is what the replay buys, where the agent trades more than one; the executor picks its own default otherwise. */
   backtest(agentId: string, lookback: BacktestResult['lookback'], symbol?: string): Promise<BacktestResult>;
   leaderboard(): Promise<Agent[]>;
   /**
@@ -245,8 +245,8 @@ export interface NewsRepository {
 /**
  * Yield — PLAN.md 12.17 [G35].
  *
- * The handoff quotes 12.6% APY on Home, in Activity and in the Briefing. The live figure derived
- * from Solana's own inflation schedule is materially lower. The app shows the LIVE number: an
+ * The handoff quotes 12.6% APY on Home, in Activity and in the Briefing. The live Aave supply rate
+ * on X Layer is materially lower. The app shows the LIVE number: an
  * app that advertises a rate it cannot deliver is the thing copy.md's "never oversell" rule
  * exists to prevent.
  */
@@ -317,10 +317,10 @@ export interface YieldRepository {
     /**
      * Whether this can be supplied on the chain this build trades.
      *
-     * The rate is read from Base mainnet on every build, deliberately — Sepolia answers a rate
-     * query with a zeroed struct rather than an error, so asking it produces a confident 0.00%.
-     * The consequence is that a Sepolia build showed a real 4% and offered to sweep cash into a
-     * pool that is not deployed there, where the executor's own planner refuses every run.
+     * The rate is read from X Layer mainnet on every build, deliberately — a testnet answers a
+     * rate query with a zeroed struct rather than an error, so asking it produces a confident
+     * 0.00%. The consequence is that a testnet build shows a real rate while the pool is not
+     * deployed there, where the executor's own planner refuses every run — so this says so.
      */
     availableHere?: boolean;
   } | null>;

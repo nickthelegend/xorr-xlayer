@@ -196,7 +196,7 @@ export function closeCta(pct: number): string {
  * The swap a person composed, as the executor takes it — the body `POST /swap` receives (PLAN.md 3.9).
  *
  * The amount stays the decimal they typed: the executor parses it into the token's own base units, so no float
- * stands between "0.1 WETH" and the wei the delegation pulls. `null` when there is nothing to send — no amount, or
+ * stands between "0.1 WOKB" and the wei the delegation pulls. `null` when there is nothing to send — no amount, or
  * the same token on both sides — so the screen cannot build a request the executor would only refuse.
  *
  * It replaced `swapOut`, `swapFee` and the slider bounds: the prototype's arithmetic, with a 0.25% fee nobody charges.
@@ -773,15 +773,17 @@ export function driftSentence(symbol: string, drift: { kind: 'missing' | 'unreco
 
 /** Which tradable symbols each onboarding sleeve means (PLAN.md 2.17). Stable yield is Aave, not a swap: cash here. */
 export const SLEEVE_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
-  'Blue-chip crypto': ['WETH', 'CBBTC'],
-  'Tokenized equities': ['NVDAc', 'AAPLc', 'TSLAc', 'METAc', 'MSFTc', 'AMZNc', 'GOOGLc', 'MSTRc'],
+  'Blue-chip crypto': ['XBTC', 'WOKB'],
+  'Tokenized equities': [
+    'NVDAx', 'AAPLx', 'TSLAx', 'METAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'MSTRx', 'COINx', 'SPYx', 'QQQx',
+  ],
   'Stable yield': [],
 };
 
 /**
  * Whether a sleeve's weight is held as cash on this network because nothing it names settles here: the equities on a
- * fork or on Base Sepolia. The onboarding screen said "NVDAc, AAPLc and six more tokenized stocks" beside 30% on a fork,
- * where approving holds that 30% as cash. Not the stable-yield sleeve, which names nothing to swap on any chain; not
+ * build whose executor finds the xStock wrappers non-functional. The onboarding screen said "NVDAx, AAPLx and nine more
+ * tokenized stocks" beside 30% where approving would hold that 30% as cash. Not the stable-yield sleeve, which names nothing to swap on any chain; not
  * where nothing settles at all, which the screen says on its own; and not before the executor has said what settles.
  */
 export function sleeveHeldAsCash(name: string, tradable: readonly string[] | undefined): boolean {
@@ -794,7 +796,7 @@ export function sleeveHeldAsCash(name: string, tradable: readonly string[] | und
 /**
  * The onboarding weights as a rebalance holds them (PLAN.md 2.17): each sleeve's percent split evenly across
  * the symbols it names that this chain can settle. What is left — a sleeve with nothing tradable here, like
- * the equities on Base Sepolia, and the stable-yield sleeve — is cash, because a rebalance's untargeted weight
+ * the equities where their wrappers do not function, and the stable-yield sleeve — is cash, because a rebalance's untargeted weight
  * is cash. Rounded down to a hundredth of a percent, so the targets never add up past the whole.
  */
 export function targetsFromSleeves(
@@ -818,7 +820,7 @@ export function targetsFromSleeves(
 
 /**
  * What approving the onboarding proposal creates (PLAN.md 2.17, 3.7): a live rebalance over what this network
- * settles or — where nothing settles, as on Base Sepolia — a watched one over what it can follow, which reports
+ * settles or — where nothing settles, as on the X Layer testnet — a watched one over what it can follow, which reports
  * what it would trade and moves nothing. `watchable` is used only when nothing settles.
  */
 export function proposalRebalance(
@@ -833,7 +835,7 @@ export function proposalRebalance(
 /**
  * Whether this deployment fills nothing (PLAN.md 4.3): the executor offers nothing to trade while it still offers
  * things to watch. `/market/tradable` answers `[]` exactly where nothing settles (3.7); an empty watch list beside it
- * would be an executor with no registry, not a chain without 1inch, so that says nothing — and neither does a read
+ * would be an executor with no registry, not a chain without a DEX, so that says nothing — and neither does a read
  * that has not answered.
  */
 export function nothingSettles(
@@ -1086,7 +1088,7 @@ function recordValue(value: unknown, unit: RecordUnit | undefined): string {
  *
  * Both screens rendered `String(value)` key by key, so anything nested reached the screen as
  * `[object Object]` (a rebalance's targets) or as `55,30,15` (its weights). Nested objects are flattened
- * into rows like "Target · WETH" rather than dropped, because the shape differs per strategy and per
+ * into rows like "Target · XBTC" rather than dropped, because the shape differs per strategy and per
  * agent, and a layout that skipped what it did not expect would hide a field without saying so. A value
  * that cannot be read is a dash, never `NaN`, `null` or `undefined`.
  */
@@ -1109,7 +1111,7 @@ export function recordEntries(
       if (children.length === 0) rows.push({ key, label, value: '—' });
       for (const [k, v] of children) {
         const field = recordField(k);
-        // A child key is usually data — a symbol, a sleeve — so it keeps its own spelling: "Target · CBBTC".
+        // A child key is usually data — a symbol, a sleeve — so it keeps its own spelling: "Target · XBTC".
         visit(`${key}.${k}`, `${label} · ${field?.label ?? k}`, v, field?.unit ?? unit);
       }
       return;

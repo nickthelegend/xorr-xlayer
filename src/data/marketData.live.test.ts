@@ -49,18 +49,18 @@ describe('live market data', () => {
     }
   }, 90_000);
 
-  it('prices the Base assets the delegation actually trades', async () => {
-    // WETH and cbBTC are what a Base strategy holds; if they have no feed the order ticket and the
+  it('prices the X Layer assets the delegation actually trades', async () => {
+    // XBTC and WOKB are what an X Layer strategy holds; if they have no feed the order ticket and the
     // executor are pricing different things.
-    const quotes = await fetchQuotes(['WETH', 'CBBTC', 'USDC']);
-    for (const sym of ['WETH', 'CBBTC', 'USDC']) {
+    const quotes = await fetchQuotes(['XBTC', 'WOKB', 'USDC']);
+    for (const sym of ['XBTC', 'WOKB', 'USDC']) {
       expect(quotes[sym], `${sym} has no live quote`).toBeDefined();
       expect(quotes[sym]!.price).toBeGreaterThan(0);
     }
-    // WETH must track ETH: same asset, one wrapped. Anything past a few percent is a broken map.
-    const eth = await fetchQuotes(['ETH']);
-    const drift = Math.abs(quotes.WETH!.price - eth.ETH!.price) / eth.ETH!.price;
-    expect(drift, `WETH ${quotes.WETH!.price} vs ETH ${eth.ETH!.price}`).toBeLessThan(0.05);
+    // XBTC must track BTC: same asset, one wrapped. Anything past a few percent is a broken map.
+    const btc = await fetchQuotes(['BTC']);
+    const drift = Math.abs(quotes.XBTC!.price - btc.BTC!.price) / btc.BTC!.price;
+    expect(drift, `XBTC ${quotes.XBTC!.price} vs BTC ${btc.BTC!.price}`).toBeLessThan(0.05);
     // A dollar stablecoin that is not within a cent of a dollar is a feed bug, not a market move.
     expect(Math.abs(quotes.USDC!.price - 1)).toBeLessThan(0.01);
   }, 90_000);
@@ -113,7 +113,7 @@ describe('live market data', () => {
      */
     const priced = await pricedSymbols();
     expect(priced.size).toBeGreaterThan(0);
-    for (const sym of ['WETH', 'USDC', 'CBBTC', 'BTC', 'ETH']) expect(priced.has(sym)).toBe(true);
+    for (const sym of ['XBTC', 'WOKB', 'USDC', 'BTC', 'ETH']) expect(priced.has(sym)).toBe(true);
     // The two that drifted. A real gold feed exists; the commodities tab must be able to ask.
     for (const sym of ['XAUT', 'PAXG']) expect(priced.has(sym)).toBe(true);
   });

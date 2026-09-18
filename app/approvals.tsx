@@ -2,7 +2,7 @@
  * Approvals — what may pull tokens from this wallet, read from the chain (PLAN.md 3.12).
  *
  * Two spenders, not one. The delegation contract is what the app asks you to approve, so the executor can trade
- * inside your cap. The 1inch router is what the app never needs approved — the delegation approves it for a single
+ * inside your cap. The swap router is what the app never needs approved — the delegation approves it for a single
  * trade and resets it to zero — so an allowance to it was granted somewhere else, and is worth taking back.
  *
  * Every allowance above zero has a button that takes it back: an `approve(spender, 0)` you sign yourself. An allowance

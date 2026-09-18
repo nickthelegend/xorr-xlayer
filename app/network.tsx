@@ -1,22 +1,26 @@
 /**
  * Which chain this build is actually pointed at.
  *
- * More useful than it sounds, because this app runs against three: Base mainnet, Base Sepolia, and
- * a mainnet fork. They look identical from every other screen and behave completely differently —
- * 1inch cannot settle on Sepolia, the tokenized equities do not function on the fork, and a block
- * explorer link means nothing on either. Someone reading a price should be able to find out which
- * of those they are looking at without reading the source.
+ * More useful than it sounds, because this app runs against three: X Layer mainnet, X Layer testnet, and a fork of
+ * mainnet. They look identical from every other screen and behave completely differently — no DEX routes on the testnet,
+ * so swaps cannot fill there, and a fork's fresh transactions exist on no public explorer. Someone reading a price should
+ * be able to find out which of those they are looking at without reading the source.
  *
  * The block height comes from the RPC dependency's own detail string in `/health`, which is where
  * the executor already reports it. Parsing it here rather than adding a route keeps one source of
  * truth for "what block are we on".
  *
- * Since 2026-09-15 it is also any network xorr runs on (`/network?key=base-sepolia`, from Networks): the same cards, read
- * from that network's own executor, with what works there. Without a key it is the network this app talks to, and it
+ * Since 2026-09-15 it is also any network xorr runs on (`/network?key=xlayer-testnet`, from Networks): the same cards,
+ * read from that network's own executor, with what works there. Without a key it is the network this app talks to, and it
  * says when this build and its executor disagree about which chain that is.
+ *
+ * A build no deployment row names (the list is empty until the X Layer executors are recorded) still says which X Layer
+ * its executor serves: the chain id and explorer come from the chain key the executor reports, from `CHAIN_FACTS` below.
+ * The explorer is OKLink for mainnet and testnet, the same pages `server/src/evm/chains.ts` links transactions to; a fork
+ * and a local chain have none.
  */
 import React from 'react';
-import { ScrollView, View } from 'react-native';
+import { Linking, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import {
@@ -26,6 +30,7 @@ import {
   Fill,
   HeaderBar,
   Placeholder,
+  Press,
   Screen,
   SheetCard,
   Tag,
@@ -35,7 +40,7 @@ import {
   space,
 } from '@/ui';
 import { shortAddress } from '@/format';
-import { CHAIN_KEY } from '@/chain';
+import { CHAIN_KEY, chainSentenceNameOf } from '@/chain';
 import { API_BASE } from '@/data/apiBase';
 import { useAsync } from '@/data/useAsync';
 import { readNetwork } from '@/data/networks';
@@ -53,6 +58,17 @@ const CHAIN_NOTE: Record<string, string> = {
   'xlayer-testnet': 'X Layer testnet. Transactions settle; swaps cannot fill.',
   'xlayer-fork': 'A fork of X Layer. Fills are real here and nowhere else.',
   localnet: 'A local chain. Nothing leaves this machine.',
+};
+
+/**
+ * What each chain key is, for a network no deployment row names. A fork answers mainnet's id; its new blocks are on no
+ * public explorer, so it links none. The local chain's id is whatever the node was started with, so it is not claimed.
+ */
+const CHAIN_FACTS: Record<string, { chainId: number | null; explorer: string | null }> = {
+  xlayer: { chainId: 196, explorer: 'https://www.oklink.com/xlayer' },
+  'xlayer-testnet': { chainId: 1952, explorer: 'https://www.oklink.com/xlayer-test' },
+  'xlayer-fork': { chainId: 196, explorer: null },
+  localnet: { chainId: null, explorer: null },
 };
 
 export default function Network() {
@@ -92,6 +108,11 @@ export default function Network() {
   // Which chain the network is meant to be: this build's own key here, the deployment's key for another network.
   const expected = isThisApp ? CHAIN_KEY : target?.key;
   const disagree = health !== undefined && expected !== undefined && health.chain !== expected;
+  // The deployment row when there is one; otherwise what the executor's own chain key says.
+  const facts = health ? CHAIN_FACTS[health.chain] : undefined;
+  const chainName = target?.name ?? (health ? chainSentenceNameOf(health.chain) : undefined);
+  const chainId = target?.chainId ?? facts?.chainId ?? null;
+  const explorer = target ? target.explorer : (facts?.explorer ?? null);
 
   return (
     <Screen gutter="none">
@@ -125,16 +146,14 @@ export default function Network() {
                 {isThisApp && target ? <Tag label="This app" sentence radius={radius.full} /> : null}
               </View>
               <Text variant="screenTitle" style={{ marginTop: space.s6 }}>
-                {target?.name ?? health.chain}
+                {chainName ?? health.chain}
               </Text>
-              {target ? (
-                <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s4 }}>
-                  {`Chain ${target.chainId} · ${health.chain}`}
-                </Text>
-              ) : null}
+              <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s4 }}>
+                {chainId === null ? health.chain : `Chain ${chainId} · ${health.chain}`}
+              </Text>
               <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s10 }}>
                 {/*
-                  The consequence, not just the name. "base-fork" tells a reader nothing about why
+                  The consequence, not just the name. "xlayer-fork" tells a reader nothing about why
                   their explorer link is missing.
                 */}
                 {CHAIN_NOTE[health.chain] ?? 'An unrecognised chain key. Treat everything here with suspicion.'}
@@ -213,7 +232,7 @@ export default function Network() {
                 </Text>
                 <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s6 }}>
                   {/*
-                    Worth its own card: the bot pays its own gas and never touches the user's ETH,
+                    Worth its own card: the bot pays its own gas and never touches the user's OKB,
                     which is a claim `/verify` checks and this is where the balance behind it lives.
                   */}
                   {gas.detail ?? '—'}
@@ -221,13 +240,31 @@ export default function Network() {
               </SheetCard>
             ) : null}
 
-            {target?.explorer ? (
+            {explorer ? (
+              <Press
+                onPress={() => void Linking.openURL(`${explorer}/address/${health.delegation}`)}
+                accessibilityRole="link"
+                accessibilityLabel="Open the delegation contract on the explorer"
+              >
+                <SheetCard bordered borderRadius={radius.panel} padding={space.s14}>
+                  <Text variant="footnote" color={colors.ink55}>
+                    EXPLORER
+                  </Text>
+                  <Text variant="rowPrimary" style={{ marginTop: space.s4 }}>
+                    {explorer.replace(/^https:\/\//, '')}
+                  </Text>
+                  <Text variant="footnoteSm" color={colors.ink55} style={{ marginTop: space.s4 }}>
+                    The delegation contract, on OKLink.
+                  </Text>
+                </SheetCard>
+              </Press>
+            ) : health.chain === 'xlayer-fork' ? (
               <SheetCard bordered borderRadius={radius.panel} padding={space.s14}>
                 <Text variant="footnote" color={colors.ink55}>
                   EXPLORER
                 </Text>
-                <Text variant="rowPrimary" style={{ marginTop: space.s4 }}>
-                  {target.explorer.replace(/^https:\/\//, '')}
+                <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s6 }}>
+                  None. A fork's own transactions are on no public explorer.
                 </Text>
               </SheetCard>
             ) : null}

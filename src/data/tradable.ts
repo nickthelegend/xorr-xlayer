@@ -1,42 +1,50 @@
 /**
  * The symbols this build can actually place an order for.
  *
- * Mirrors `TOKENS` in server/src/venues/oneinch.ts, and `tradable.live.test.ts` fails if the two
- * ever drift. It exists because the market list and the tradable set are genuinely different
- * things: the app shows nine crypto instruments plus stocks, commodities and indices, and on Base
- * only a handful of those can be routed and settled. Offering a Buy on the rest would put a
- * strategy in the database that no signed transaction could ever fill.
+ * Mirrors the routable part of `TOKENS` in server/src/venues/tokens.ts (with the wrapped xStocks from
+ * server/src/venues/stocks.ts), and `tradable.live.test.ts` fails if the two ever drift. It exists
+ * because the market list and the tradable set are genuinely different things: the app shows crypto
+ * instruments plus stocks, commodities and indices, and on X Layer only a handful of those have a
+ * Uniswap v3 pool with real liquidity. Offering a Buy on the rest would put a strategy in the
+ * database that no signed transaction could ever fill.
+ *
+ * WETH is in the registry and deliberately not here: no WETH pool on X Layer holds real liquidity
+ * against a stablecoin, so it is held and shown, never traded.
  */
 export const TRADABLE = [
-  // Crypto the delegation can route on Base.
-  'ETH',
-  'WETH',
+  // Crypto with a route to USDC on X Layer.
   'USDC',
-  'CBBTC',
-  // Tokenized equities. Ordinary ERC-20s to the swap path — see server/src/venues/stocks.ts.
-  'NVDAc',
-  'AAPLc',
-  'TSLAc',
-  'METAc',
-  'MSFTc',
-  'AMZNc',
-  'GOOGLc',
-  'MSTRc',
+  'USDG',
+  'USDT0',
+  'XBTC',
+  'WOKB',
+  // Wrapped xStocks — ERC-4626 wrappers, ordinary ERC-20s to the swap path. See server/src/venues/stocks.ts.
+  'NVDAx',
+  'TSLAx',
+  'AAPLx',
+  'MSFTx',
+  'AMZNx',
+  'GOOGLx',
+  'METAx',
+  'MSTRx',
+  'COINx',
+  'SPYx',
+  'QQQx',
 ] as const;
 
 export type TradableSymbol = (typeof TRADABLE)[number];
 
 /**
- * What a market symbol settles into on Base.
+ * What a market symbol settles into on X Layer.
  *
- * Buying "BTC" here means buying cbBTC, and buying "ETH" means buying WETH — the market is real,
- * and the instrument that represents it on this chain has a different ticker. Telling someone
- * "BTC is not tradable" when the app can and does buy cbBTC for them would be true in the most
- * useless way.
+ * Buying "BTC" here means buying XBTC, OKX's wrapped bitcoin, and buying "OKB" means buying WOKB —
+ * the market is real, and the instrument that represents it on this chain has a different ticker.
+ * Telling someone "BTC is not tradable" when the app can and does buy XBTC for them would be true in
+ * the most useless way. ETH has no entry: WETH is held on X Layer but nothing routes it.
  */
 export const SETTLES_AS: Record<string, string> = {
-  BTC: 'CBBTC',
-  ETH: 'WETH',
+  BTC: 'XBTC',
+  OKB: 'WOKB',
 };
 
 /** The token a market symbol actually trades as, or the symbol itself. */
@@ -45,7 +53,7 @@ export function settlementSymbol(symbol: string): string {
   return SETTLES_AS[upper] ?? symbol;
 }
 
-/** Case-insensitive: the markets fixtures spell it `cbBTC`, the token registry `CBBTC`. */
+/** Case-insensitive: a route param may arrive as `xbtc`, and the equities carry a lowercase `x` (`NVDAx`). */
 export function isTradable(symbol: string): boolean {
   const upper = symbol.toUpperCase();
   const settled = (SETTLES_AS[upper] ?? upper).toUpperCase();
@@ -53,16 +61,16 @@ export function isTradable(symbol: string): boolean {
 }
 
 /** What the default buy is when a screen has to pick one. */
-export const DEFAULT_BUY: string = 'WETH';
+export const DEFAULT_BUY: string = 'XBTC';
 
 /**
  * What the SERVER says can be settled, which is not always what this list says.
  *
  * `TRADABLE` above is a compile-time mirror of the token registry — it answers "is this a symbol we
  * know how to route". That is a different question from "can this deployment settle it", and the
- * two came apart on the tokenized equities: their addresses are real on Base, they do not function
- * on a fork of Base, and the app offered a Buy button for all eight regardless. Live price, unit
- * conversion, an enabled "Buy $250 of NVDAc", and a fill that reverts.
+ * two come apart on the tokenized equities: their wrappers are real on X Layer mainnet and have no
+ * code on the testnet, and a static list would offer a Buy button for all eleven regardless. Live
+ * price, unit conversion, an enabled "Buy $250 of NVDAx", and a fill that reverts.
  *
  * So the order path asks the executor rather than a constant. `/market/tradable` now filters by
  * whether the token actually answers on the running chain.
@@ -110,7 +118,7 @@ export async function isSettleable(symbol: string): Promise<boolean> {
  *
  * `TRADABLE` answers "do we know how to route this" and `settleableSymbols` answers "can this
  * deployment fill it". Neither answers "can anything price it", and that is the question a price
- * alert asks: BTC is priceable and not tradable on Base, so an alert on it is perfectly reasonable
+ * alert asks: ETH is priceable and not tradable on X Layer, so an alert on it is perfectly reasonable
  * and `isTradable` would refuse it.
  *
  * Mirrors the executor's `priceOf`: a tokenized equity is priced by the venue that would fill it,
@@ -131,10 +139,11 @@ export async function priceableSymbols(): Promise<Set<string> | undefined> {
     try {
       const { api } = await import('./api');
       /*
-       * Three registries, because the executor has three (`server/src/market/feeds.ts`): the crypto
-       * feed table, the EVM equities, and the xStocks priced by the Jupiter route that would fill
-       * them. The third was missing, so the field refused an alert on NVDAx — "nothing prices it" —
-       * while the executor was pricing it all day.
+       * Three reads, because the executor publishes three (`server/src/market/feeds.ts`): the crypto
+       * feed table, the equities, and the xStock catalog priced by the Uniswap v3 pools that would
+       * fill them. On X Layer the last two list the same wrapped xStocks; both are read so an alert
+       * is never refused because one of them was quiet. The catalog was once missing, and the field
+       * refused an alert on NVDAx — "nothing prices it" — while the executor was pricing it all day.
        */
       const [crypto, stocks, xstocks] = await Promise.all([
         api.get<string[]>('/market/symbols'),
@@ -142,10 +151,10 @@ export async function priceableSymbols(): Promise<Set<string> | undefined> {
         api.get<{ rows: { symbol: string }[] }>('/market/xstocks'),
       ]);
       /*
-       * Every catalogued mint, including the ones with no price at this moment.
+       * Every catalogued xStock, including the ones with no price at this moment.
        *
        * "Nothing can ever price this" and "nothing will route it right now" are different facts and
-       * only the first is a reason to refuse an alert. A mint whose route is quiet has a feed; the
+       * only the first is a reason to refuse an alert. An xStock whose pool is quiet has a feed; the
        * alert sits armed and fires when the route comes back, which is what someone setting one
        * during a quiet hour actually wants.
        */
@@ -167,9 +176,9 @@ export async function priceableSymbols(): Promise<Set<string> | undefined> {
  * The set's own spelling of a symbol the user typed, or `undefined` if nothing prices it.
  *
  * Case-insensitive, and it returns the CANONICAL spelling rather than an uppercased one — the
- * tokenized equities carry a lowercase suffix (`NVDAc`), and uppercasing them is the boundary
- * mistake `venues/oneinch.ts` documents three production bugs from. A user typing `nvdac` gets
- * `NVDAc` back, not `NVDAC`.
+ * tokenized equities carry a lowercase suffix (`NVDAx`), and uppercasing them is the boundary
+ * mistake `venues/tokens.ts` documents three production bugs from. A user typing `nvdax` gets
+ * `NVDAx` back, not `NVDAX`.
  */
 export function resolvePriceable(symbol: string, known: Set<string> | undefined): string | undefined {
   const typed = symbol.trim();

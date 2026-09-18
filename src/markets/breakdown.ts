@@ -43,15 +43,22 @@ export function slippagePct(bps: number): string {
 /**
  * The route, in the venue's own words.
  *
- * A single hop is named alone — "Whirlpool" — because "Whirlpool 100%" invites the reader to look
- * for the other 99%. A split route names each share, since that IS the information.
+ * Uniswap v3 routes are sequential, not split: the whole order passes through every pool, so a share
+ * beside each hop ("100%") would only invite the reader to look for the rest. A single hop is named
+ * alone — "Uniswap v3 USDC→TSLAx 0.05%". A path through several pools of one venue reads as the path,
+ * joined with arrows — "Uniswap v3 USDC → USDG → NVDAx" — with each pool's fee tier after it, because
+ * the tiers are what the hops cost. Hops that do not chain (a venue that reports them unordered) are
+ * named one by one, still joined with arrows, since that is the order they were given in.
  */
 export function routeLabel(hops: readonly RouteHop[]): string {
   if (hops.length === 0) return NOT_REPORTED;
   if (hops.length === 1) return hops[0]!.label;
-  return hops
-    .map((h) => (h.percent === null ? h.label : `${h.label} ${Math.round(h.percent)}%`))
-    .join(' + ');
+  const venue = hops[0]!.venue;
+  const chains = hops.every((h, i) => h.venue === venue && (i === 0 || hops[i - 1]!.to === h.from));
+  if (!chains || !venue) return hops.map((h) => h.label).join(' → ');
+  const path = [hops[0]!.from, ...hops.map((h) => h.to)].join(' → ');
+  const fees = hops.map((h) => `${h.feePct}%`).join(' + ');
+  return `${venue} ${path} (${fees})`;
 }
 
 export type BreakdownRow = {
@@ -108,8 +115,8 @@ export function breakdownRows(
     {
       label: 'Venue fee',
       /*
-       * Null is the aggregator taking nothing, and it is said in a word rather than left off.
-       * An absent line reads the same as a line nobody checked.
+       * Null is nothing taken beyond each pool's own fee tier (named on the Route line), and it is
+       * said in a word rather than left off. An absent line reads the same as a line nobody checked.
        */
       value: q.platformFeeUsd === null ? 'None' : fmt.money(q.platformFeeUsd),
       note: null,

@@ -7,7 +7,7 @@
  *
  * It was a fixed WETH → USDC card whose token pills, direction circle and settings gear did nothing, and whose
  * "Review swap" opened a sell ticket at the stop tolerance. Now the pair is picked from what this executor settles
- * (with 1inch's token logos), the amount is typed, the tolerance is chosen and quoted at, and confirming sends the
+ * (with the tokens' own logos), the amount is typed, the tolerance is chosen and quoted at, and confirming sends the
  * swap itself — `POST /swap`, under the same permission as every other trade — and shows what arrived and where it
  * settled.
  */
@@ -65,7 +65,7 @@ const SEAM_PULL = -14;
 export default function Swap() {
   const goBack = useGoBack();
   const [pay, setPay] = useState('USDC');
-  const [receive, setReceive] = useState('WETH');
+  const [receive, setReceive] = useState('NVDAx');
   const [amount, setAmount] = useState('0');
   const [slippagePct, setSlippagePct] = useState<number>(0.3);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -75,8 +75,8 @@ export default function Swap() {
   const [outcome, setOutcome] = useState<SwapOutcome>();
 
   /*
-   * What can be swapped here is what this executor settles. Native ETH is left out: the permission moves ERC-20s,
-   * and the executor takes "ETH" as WETH, which is listed. Where nothing settles the list is empty, and the screen
+   * What can be swapped here is what this executor settles. A native coin is left out: the permission moves ERC-20s,
+   * and a listed "ETH" would be WETH's alias. Where nothing settles the list is empty, and the screen
    * says so instead of offering a swap that could only be refused.
    *
    * A list that did not load says that, with a retry. It used to leave an empty picker under the default pair,
@@ -393,7 +393,7 @@ export default function Swap() {
 /** An amount of a token: cents above one unit, four places below it. */
 const units = (n: number) => quantity(n, n >= 1 ? 2 : 4);
 
-/** The route's gas, which the executor pays — in dollars when ETH has a price. */
+/** The route's gas, which the executor pays — in dollars when the gas token has a price. */
 function networkFee(gas: SwapQuoteResult['gas']): string {
   if (!gas) return '—';
   return gas.feeUsd !== null ? `On us · ≈ ${money(gas.feeUsd)}` : 'On us';

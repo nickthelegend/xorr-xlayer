@@ -33,7 +33,7 @@ describe('a number can never live in a voice segment', () => {
 
   it('a fact must name where its number came from', () => {
     expect(() => fact(88.32, 'price', '')).toThrow();
-    expect(fact(2481.11, 'price', '1inch:WETH').source).toBe('1inch:WETH');
+    expect(fact(117240.5, 'price', 'uniswap-v3:XBTC').source).toBe('uniswap-v3:XBTC');
   });
 });
 
@@ -78,7 +78,7 @@ describe('facts are formatted by code, never by the model', () => {
 });
 
 describe("an executor's sentence keeps its numbers as facts", () => {
-  const FILLED = 'Bought 0.0020 WETH at $2,517.86. Your existing exit on WETH stays as it is.';
+  const FILLED = 'Bought 0.0020 XBTC at $2,517.86. Your existing exit on XBTC stays as it is.';
 
   it('never throws on the fill the executor sends, and reads exactly as it was sent', () => {
     const segments = executorSentence(FILLED, 'executor:decide');

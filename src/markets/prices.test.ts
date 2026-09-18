@@ -26,12 +26,12 @@ describe('one instrument, priced', () => {
   });
 
   it('prices a share from the snapshot, with no invented change, and a share with no route as no price', () => {
-    expect(priceInstrument(inst('NVDAc'), {}, { NVDAc: share('NVDAc', 232.14) })).toMatchObject({
+    expect(priceInstrument(inst('NVDAx'), {}, { NVDAx: share('NVDAx', 232.14) })).toMatchObject({
       px: '$232.14',
       chg: '',
       feed: 'live',
     });
-    expect(priceInstrument(inst('NVDAc'), {}, { NVDAc: share('NVDAc', null) })).toMatchObject({
+    expect(priceInstrument(inst('NVDAx'), {}, { NVDAx: share('NVDAx', null) })).toMatchObject({
       px: '—',
       feed: 'unavailable',
     });
@@ -43,7 +43,7 @@ describe('one instrument, priced', () => {
 
   it('gives gold its real price when the feed has one, and leaves an index alone', () => {
     expect(priceInstrument(inst('XAUT'), { XAUT: quote(4_420, 0.5) }, {})).toMatchObject({ feed: 'live', chg: '+0.50%' });
-    expect(priceInstrument(inst('SPYx'), {}, {})).toEqual(inst('SPYx'));
+    expect(priceInstrument(inst('IWM'), {}, {})).toEqual(inst('IWM'));
   });
 });
 
@@ -51,7 +51,7 @@ describe('classes follow their own read', () => {
   it('asks the feed for everything but the shares', () => {
     expect(FEED_SYMBOLS).toContain('BTC');
     expect(FEED_SYMBOLS).toContain('XAUT');
-    expect(FEED_SYMBOLS.some((s) => s.endsWith('c') && s !== s.toUpperCase())).toBe(false);
+    expect(FEED_SYMBOLS.some((s) => s.endsWith('x') && s !== s.toUpperCase())).toBe(false);
     expect(sourceOf(byId('stocks'))).toBe('stocks');
     expect(sourceOf(byId('crypto'))).toBe('feed');
   });

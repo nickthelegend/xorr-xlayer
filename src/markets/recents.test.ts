@@ -7,16 +7,16 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_RECENTS, openingList, remember, visibleRecents } from './recents';
 
-const KNOWN = new Set(['NVDAx', 'TSLAx', 'AAPLx', 'WETH', 'BTC', 'SPYx', 'MSFTx', 'AMZNx']);
+const KNOWN = new Set(['NVDAx', 'TSLAx', 'AAPLx', 'XBTC', 'BTC', 'SPYx', 'MSFTx', 'AMZNx']);
 
 describe('recording a visit', () => {
   it('puts the newest first', () => {
-    expect(remember(['WETH'], 'NVDAx')).toEqual(['NVDAx', 'WETH']);
+    expect(remember(['XBTC'], 'NVDAx')).toEqual(['NVDAx', 'XBTC']);
   });
 
   it('moves a repeat to the front rather than adding it twice', () => {
     // The same symbol twice would push something genuinely different off the end.
-    expect(remember(['WETH', 'NVDAx', 'BTC'], 'NVDAx')).toEqual(['NVDAx', 'WETH', 'BTC']);
+    expect(remember(['XBTC', 'NVDAx', 'BTC'], 'NVDAx')).toEqual(['NVDAx', 'XBTC', 'BTC']);
   });
 
   it('keeps the list short enough to stay a shortcut', () => {
@@ -29,14 +29,14 @@ describe('recording a visit', () => {
   });
 
   it('ignores an empty symbol', () => {
-    expect(remember(['WETH'], '   ')).toEqual(['WETH']);
-    expect(remember(['WETH'], '')).toEqual(['WETH']);
+    expect(remember(['XBTC'], '   ')).toEqual(['XBTC']);
+    expect(remember(['XBTC'], '')).toEqual(['XBTC']);
   });
 
   it('does not mutate what it was given', () => {
-    const before = ['WETH'];
+    const before = ['XBTC'];
     remember(before, 'NVDAx');
-    expect(before).toEqual(['WETH']);
+    expect(before).toEqual(['XBTC']);
   });
 });
 
@@ -59,7 +59,7 @@ describe('which recents are worth showing', () => {
 });
 
 describe('what the screen opens on', () => {
-  const catalogue = ['WETH', 'BTC', 'NVDAx', 'TSLAx', 'AAPLx', 'SPYx'];
+  const catalogue = ['XBTC', 'BTC', 'NVDAx', 'TSLAx', 'AAPLx', 'SPYx'];
 
   it('puts recents first, marked as such', () => {
     const list = openingList({ recents: ['TSLAx', 'NVDAx'], catalogue, known: KNOWN, limit: 4 });
@@ -71,7 +71,7 @@ describe('what the screen opens on', () => {
 
   it('fills the rest from the catalogue, in the catalogue’s order', () => {
     const list = openingList({ recents: ['TSLAx'], catalogue, known: KNOWN, limit: 4 });
-    expect(list.map((r) => r.symbol)).toEqual(['TSLAx', 'WETH', 'BTC', 'NVDAx']);
+    expect(list.map((r) => r.symbol)).toEqual(['TSLAx', 'XBTC', 'BTC', 'NVDAx']);
   });
 
   it('never repeats a recent further down', () => {
@@ -90,7 +90,7 @@ describe('what the screen opens on', () => {
 
   it('shows every recent even when they outnumber the limit', () => {
     // Truncating the recents to make room for the catalogue would drop the most useful rows first.
-    const recents = ['WETH', 'BTC', 'NVDAx', 'TSLAx'];
+    const recents = ['XBTC', 'BTC', 'NVDAx', 'TSLAx'];
     const list = openingList({ recents, catalogue, known: KNOWN, limit: 2 });
     expect(list.filter((r) => r.recent).map((r) => r.symbol)).toEqual(recents);
   });
@@ -98,7 +98,7 @@ describe('what the screen opens on', () => {
   it('is just the catalogue when there are no recents', () => {
     const list = openingList({ recents: [], catalogue, known: KNOWN, limit: 3 });
     expect(list).toEqual([
-      { symbol: 'WETH', recent: false },
+      { symbol: 'XBTC', recent: false },
       { symbol: 'BTC', recent: false },
       { symbol: 'NVDAx', recent: false },
     ]);

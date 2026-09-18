@@ -2,7 +2,7 @@
  * What the order ticket may send, checked against what the wallet actually has.
  *
  * A sale had no check at all. Its ceiling was the position's value, and with no position the ceiling was
- * `undefined`, which the ticket read as "no limit" — so "Sell $250 of WETH" stayed live for a token the
+ * `undefined`, which the ticket read as "no limit" — so "Sell $250 of XBTC" stayed live for a token the
  * wallet did not hold, and only the executor said no. A buy is checked against cash where cash is known;
  * the executor enforces the daily cap either way.
  *

@@ -27,8 +27,10 @@ export type DecisionRecord = {
   price: number;
   stopPrice: number;
   targetPrice: number;
+  /** The X Layer transaction hash of the fill. */
   signature: string;
-  slot: number;
+  /** The executor run that settled it (`strategy_runs.id`), where the venue and measured units live. */
+  runId: string;
   opening: string;
   reason: string;
   marketCondition: string;
@@ -129,7 +131,9 @@ export function explainLines(record: DecisionRecord): ExplainLine[] {
   /*
    * The drift, or the fact that there was none to be had.
    *
-   * `spreadBps: null` is the agent saying it had no second source to measure the pool against, and
+   * The second source is the issuer's reference price for the share, scaled by the wrapper's own
+   * multiplier (`server/src/market/nasdaq.ts`). `spreadBps: null` is the agent saying it had no
+   * second source to measure the pool against, and
    * it is a different statement from a drift of zero. Rendering null as "0 bps" would turn "I could
    * not check" into "I checked and it was perfect", which is the exact inversion this app exists
    * not to make.
@@ -140,7 +144,7 @@ export function explainLines(record: DecisionRecord): ExplainLine[] {
     value:
       record.spreadBps === null
         ? `${session}, and no second venue answered, so the drift was unmeasured`
-        : `${session}, and the pool was within ${record.spreadBps} bps of the Base listing`,
+        : `${session}, and the pool was within ${record.spreadBps} bps of the issuer’s reference price`,
   });
 
   lines.push({

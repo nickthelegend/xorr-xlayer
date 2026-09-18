@@ -32,7 +32,6 @@ export type EmptyListKey =
   | 'watchlist'
   | 'schedule'
   | 'alerts'
-  | 'limitOrders'
   | 'tradable'
   | 'approvals'
   | 'proposals'
@@ -94,11 +93,6 @@ export const EMPTY_LISTS: Record<EmptyListKey, EmptyListCopy> = {
     text: 'No alerts yet.',
     actionLabel: 'Set an alert',
     href: '/alerts/new',
-  },
-  limitOrders: {
-    text: 'No limit orders yet.',
-    actionLabel: 'Browse markets',
-    href: '/tokens',
   },
   tradable: {
     text: 'Nothing can be traded here right now.',

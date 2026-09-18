@@ -7,7 +7,7 @@
  * clock, never this device's. Raw amounts stay strings: they are uint256 values, and a number would round them.
  *
  * A refusal (400, 403, 404, 409) or a failure (502) that carries a `status` in its body is the executor's own sentence,
- * so it is returned for the caller to show rather than thrown as a status code, as `fillLimitOrder` does.
+ * so it is returned for the caller to show rather than thrown as a status code.
  */
 import { api, ApiError } from './api';
 import type { Keyed } from './intentKey';

@@ -97,7 +97,7 @@ describe('actionSentence', () => {
    * "We could not check" is worth saying on a screen whose other numbers are all things we did
    * check. It must not be shown as "nothing is coming".
    */
-  it('says so when the mint could not be read', () => {
+  it('says so when the token could not be read', () => {
     const out = actionSentence(
       { status: 'unavailable', symbol: 'NVDAx', multiplier: null, pending: null, reason: 'unreadable' },
       NOW,
@@ -108,7 +108,7 @@ describe('actionSentence', () => {
 
   it('stays silent about an asset that has no multiplier to move', () => {
     const out = actionSentence(
-      { status: 'unavailable', symbol: 'WETH', multiplier: null, pending: null, reason: 'not_tokenized' },
+      { status: 'unavailable', symbol: 'XBTC', multiplier: null, pending: null, reason: 'not_tokenized' },
       NOW,
     );
     expect(out).toBeNull();

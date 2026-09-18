@@ -23,7 +23,7 @@ const fmt = {
   price: (n: number) => `$${n.toFixed(2)}`,
 };
 
-/** A real buy, with the numbers a live Jupiter quote for $250 of NVDAx actually returned. */
+/** A buy of $250 of NVDAx, shaped as the executor's Uniswap v3 quote returns it: USDC → USDG → NVDAx. */
 const BUY: XStockQuote = {
   symbol: 'NVDAx',
   side: 'buy',
@@ -37,8 +37,12 @@ const BUY: XStockQuote = {
   priceImpactUsd: 0.1408,
   slippageBps: 50,
   slippageWorstUsd: 1.2505,
-  hops: [{ label: 'Whirlpool', percent: 100 }],
+  hops: [
+    { label: 'Uniswap v3 USDC→USDG 0.01%', percent: 100, venue: 'Uniswap v3', from: 'USDC', to: 'USDG', feePct: 0.01 },
+    { label: 'Uniswap v3 USDG→NVDAx 0.05%', percent: 100, venue: 'Uniswap v3', from: 'USDG', to: 'NVDAx', feePct: 0.05 },
+  ],
   platformFeeUsd: null,
+  estimatedGas: 182_000,
   effectivePrice: 216.7448,
   markPrice: 216.8341,
 };
@@ -92,27 +96,31 @@ describe('the tolerance', () => {
 });
 
 describe('the route', () => {
+  const hop = (from: string, to: string, feePct: number) => ({
+    label: `Uniswap v3 ${from}→${to} ${feePct}%`,
+    percent: 100,
+    venue: 'Uniswap v3',
+    from,
+    to,
+    feePct,
+  });
+
   it('names a single pool without a share', () => {
-    // "Whirlpool 100%" invites the reader to go looking for the other 99%.
-    expect(routeLabel([{ label: 'Whirlpool', percent: 100 }])).toBe('Whirlpool');
+    // "… 100%" invites the reader to go looking for the other part of the order.
+    expect(routeLabel([hop('USDC', 'TSLAx', 0.05)])).toBe('Uniswap v3 USDC→TSLAx 0.05%');
   });
 
-  it('names each share of a split', () => {
-    expect(
-      routeLabel([
-        { label: 'Whirlpool', percent: 60 },
-        { label: 'Raydium CLMM', percent: 40 },
-      ]),
-    ).toBe('Whirlpool 60% + Raydium CLMM 40%');
+  it('reads a path through several pools as the path, joined with arrows, never as shares', () => {
+    const label = routeLabel(BUY.hops);
+    expect(label).toBe('Uniswap v3 USDC → USDG → NVDAx (0.01% + 0.05%)');
+    // Sequential hops each carry the whole order: no "100%" beside any of them, and no "+" between shares.
+    expect(label).not.toMatch(/100%/);
   });
 
-  it('drops the share a venue did not give', () => {
-    expect(
-      routeLabel([
-        { label: 'Whirlpool', percent: null },
-        { label: 'Meteora DLMM', percent: 40 },
-      ]),
-    ).toBe('Whirlpool + Meteora DLMM 40%');
+  it('names hops that do not chain one by one, in the order given', () => {
+    expect(routeLabel([hop('USDC', 'USDG', 0.01), hop('WOKB', 'NVDAx', 0.05)])).toBe(
+      'Uniswap v3 USDC→USDG 0.01% → Uniswap v3 WOKB→NVDAx 0.05%',
+    );
   });
 
   it('admits to no route rather than showing an empty line', () => {
@@ -121,7 +129,7 @@ describe('the route', () => {
 });
 
 describe('the venue fee', () => {
-  it('says None in a word when the aggregator takes nothing', () => {
+  it('says None in a word when nothing is taken beyond the pools’ own fee tiers', () => {
     // Leaving the line off reads identically to a line nobody checked.
     expect(row(BUY, 'Venue fee')).toMatchObject({ value: 'None', cost: false });
   });

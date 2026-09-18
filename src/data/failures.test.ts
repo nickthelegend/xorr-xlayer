@@ -100,7 +100,7 @@ describe('the fix, where there is one', () => {
   });
 
   it('sends a chain that cannot settle to the networks, and offers no retry', () => {
-    const f = classify(api(409, { error: 'not_settleable_here', message: 'NVDAc cannot be settled on base-fork.' }));
+    const f = classify(api(409, { error: 'not_settleable_here', message: 'NVDAx cannot be settled on xlayer-testnet.' }));
     expect(f).toMatchObject({ kind: 'rejected', retryable: false });
     expect(f.fix?.href).toBe('/networks');
   });

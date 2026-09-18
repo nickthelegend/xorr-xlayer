@@ -556,8 +556,8 @@ export default function Home() {
         </Rise>
 
         {/*
-          Said on Home, before anything asks for a permission (PLAN.md 4.3). Where nothing settles — Base Sepolia, where
-          1inch has no deployment — a strategy is watched and never filled, and a person who grants a permission and waits
+          Said on Home, before anything asks for a permission (PLAN.md 4.3). Where nothing settles — X Layer testnet, where
+          no DEX has pools — a strategy is watched and never filled, and a person who grants a permission and waits
           for a fill should not have to find that out three taps away.
         */}
         {fillsNothing ? (

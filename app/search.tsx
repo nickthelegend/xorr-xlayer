@@ -14,7 +14,7 @@
  * ticker, and still strict enough that a wrong character finds nothing rather than something close.
  *
  * And it searched the EVM market classes only, so none of the xStocks were reachable from here at
- * all — the catalogue this app can actually trade on Solana was invisible to its own search box.
+ * all — the catalogue this app can actually trade was invisible to its own search box.
  * They are merged in from `/market/xstocks`, priced or saying "No price", never a placeholder.
  */
 import React, { useMemo, useState } from 'react';
@@ -88,7 +88,7 @@ export default function Search() {
   /*
    * The xStocks catalogue, merged in beside the market classes.
    *
-   * Its own read, so a search box opens instantly on the names it already has and the Solana rows
+   * Its own read, so a search box opens instantly on the names it already has and the xStock rows
    * arrive when the executor answers — the same reasoning the class prices already follow.
    */
   const xstocks = useAsync(() => system.xstocks(), []);

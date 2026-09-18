@@ -3,8 +3,8 @@
  *
  * The server refuses it and says so well — "nothing prices NOTATOKEN, so this alert could never
  * fire" — but only after a round trip, to learn something the client already knows. And the form
- * uppercased what the user typed, which is rule 3 in `venues/oneinch.ts`: the tokenized equities
- * carry a lowercase suffix, and `NVDAc` becoming `NVDAC` is where three production bugs started.
+ * uppercased what the user typed, which is rule 3 in `venues/tokens.ts`: the tokenized equities
+ * carry a lowercase suffix, and `NVDAx` becoming `NVDAX` is where three production bugs started.
  */
 import { describe, expect, it } from 'vitest';
 import { resolvePriceable } from './tradable';
@@ -12,50 +12,48 @@ import { resolvePriceable } from './tradable';
 const known = new Set([
   'BTC',
   'ETH',
-  'WETH',
+  'OKB',
   'USDC',
-  'CBBTC',
+  'XBTC',
+  'WOKB',
   'XAUT',
-  'NVDAc',
-  'TSLAc',
-  // The xStocks, priced by the Jupiter route that would fill them (`server/src/market/feeds.ts`).
+  // The wrapped xStocks, priced by the Uniswap v3 pools that would fill them (`server/src/market/feeds.ts`).
   'NVDAx',
   'TSLAx',
 ]);
 
 describe('resolvePriceable', () => {
   it('accepts a symbol the price sources know', () => {
-    expect(resolvePriceable('WETH', known)).toBe('WETH');
-    // Priceable but NOT tradable on Base — an alert on it is perfectly reasonable, and checking
+    expect(resolvePriceable('XBTC', known)).toBe('XBTC');
+    // Priceable but NOT tradable on X Layer — an alert on it is perfectly reasonable, and checking
     // `isTradable` here would have refused it.
-    expect(resolvePriceable('BTC', known)).toBe('BTC');
+    expect(resolvePriceable('ETH', known)).toBe('ETH');
   });
 
   it('returns the canonical spelling rather than an uppercased one', () => {
-    expect(resolvePriceable('nvdac', known)).toBe('NVDAc');
-    expect(resolvePriceable('NVDAC', known)).toBe('NVDAc');
-    expect(resolvePriceable('weth', known)).toBe('WETH');
+    expect(resolvePriceable('nvdax', known)).toBe('NVDAx');
+    expect(resolvePriceable('NVDAX', known)).toBe('NVDAx');
+    expect(resolvePriceable('xbtc', known)).toBe('XBTC');
   });
 
-  it('accepts a tokenized equity on Solana', () => {
+  it('accepts a wrapped xStock', () => {
     /*
-     * The executor prices these through Jupiter, and the field used to refuse them: the client's
-     * list asked `/market/symbols` and `/market/stocks` and never `/market/xstocks`, so an alert on
-     * NVDAx was rejected with "nothing prices it" while the executor was pricing it all day.
+     * The executor prices these through the Uniswap v3 pools that fill them, and the field once
+     * refused them: the client's list never asked `/market/xstocks`, so an alert on NVDAx was
+     * rejected with "nothing prices it" while the executor was pricing it all day.
      */
     expect(resolvePriceable('NVDAx', known)).toBe('NVDAx');
-    expect(resolvePriceable('nvdax', known)).toBe('NVDAx');
+    expect(resolvePriceable('tslax', known)).toBe('TSLAx');
   });
 
-  it('keeps the two spellings of the same company apart', () => {
-    // NVIDIA on two chains, under two registries, priced by two venues.
-    expect(resolvePriceable('NVDAx', known)).toBe('NVDAx');
-    expect(resolvePriceable('NVDAc', known)).toBe('NVDAc');
+  it('does not accept another chain\'s spelling of the same company', () => {
+    // `NVDAc` was the Base build's tokenized NVIDIA. Nothing on X Layer prices it.
+    expect(resolvePriceable('NVDAc', known)).toBeUndefined();
   });
 
   it('refuses a symbol nothing prices', () => {
     expect(resolvePriceable('NOTATOKEN', known)).toBeUndefined();
-    expect(resolvePriceable("WETH'; DROP TABLE alerts;--", known)).toBeUndefined();
+    expect(resolvePriceable("XBTC'; DROP TABLE alerts;--", known)).toBeUndefined();
   });
 
   it('refuses an empty symbol', () => {
@@ -64,7 +62,7 @@ describe('resolvePriceable', () => {
 
   it('stays permissive while the list is unknown, and lets the server answer', () => {
     // An empty or failed fetch must not refuse every alert in the app.
-    expect(resolvePriceable('WETH', undefined)).toBe('WETH');
+    expect(resolvePriceable('XBTC', undefined)).toBe('XBTC');
     expect(resolvePriceable('ANYTHING', undefined)).toBe('ANYTHING');
   });
 });

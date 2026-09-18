@@ -12,23 +12,32 @@ import { MINUS } from '../format';
 describe('3.4 instrument counts reconcile [G4]', () => {
   it('every class carries its full instrument list', () => {
     expect(assetClasses).toHaveLength(5);
-    // The design shipped 9 per class. Stocks is 8: the ninth was COINx, and Coinbase has no
-    // tokenized issue on Base. A row that cannot be bought is worse than a shorter list, so the
-    // count follows what is actually on chain rather than the other way round.
+    // The design shipped 9 per class. Stocks is 11 — every wrapped xStock on X Layer, SPYx and
+    // QQQx included — and indices is 7 because those two moved to stocks when they became real
+    // tokens. The count follows what is actually on chain rather than the other way round.
     const EXPECTED: Record<string, number> = {
-      crypto: 9, stocks: 8, commodities: 9, indices: 9, preipo: 9,
+      crypto: 9, stocks: 11, commodities: 9, indices: 7, preipo: 9,
     };
     for (const c of assetClasses) {
       expect(c.instruments, `${c.id}`).toHaveLength(EXPECTED[c.id]!);
     }
     const total = assetClasses.reduce((a, c) => a + c.instruments.length, 0);
-    expect(total).toBe(44);
+    expect(total).toBe(45);
   });
 
-  it('every tokenized equity carries the ERC-20 it settles into', () => {
+  it('every tokenized equity carries the wrapper it settles into', () => {
     const stocks = assetClasses.find((c) => c.id === 'stocks')!;
     for (const i of stocks.instruments) {
-      expect(i.mint, `${i.sym} has no token address`).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(i.address, `${i.sym} has no token address`).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    }
+  });
+
+  it('no instrument carries another chain\'s address', () => {
+    // The crypto rows once carried Solana mints; nothing on X Layer answers at those.
+    for (const c of assetClasses) {
+      for (const i of c.instruments) {
+        if (i.address !== undefined) expect(i.address, i.sym).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      }
     }
   });
 
@@ -83,12 +92,12 @@ describe('3.6 no hyphen-minus in any numeric field [G12]', () => {
 describe('3.10 series that were trapped inside the prototype [G5][G6][G7]', () => {
   it('sparklines exist as data for all 5 watchlist groups', () => {
     // The design shipped five groups. Two of them — Metals and an Overview "Total" pseudo-row —
-    // held only symbols nothing on Base can price, and a tab that renders as dashes is worse than
+    // held only symbols nothing on X Layer can price, and a tab that renders as dashes is worse than
     // a tab that is not there. What remains is every group that can show a real number.
     expect(watchlistGroups.length).toBeGreaterThanOrEqual(3);
     const rows = watchlistGroups.flatMap((g) => g.rows);
     // Every row must be one the app can actually price. Four were dropped — XAUT, XAGT, JUP and a
-    // "Total" pseudo-row — because nothing on Base quotes them, and a curated list of markets that
+    // "Total" pseudo-row — because nothing the executor reads quotes them, and a curated list of markets that
     // render as a dash is not a curated list.
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(r.sym).not.toMatch(/^(XAUT|XAGT|JUP|Total)$/);

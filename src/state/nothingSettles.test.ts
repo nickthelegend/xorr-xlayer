@@ -4,18 +4,18 @@
 import { describe, expect, it } from 'vitest';
 import { nothingSettles } from './derived';
 
-const WETH = { symbol: 'WETH' };
+const XBTC = { symbol: 'XBTC' };
 
 describe('nothingSettles', () => {
   it('is true where the executor offers nothing to trade and something to watch', () => {
-    expect(nothingSettles([], [WETH])).toBe(true);
+    expect(nothingSettles([], [XBTC])).toBe(true);
   });
 
   it('is false where something trades, where there is nothing to watch either, and before either read answers', () => {
-    expect(nothingSettles([WETH], [WETH])).toBe(false);
+    expect(nothingSettles([XBTC], [XBTC])).toBe(false);
     expect(nothingSettles([], [])).toBe(false);
-    expect(nothingSettles(undefined, [WETH])).toBe(false);
-    expect(nothingSettles(null, [WETH])).toBe(false);
+    expect(nothingSettles(undefined, [XBTC])).toBe(false);
+    expect(nothingSettles(null, [XBTC])).toBe(false);
     expect(nothingSettles([], undefined)).toBe(false);
   });
 });

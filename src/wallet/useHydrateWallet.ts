@@ -73,8 +73,8 @@ export function useHydrateWallet(): void {
      *
      * This returned early whenever anything was cached, so `/wallet` was read once and never
      * again — and the row carries live facts, not just the address. `chain` is the one that
-     * showed: a wallet created while the executor settled on Sepolia kept saying
-     * "Connected · base-sepolia" underneath live Base-fork balances, for good, because the
+     * showed: a wallet created while the executor settled on a testnet kept saying
+     * "Connected · <testnet>" underneath live fork balances, for good, because the
      * only code that could have corrected it had decided it already knew.
      *
      * So: render from the cache immediately — nothing waits, the gate opens on the same tick as

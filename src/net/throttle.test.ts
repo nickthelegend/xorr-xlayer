@@ -17,7 +17,7 @@ describe('nothing is throttled', () => {
 
   it('says nothing about a breaker that has closed', () => {
     expect(
-      throttleBanner({ limitedUntil: 0, breakers: [{ host: 'api.1inch.dev', failures: 4, openUntil: NOW - 1000 }] }, NOW),
+      throttleBanner({ limitedUntil: 0, breakers: [{ host: 'web3.okx.com', failures: 4, openUntil: NOW - 1000 }] }, NOW),
     ).toBeUndefined();
   });
 });
@@ -34,7 +34,7 @@ describe('our own limiter', () => {
 
   it('wins over an upstream, because nothing is reaching the upstream either', () => {
     const b = throttleBanner(
-      { limitedUntil: NOW + 10_000, breakers: [{ host: 'api.1inch.dev', failures: 5, openUntil: NOW + 60_000 }] },
+      { limitedUntil: NOW + 10_000, breakers: [{ host: 'web3.okx.com', failures: 5, openUntil: NOW + 60_000 }] },
       NOW,
     );
     expect(b?.scope).toBe('app');
@@ -45,24 +45,24 @@ describe('the executor’s circuit breakers', () => {
   const open = (host: string) => ({ host, failures: 5, openUntil: NOW + 30_000 });
 
   it('names the host, because "a dependency" is not something anyone can check', () => {
-    const b = throttleBanner({ limitedUntil: 0, breakers: [open('api.1inch.dev')] }, NOW);
+    const b = throttleBanner({ limitedUntil: 0, breakers: [open('web3.okx.com')] }, NOW);
     expect(b?.scope).toBe('upstream');
     expect(b?.title).toBe('One price source is not answering');
-    expect(b?.detail).toContain('api.1inch.dev');
+    expect(b?.detail).toContain('web3.okx.com');
   });
 
   it('promises a missing price is shown missing, never filled in from somewhere else', () => {
-    const b = throttleBanner({ limitedUntil: 0, breakers: [open('api.1inch.dev')] }, NOW);
+    const b = throttleBanner({ limitedUntil: 0, breakers: [open('web3.okx.com')] }, NOW);
     expect(b?.detail).toContain('never filled in from somewhere else');
   });
 
   it('lists several', () => {
     const b = throttleBanner(
-      { limitedUntil: 0, breakers: [open('api.1inch.dev'), open('api.coingecko.com'), open('gateway.thegraph.com')] },
+      { limitedUntil: 0, breakers: [open('web3.okx.com'), open('api.coingecko.com'), open('api.xstocks.fi')] },
       NOW,
     );
     expect(b?.title).toBe('3 price sources are not answering');
-    expect(b?.detail).toContain('api.1inch.dev, api.coingecko.com and gateway.thegraph.com');
+    expect(b?.detail).toContain('web3.okx.com, api.coingecko.com and api.xstocks.fi');
   });
 
   it('takes the executor’s own verdict over the clock where it gave one', () => {
