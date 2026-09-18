@@ -22,6 +22,13 @@ vi.mock('../portfolio/snapshots.js', () => ({ snapshotSweep: vi.fn(async () => (
  * `market/observe.test.ts`. What this file needs is that the tick calls it, which the first test asserts.
  */
 vi.mock('../market/observe.js', () => ({ observeSweep: vi.fn(async () => null) }));
+/*
+ * The agent sweeps and the corporate-action sweep, stubbed for the same reason: left real, the corporate-action sweep
+ * reads every xStock's multiplier from a live X Layer RPC, and the slow-tick test below timed out waiting on it.
+ */
+vi.mock('../bot/autonomous.js', () => ({ autonomousAgentSweep: vi.fn(async () => 0) }));
+vi.mock('../bot/basket.js', () => ({ basketSweep: vi.fn(async () => 0) }));
+vi.mock('../venues/corporate-actions.js', () => ({ sweepCorporateActions: vi.fn(async () => []) }));
 
 const { query } = await import('../db/index.js');
 const { runStrategy } = await import('./run.js');
