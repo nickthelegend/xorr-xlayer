@@ -200,7 +200,7 @@ contract XorrDelegation {
      * @param amount Amount of `token` to spend.
      * @param tokenOut The token the trade must deliver to the owner.
      * @param minOut The least the owner's `tokenOut` balance must rise by. Must be above zero.
-     * @param data Calldata forwarded to `venue` (e.g. a 1inch swap payload).
+     * @param data Calldata forwarded to `venue` (e.g. a Uniswap v3 `exactInput` payload).
      */
     function spend(
         address owner,
@@ -211,12 +211,49 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
+        return _spend(owner, token, venue, venue, amount, tokenOut, minOut, data);
+    }
+
+    /**
+     * @notice `spend` through a venue that pulls tokens via a separate approval contract.
+     *
+     * @dev Some aggregators (OKX DEX) call a router that has the input pulled by a different contract, so approving the
+     *      call target — what `spend` does — approves the wrong address and the trade reverts. Here the `spender` is
+     *      approved (for exactly `amount`, reset to zero after) and `venue` is called. BOTH must be on the owner's
+     *      allowlist: the owner signs for every address that may touch their tokens, and the cap, expiry, revocation and
+     *      output floor apply exactly as in `spend`.
+     * @param spender The allowlisted address the venue pulls `token` through.
+     */
+    function spendVia(
+        address owner,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) external returns (bytes memory result) {
+        return _spend(owner, token, spender, venue, amount, tokenOut, minOut, data);
+    }
+
+    function _spend(
+        address owner,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) private returns (bytes memory result) {
         Policy memory p = _policies[owner];
 
         if (msg.sender != p.delegate) revert NotDelegate();
         if (p.revoked) revert PolicyRevoked();
         if (block.timestamp >= p.expiresAt) revert PolicyExpired();
         if (!_venueAllowed[owner][venue]) revert VenueNotAllowed(venue);
+        if (!_venueAllowed[owner][spender]) revert VenueNotAllowed(spender);
         if (amount == 0) revert ZeroAmount();
         _requireNamedOutput(token, tokenOut, minOut);
 
@@ -230,7 +267,7 @@ contract XorrDelegation {
 
         // Pull exactly `amount` from the owner. The contract holds nothing between trades.
         require(IERC20(token).transferFrom(owner, address(this), amount), "pull failed");
-        result = _callVenue(owner, token, venue, amount, tokenOut, minOut, data);
+        result = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
 
         emit Spent(owner, p.delegate, venue, token, amount, spent + amount);
     }
@@ -273,18 +310,46 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
+        return _close(owner, token, venue, venue, amount, tokenOut, minOut, data);
+    }
+
+    /// @notice `closePosition` through a venue that pulls via a separate, allowlisted approval contract. See `spendVia`.
+    function closePositionVia(
+        address owner,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) external returns (bytes memory result) {
+        return _close(owner, token, spender, venue, amount, tokenOut, minOut, data);
+    }
+
+    function _close(
+        address owner,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) private returns (bytes memory result) {
         Policy memory p = _policies[owner];
 
         if (msg.sender != p.delegate) revert NotDelegate();
         if (p.revoked) revert PolicyRevoked();
         if (block.timestamp >= p.expiresAt) revert PolicyExpired();
         if (!_venueAllowed[owner][venue]) revert VenueNotAllowed(venue);
+        if (!_venueAllowed[owner][spender]) revert VenueNotAllowed(spender);
         if (amount == 0) revert ZeroAmount();
         if (token == SETTLEMENT_TOKEN) revert SettlementTokenNotClosable();
         _requireNamedOutput(token, tokenOut, minOut);
 
         require(IERC20(token).transferFrom(owner, address(this), amount), "pull failed");
-        result = _callVenue(owner, token, venue, amount, tokenOut, minOut, data);
+        result = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
 
         emit Closed(owner, p.delegate, venue, token, amount);
     }
@@ -347,20 +412,22 @@ contract XorrDelegation {
     }
 
     /**
-     * @dev Approve the venue for exactly `amount`, call it with the owner recorded as active, take the
-     *      approval back, and require the owner to have received at least `minOut` of `tokenOut`.
+     * @dev Approve `spender` (the venue itself, or the venue's approval contract) for exactly `amount`, call the venue
+     *      with the owner recorded as active, take the approval back, and require the owner to have received at least
+     *      `minOut` of `tokenOut`.
      */
     function _callVenue(
         address owner,
         address token,
+        address spender,
         address venue,
         uint256 amount,
         address tokenOut,
         uint256 minOut,
         bytes calldata data
     ) private returns (bytes memory ret) {
-        // Approve the venue for exactly this trade, and nothing more.
-        IERC20(token).approve(venue, amount);
+        // Approve the spender for exactly this trade, and nothing more.
+        IERC20(token).approve(spender, amount);
         uint256 before = IERC20(tokenOut).balanceOf(owner);
 
         _setActiveOwner(owner);
@@ -370,7 +437,7 @@ contract XorrDelegation {
         _bubble(ok, ret);
 
         // Never leave a standing approval behind.
-        IERC20(token).approve(venue, 0);
+        IERC20(token).approve(spender, 0);
 
         uint256 afterCall = IERC20(tokenOut).balanceOf(owner);
         uint256 received = afterCall > before ? afterCall - before : 0;
