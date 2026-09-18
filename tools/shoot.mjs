@@ -144,7 +144,8 @@ const ROUTES = [
   ['95-route', '/route/XBTC'],
   ['96-audit-anchor', '/audit/anchor'],
   ['97-portfolio', '/portfolio'],
-  ['98-agent', '/agent/momentum-scout'],
+  // An agent whose kind can be set up by hand (exit rules); momentum and events run inside the hired agent itself.
+  ['98-agent', '/agent/drawdown-guard'],
   // Money and markets screens the sweep never opened (docs/qa/SCREENS.md, "tools/shoot.mjs drift").
   ['99a-deposit', '/deposit'],
   ['99b-withdraw-everything', '/withdraw-everything'],
@@ -394,7 +395,7 @@ const EXPECT = {
   '97-portfolio': { must: [/TOTAL BALANCE/, /Deposit/, /Withdraw/, /Positions/, /Profit/] },
   // One agent: money in and out, what it runs, and a way to add to it — without the long caveats.
   '98-agent': {
-    must: [/Momentum Scout/, /Add funds/, /Withdraw/, /Strategies/, /Add strategy/],
+    must: [/Drawdown Guard/, /Add funds/, /Withdraw/, /Strategies/, /Add strategy/],
     never: [/Past performance of a strategy/, /runs are recorded against strategies/],
   },
   /*
@@ -433,10 +434,10 @@ const EXPECT = {
     // "The chain", not "Base": a fork build anchors to a fork. The raw status line of a failed anchor must not show.
     never: [/DIVERGED/, /BASE HOLDS/, /to Base\./, /\d{3} [A-Z][a-z]+: \{/],
   },
-  '46-dev-ui': { must: [/Design system|TOTAL VALUE/] },
-  '46b-dev-ui-edge': { must: [/Edge cases|TOTAL VALUE/] },
-  '47-dev-fidelity': { must: [/Fidelity|fidelity|TOTAL VALUE/] },
-  '48-dev-boom': { must: [/Break this screen|TOTAL VALUE/] },
+  '46-dev-ui': { must: [/Design system|TOTAL (VALUE|BALANCE)/] },
+  '46b-dev-ui-edge': { must: [/Edge cases|TOTAL (VALUE|BALANCE)/] },
+  '47-dev-fidelity': { must: [/Fidelity|fidelity|TOTAL (VALUE|BALANCE)/] },
+  '48-dev-boom': { must: [/Break this screen|TOTAL (VALUE|BALANCE)/] },
 };
 
 /** Which expectations a screen's text failed. Empty means it said everything it had to. */
@@ -648,11 +649,13 @@ const main = async () => {
      */
     const aborted = (r.failure()?.errorText ?? '').includes('ERR_ABORTED');
     const isDevProbe = aborted && r.method() === 'HEAD' && r.url().startsWith(BASE);
-    if (!isDevProbe) netFail.push(`FAILED ${r.method()} ${r.url().slice(0, 110)}`);
+    // A coin icon Hyperliquid's own CDN does not carry (kPEPE.svg): third-party decoration, the row keeps its mark.
+    const isVenueIcon = /^https:\/\/app\.hyperliquid\.xyz\/coins\//.test(r.url());
+    if (!isDevProbe && !isVenueIcon) netFail.push(`FAILED ${r.method()} ${r.url().slice(0, 110)}`);
   });
   page.on('response', (r) => {
     // 503 is the documented warming handshake, not a failure — the client retries it.
-    if (r.status() >= 400 && r.status() !== 503) netFail.push(`${r.status()} ${r.url().slice(0, 110)}`);
+    if (r.status() >= 400 && r.status() !== 503 && !/^https:\/\/app\.hyperliquid\.xyz\/coins\//.test(r.url())) netFail.push(`${r.status()} ${r.url().slice(0, 110)}`);
   });
 
   const { agentId } = await resolveIds();

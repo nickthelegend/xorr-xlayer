@@ -59,7 +59,7 @@ export default function Earnings() {
       <View style={{ paddingHorizontal: space.gutter }}>
         <HeaderBar onBack={goBack} title={<Text variant="screenTitle">Earnings</Text>} />
         <Text variant="secondary" color={colors.ink55} style={{ marginTop: space.s8 }}>
-          Past filings, and when the next is likely.
+          Past SEC EDGAR filings, and when the next is likely.
         </Text>
       </View>
 

@@ -1955,7 +1955,7 @@ check(
   },
 );
 
-const FEEDS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'HYPE', 'AAVE', 'LINK', 'TON', 'XAUT', 'PAXG', 'WETH', 'USDC', 'USDT0', 'CBBTC'];
+const FEEDS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'HYPE', 'AAVE', 'LINK', 'TON', 'XAUT', 'PAXG', 'WETH', 'USDC', 'XBTC', 'WOKB', 'USDG', 'USDT0'];
 
 check(
   {
@@ -1963,7 +1963,7 @@ check(
     path: '/market/symbols',
     auth: 'public',
     kind: 'contract',
-    correct: 'Public. 200: exactly the feed table (server/src/market/ids.ts) BTC, ETH, SOL, XRP, DOGE, HYPE, AAVE, LINK, TON, XAUT, PAXG, WETH, USDC, USDT0, CBBTC — no duplicates — and every one prices in /market/quotes.',
+    correct: 'Public. 200: exactly the feed table (server/src/market/ids.ts) BTC, ETH, SOL, XRP, DOGE, HYPE, AAVE, LINK, TON, XAUT, PAXG, WETH, USDC, XBTC, WOKB, USDG, USDT0 — no duplicates — and every one prices in /market/quotes.',
   },
   async () => {
     const r = await get('/market/symbols', { auth: false });
@@ -3043,7 +3043,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the swap screen asks (?in=USDC&out=XBTC&amount=20&slippage=0.5, src/data/useSwapQuote.ts): 200 {inSymbol "USDC", outSymbol "XBTC", inAmount 20, outAmount > 0, minimumOut = outAmount × (1 − slippagePct/100), slippagePct 0.5, venues: string[], route = "Direct" | the one venue | "Best of n venues", priceImpactPct: null or in [0, 5), gas: null or {paidBy "executor", …}}; the implied XBTC price is within 3% of /market/quotes BTC; without ?slippage the default 0.3 applies; ?out=nvdax quotes under "NVDAx". Each ask answers inside a screen\'s patience: a quote still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
+      'As the swap screen asks (?in=USDC&out=XBTC&amount=20&slippage=0.5, src/data/useSwapQuote.ts): 200 {inSymbol "USDC", outSymbol "XBTC", inAmount 20, outAmount > 0, minimumOut = outAmount × (1 − slippagePct/100), slippagePct 0.5, venues: string[], route = "Direct" | the one venue (optionally "<venue> via <hop>") | "Best of n venues", priceImpactPct: null or in [0, 5), gas: null or {paidBy "executor", …}}; the implied XBTC price is within 3% of /market/quotes BTC; without ?slippage the default 0.3 applies; ?out=nvdax quotes under "NVDAx". Each ask answers inside a screen\'s patience: a quote still on its way is 503 warming with a retry-after, which is waited out, and no attempt takes the app\'s 45s.',
   },
   async () => {
     const r = await get('/swap/quote?in=USDC&out=XBTC&amount=20&slippage=0.5');
@@ -3053,7 +3053,9 @@ check(
     must(q.inSymbol === 'USDC' && q.outSymbol === 'XBTC' && q.inAmount === 20 && q.outAmount > 0 && q.slippagePct === 0.5, `header ${clip(q)}`);
     must(near(q.minimumOut, q.outAmount * (1 - 0.005), 1e-12, 1e-9), `minimumOut ${q.minimumOut}`);
     const label = q.venues.length === 0 ? 'Direct' : q.venues.length === 1 ? q.venues[0] : `Best of ${q.venues.length} venues`;
-    must(Array.isArray(q.venues) && q.route === label, `route "${q.route}" for venues ${clip(q.venues)}`);
+    // A single venue may name the hop it routes through ("Uniswap v3 via USDG").
+    const viaHop = q.venues.length === 1 && new RegExp(`^${q.venues[0]} via [A-Za-z0-9]+$`).test(q.route);
+    must(Array.isArray(q.venues) && (q.route === label || viaHop), `route "${q.route}" for venues ${clip(q.venues)}`);
     must(q.priceImpactPct === null || (q.priceImpactPct >= 0 && q.priceImpactPct < 5), `priceImpactPct ${q.priceImpactPct}`);
     must(q.gas === null || q.gas?.paidBy === 'executor', `gas ${clip(q.gas)}`);
     const spot = (await quotes('BTC')).BTC.price;
