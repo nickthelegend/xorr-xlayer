@@ -25,8 +25,7 @@ import { agreement, anchoringConfigured } from '../audit/anchor.js';
 import { verify as verifyAudit } from '../audit/log.js';
 import { usdcReserve } from '../market/yield.js';
 import { priceOf } from '../market/prices.js';
-import { quote } from '../venues/oneinch.js';
-import { health as graphHealth } from '../graph/client.js';
+import { quote } from '../venues/uniswap.js';
 import { STOCKS, equitiesFunctional } from '../venues/stocks.js';
 import { earningsCalendar } from '../market/edgar.js';
 import { markBroadcast } from '../http/request-id.js';
@@ -418,23 +417,13 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       },
     },
     {
-      id: 'subgraph',
-      claim: 'The delegation subgraph is deployed and synced.',
-      how: '{ _meta { block { number } hasIndexingErrors } } against the Studio endpoint',
+      id: 'uniswap',
+      claim: 'Uniswap v3 on X Layer routes real liquidity into a wrapped xStock, and the Route row names it.',
+      how: 'QuoterV2 quoteExactInput, 100 USDC → TSLAx on X Layer (chain 196)',
       run: async () => {
-        const h = await graphHealth();
-        if (!h.healthy) throw new Error(`subgraph reports indexing errors at block ${h.block}`);
-        return `synced to block ${h.block}, no indexing errors`;
-      },
-    },
-    {
-      id: 'oneinch',
-      claim: '1inch routes real liquidity, and the Route row names what it routed through.',
-      how: '1inch v6 quote, 100 USDC → WETH on chain 8453',
-      run: async () => {
-        const q = await quote({ inSymbol: 'USDC', outSymbol: 'WETH', amount: 100 });
+        const q = await quote({ inSymbol: 'USDC', outSymbol: 'TSLAx', amount: 100 });
         if (!(q.outAmount > 0)) throw new Error('quote returned zero');
-        return `100 USDC → ${q.outAmount.toFixed(6)} WETH via ${q.venues.join(', ') || 'an unnamed route'}`;
+        return `100 USDC → ${q.outAmount.toFixed(6)} TSLAx via ${q.route}`;
       },
     },
     {

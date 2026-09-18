@@ -1,10 +1,25 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
+// The database is never reached here; mocked so importing the registry does not need a configured chain.
+vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
+
 const priceMock = vi.fn<(symbol: string) => Promise<number | null>>();
 
 vi.mock('../venues/xstocks.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../venues/xstocks.js')>()),
   xStockPriceUsd: (s: string) => priceMock(s),
+}));
+
+/*
+ * The multiplier half of the sweep, replaced: a reading per symbol and the outcome of writing it.
+ * What each case sets is whether the token answered and whether the value was new.
+ */
+const readMultiplierMock = vi.fn<(symbol: string) => Promise<unknown>>();
+const recordMock = vi.fn<(reading: { symbol: string }, at: Date) => Promise<'recorded' | 'unchanged' | 'failed'>>();
+
+vi.mock('../venues/multiplier.js', () => ({
+  readMultiplier: (s: string) => readMultiplierMock(s),
+  recordMultiplierObservation: (r: { symbol: string }, at: Date) => recordMock(r, at),
 }));
 
 const { observeSweep, resetObserveClock, OBSERVE_EVERY_MS } = await import('./observe.js');
@@ -18,13 +33,20 @@ describe('recording what the xStocks cost', () => {
     vi.clearAllMocks();
     resetObserveClock();
     priceMock.mockResolvedValue(216.5);
+    readMultiplierMock.mockImplementation(async (symbol) => ({ symbol, multiplier: 1, exact: '1', pending: null }));
+    recordMock.mockResolvedValue('unchanged');
   });
 
   afterEach(() => resetObserveClock());
 
   it('prices every symbol in the universe', async () => {
     const out = await observeSweep(T0);
-    expect(out).toEqual({ asked: Object.keys(XSTOCKS).length, recorded: Object.keys(XSTOCKS).length, unpriced: [] });
+    expect(out).toEqual({
+      asked: Object.keys(XSTOCKS).length,
+      recorded: Object.keys(XSTOCKS).length,
+      unpriced: [],
+      multipliers: { changed: [], unchanged: Object.keys(XSTOCKS).length, unreadable: [] },
+    });
     expect(priceMock).toHaveBeenCalledTimes(Object.keys(XSTOCKS).length);
   });
 
@@ -78,5 +100,33 @@ describe('recording what the xStocks cost', () => {
     const out = await observeSweep(T0);
     expect(out?.recorded).toBe(0);
     expect(out?.unpriced).toHaveLength(Object.keys(XSTOCKS).length);
+  });
+
+  /*
+   * The multiplier is the only history of splits and reinvested dividends this project keeps, and
+   * it is written in the same pass — at the sweep's own clock, so a row says when it was seen.
+   */
+  it('reads every multiplier and writes it at the sweep time', async () => {
+    recordMock.mockImplementation(async (r) => (r.symbol === 'SPYx' ? 'recorded' : 'unchanged'));
+    const out = await observeSweep(T0);
+    expect(readMultiplierMock).toHaveBeenCalledTimes(Object.keys(XSTOCKS).length);
+    expect(recordMock).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'SPYx' }), T0);
+    expect(out?.multipliers).toEqual({ changed: ['SPYx'], unchanged: Object.keys(XSTOCKS).length - 1, unreadable: [] });
+  });
+
+  it('writes nothing for a token that does not answer, and says which', async () => {
+    readMultiplierMock.mockImplementation(async (symbol) => {
+      if (symbol === 'TSLAx') throw new Error('raw token did not answer');
+      return { symbol, multiplier: 1, exact: '1', pending: null };
+    });
+    const out = await observeSweep(T0);
+    expect(out?.multipliers.unreadable).toEqual(['TSLAx']);
+    expect(recordMock).not.toHaveBeenCalledWith(expect.objectContaining({ symbol: 'TSLAx' }), expect.anything());
+  });
+
+  it('reads the multiplier even for a symbol with no price route', async () => {
+    priceMock.mockResolvedValue(null);
+    await observeSweep(T0);
+    expect(readMultiplierMock).toHaveBeenCalledTimes(Object.keys(XSTOCKS).length);
   });
 });

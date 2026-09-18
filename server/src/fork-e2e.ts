@@ -24,7 +24,8 @@ import {
 } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
-import { buildSwap, canonicalSymbol, TOKENS } from './venues/oneinch.js';
+import { canonicalSymbol, TOKENS } from './venues/tokens.js';
+import { buildSwap } from './venues/uniswap.js';
 import { STOCKS, stockKey } from './venues/stocks.js';
 
 const RPC = process.env.FORK_RPC ?? 'http://127.0.0.1:8545';

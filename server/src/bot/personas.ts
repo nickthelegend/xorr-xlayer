@@ -112,7 +112,7 @@ export const PERSONAS: Record<PersonaId, Persona> = {
  * the chain and the token registry already, and this file should not need an RPC to be read.
  */
 export type Venue = {
-  /** e.g. "Base" — the chain orders actually settle on. */
+  /** e.g. "X Layer" — the chain orders actually settle on. */
   chain: string;
   /** The symbols the executor can settle right now, from `/market/tradable`. */
   tradable: readonly string[];
@@ -128,7 +128,7 @@ export function systemPrompt(
     ...(venue
       ? [
           '',
-          `WHERE YOU ARE: xorr trades on-chain on ${venue.chain}, routing through 1inch. Spot only.`,
+          `WHERE YOU ARE: xorr trades on-chain on ${venue.chain}, routing through Uniswap v3 (and OKX DEX where configured). Spot only: tokenized US stocks (xStocks), BTC and OKB against USDC.`,
           `The ONLY instruments you can trade are: ${venue.tradable.join(', ')}.`,
           'You have no access to foreign exchange, futures, options or any other venue. Never',
           'describe watching or trading a market that is not in that list — if you are asked about',

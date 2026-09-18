@@ -12,7 +12,7 @@
 import { erc20Abi, formatUnits, type Address } from 'viem';
 import { publicClient } from './client.js';
 import { ADDRESSES } from './chains.js';
-import { TOKENS, canonicalSymbol } from '../venues/oneinch.js';
+import { TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { priceOf } from '../market/prices.js';
 import { aavePoolIsDeployedHere, usdcReserve } from '../market/yield.js';
 import { StillFetching, beforeDeadline } from '../http/deadline.js';

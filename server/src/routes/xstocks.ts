@@ -1,24 +1,23 @@
 /**
  * GET /market/xstocks — the tokenized-equity catalog, browsable.
  *
- * The app could trade an xStock by name and could not show you what there was to trade. `XSTOCKS`
- * has been the executor's private list since the Solana work landed: eleven mints, reachable only if
- * you already knew the symbol to type. This publishes it, with the sector of each underlying listing
- * and both prices that exist for it — see `venues/xstocks-catalog.ts` for why there are two.
+ * The app could trade an xStock by name and could not show you what there was to trade. This
+ * publishes `XSTOCKS` — the wrapped xStocks on X Layer — with the sector of each underlying listing
+ * and its Uniswap v3 pool price (see `venues/xstocks-catalog.ts`).
  *
  * Public, for the same reason the rest of `/market/*` is: a catalog of what is listed and what it
  * costs is not user data, and gating it means a signed-out visitor sees a list of dashes.
  *
  * A row with no price is a row, not an omission. `feed: 'unavailable'` and `price: null` is the
- * honest answer on a cluster where these mints do not exist, and dropping those rows would hide
- * exactly the fact that matters — that the app cannot trade them here.
+ * honest answer when the pools cannot be quoted, and dropping those rows would hide exactly the
+ * fact that matters — that the app cannot trade them right now.
  */
 import { Hono } from 'hono';
 import { log } from '../http/request-id.js';
 import { requireUser } from '../auth/middleware.js';
 import { xStockCatalog, xStockSectors, type XStockCatalogRow } from '../venues/xstocks-catalog.js';
 import { xStockQuote, DEFAULT_SLIPPAGE_BPS } from '../venues/xstocks-quote.js';
-import { UnpricedError } from '../venues/jupiter.js';
+import { UnpricedError } from '../venues/errors.js';
 
 export const xstockRoutes = new Hono();
 
@@ -37,12 +36,11 @@ xstockRoutes.get('/market/xstocks', async (c) => {
   /*
    * Worth a line in the log when nothing priced.
    *
-   * All eleven unavailable means the price endpoint is unreachable or this deployment's mints are
-   * not the ones it knows — two different faults, both of which look from the app like a quiet
-   * catalog. Silence here is how the first one gets diagnosed as the second.
+   * All unavailable means the Uniswap quoter on X Layer could not be reached (or answered for no
+   * pool) — which looks from the app like a quiet catalog. Silence here is how it gets missed.
    */
   if (unpriced === rows.length && rows.length > 0) {
-    log.warn(`[xstocks] catalog priced none of ${rows.length} mints`);
+    log.warn(`[xstocks] catalog priced none of ${rows.length} wrapped xStocks`);
   }
 
   const body: XStockCatalogResponse = { rows, sectors: xStockSectors(), unpriced };
@@ -74,7 +72,7 @@ xstockRoutes.get('/market/xstocks/quote', async (c) => {
   }
 
   /*
-   * The tolerance, bounded where `/swap/quote` bounds its own.
+   * The tolerance, in basis points, bounded where `/swap/quote` bounds its own.
    *
    * Out of range is refused rather than clamped: a ticket that asked for 0.1% and was quoted at 3%
    * would show a floor nobody agreed to, and the person reading it has no way to tell.

@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { encodeFunctionData, erc20Abi } from 'viem';
 import { requireScope } from '../auth/middleware.js';
-import { ADDRESSES } from '../evm/chains.js';
+import { ADDRESSES, chain } from '../evm/chains.js';
 import { DELEGATION_ABI, DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { currentWallet } from './wallet-context.js';
 import { markBroadcast } from '../http/request-id.js';
@@ -77,8 +77,9 @@ privyRoutes.post('/privy/policy/prove', requireScope('admin'), async (c) => {
   if (!walletId) {
     return c.json({ error: 'no_demo_wallet', message: 'No policy-bound wallet on this deployment.' }, 400);
   }
-  const caip2 = `eip155:${process.env.XORR_CHAIN === 'xlayer-testnet' ? 84532 : 8453}`;
-  const chainId = process.env.XORR_CHAIN === 'xlayer-testnet' ? 84532 : 8453;
+  // The chain this executor settles on — a fork of X Layer answers X Layer's own id, 196; the testnet is 1952.
+  const chainId = chain.id;
+  const caip2 = `eip155:${chainId}`;
 
   const attempt = async (call: string, to: string, data?: `0x${string}`) => {
     // Marked before it is tried, outside the catch below: a probe the policy lets through is a real transaction.

@@ -1,119 +1,80 @@
 /**
- * The xStocks catalog as something you can browse: every token, its sector, and what it is worth.
+ * The xStocks catalog as something you can browse: every wrapped xStock on X Layer, its sector, and
+ * what it is worth (2026-09-19).
  *
- * Two different numbers live on each row and the difference between them is the point.
+ *   `price`           — what one wrapped share trades at on X Layer, from the Uniswap v3 pools that
+ *                       would fill it (`xStockPriceUsd` → `stocks.ts`). This is what a buy costs.
+ *   `underlyingPrice` — what the listed share is marked at on its exchange. Null on X Layer: the
+ *                       Solana build read the issuer's `stockData` mark off Jupiter's price API, and
+ *                       nothing equivalent exists here. Backed's public asset API
+ *                       (`api.xstocks.fi/api/v2/public/assets/{SYMBOL}`) was checked on 2026-09-19 and
+ *                       carries listing, trading-hours and deployment data but no price or mark, so
+ *                       the field stays null rather than borrowing a number from somewhere it is not.
  *
- *   `price`          — what one token trades at on Solana, from the pools. This is what a buy costs.
- *   `underlyingPrice`— what the issuer's own feed marks the listed share at. This is what the stock
- *                      is worth on its exchange.
- *
- * They are close and they are not equal: a tokenized share trades at whatever the AMM's inventory
- * says, and that drifts from the exchange mark by the depth of the pool. Showing only one of them
- * would be hiding the spread somebody actually pays, so the row carries both and the screen can say
- * which is which.
- *
- * Both come from Jupiter's price endpoint, which returns the pool price, the issuer's `stockData`
- * mark, 24h change and pool depth for a batch of mints in one request. A mint the endpoint does not
- * answer for gets `feed: 'unavailable'` and `price: null` — a real row, and never a number. The
- * equities screen (`routes/market.ts`) has taken that shape since it shipped, for the same reason:
- * a catalog that silently dropped what it could not price would hide that the app cannot trade it.
+ * A token the pools will not price gets `feed: 'unavailable'` and `price: null` — a real row, and
+ * never a number. A catalog that silently dropped what it could not price would hide that the app
+ * cannot trade it; on the testnet, where these wrappers do not exist, prices are still a mainnet
+ * question (see `uniswap.ts`), so an unavailable row there means the quoter could not be reached.
  */
-import { getJson, staleValue } from '../http/get.js';
-import { XSTOCKS, type XStockSector } from './xstocks.js';
-
-/** Jupiter's price endpoint. Public, and the one place that carries the issuer's own mark. */
-const PRICE_URL = 'https://lite-api.jup.ag/price/v3';
-
-/**
- * One mint as the price endpoint reports it.
- *
- * Only the fields this catalog reads are named. `stockData` is optional on purpose — it is the
- * issuer's feed for the underlying listing, and a mint can be priced by the pools without it.
- */
-type PriceEntry = {
-  usdPrice?: number;
-  priceChange24h?: number;
-  liquidity?: number;
-  stockData?: { price?: number; updatedAt?: string };
-};
+import { XSTOCKS, xStockPriceUsd, type XStockSector } from './xstocks.js';
 
 export type XStockCatalogRow = {
   symbol: string;
   name: string;
+  /** The share it tracks (TSLA). */
+  ticker: string;
+  /** The ERC-4626 wrapper on X Layer — what trades. */
   address: string;
   decimals: number;
   sector: XStockSector;
-  /** What one token costs in USD on Solana right now, or null when nothing would price it. */
+  /** What one wrapped token costs in USD on X Layer right now, or null when nothing would price it. */
   price: number | null;
-  /** What the issuer's feed marks the underlying share at, or null when this mint carries no such feed. */
+  /** The exchange mark for the underlying share. Null: no source on X Layer publishes one (see the header). */
   underlyingPrice: number | null;
-  /** Percent move over 24 hours, as the feed reports it. Null is "not reported", not "flat". */
+  /** Percent move over 24 hours. Null is "not reported", not "flat" — no 24h feed is read here. */
   change24hPct: number | null;
-  /** Pool depth behind `price`, in USD. How much the number on this row is worth trusting. */
+  /** Pool depth behind `price`, in USD. Null: not read here. */
   liquidityUsd: number | null;
   /** When the underlying mark was taken, ISO-8601. Null when there is no underlying mark. */
   underlyingAt: string | null;
   /**
    * Whether this row has a price at all.
    *
-   * `unavailable` is a state the screen renders, not a row it hides — on a cluster where these
-   * mints do not exist every row is unavailable, and that IS the answer to "can I trade these here".
+   * `unavailable` is a state the screen renders, not a row it hides — it IS the answer to "can I
+   * trade this right now".
    */
   feed: 'live' | 'unavailable';
 };
 
-/** Live for half a minute; a stale answer beats a screen of dashes for ten. */
-const TTL_MS = 30_000;
-const STALE_TOLERANCE_MS = 10 * 60_000;
-
-/** A finite, positive number, or null. Guards every field read off the wire. */
-function num(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
-
+/** A finite, positive number, or null. A zero price is not a price. */
 function positive(v: unknown): number | null {
-  const n = num(v);
-  return n !== null && n > 0 ? n : null;
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 }
 
 /**
  * The catalog, priced.
  *
- * One request for every mint rather than one per row: eleven probes behind a shared rate limit is
- * how a browsable list becomes a spinner. `getJson` owns the lane, the breaker and the cache.
+ * One pool quote per row, in parallel; each is cached for 30 s in `stocks.ts`, so a screen that
+ * refreshes does not re-quote. A read that fails is that row's `null`, never the catalog's error.
  */
 export async function xStockCatalog(): Promise<XStockCatalogRow[]> {
   const tokens = Object.values(XSTOCKS);
-  const url = `${PRICE_URL}?ids=${tokens.map((t) => t.address).join(',')}`;
+  const prices = await Promise.all(tokens.map((t) => xStockPriceUsd(t.symbol).catch(() => null)));
 
-  let prices: Record<string, PriceEntry> = {};
-  try {
-    prices = await getJson<Record<string, PriceEntry>>(url, TTL_MS);
-  } catch {
-    /*
-     * The last good answer, if it is recent enough to still mean something.
-     *
-     * Ten minutes is the tolerance `/market/stocks` already uses for a spot price. Past that the
-     * rows go to `unavailable` rather than showing a number whose age nobody can see.
-     */
-    prices = staleValue<Record<string, PriceEntry>>(url, STALE_TOLERANCE_MS) ?? {};
-  }
-
-  return tokens.map((t) => {
-    const entry = prices[t.address];
-    const price = positive(entry?.usdPrice);
+  return tokens.map((t, i) => {
+    const price = positive(prices[i]);
     return {
       symbol: t.symbol,
       name: t.name,
+      ticker: t.ticker,
       address: t.address,
       decimals: t.decimals,
       sector: t.sector,
       price,
-      underlyingPrice: positive(entry?.stockData?.price),
-      // Zero is a real reading here — a stock that did not move — so this one is not `positive`.
-      change24hPct: num(entry?.priceChange24h),
-      liquidityUsd: positive(entry?.liquidity),
-      underlyingAt: entry?.stockData?.updatedAt ?? null,
+      underlyingPrice: null,
+      change24hPct: null,
+      liquidityUsd: null,
+      underlyingAt: null,
       feed: price === null ? ('unavailable' as const) : ('live' as const),
     };
   });

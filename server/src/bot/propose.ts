@@ -22,7 +22,7 @@ import { evaluate } from '../rules/engine.js';
 import { speak } from './llm.js';
 import { TONE_INSTRUCTIONS, type ToneId } from './tone.js';
 import { readPolicy } from '../evm/delegation.js';
-import { SETTLEMENT_SYMBOL } from '../venues/oneinch.js';
+import { SETTLEMENT_SYMBOL } from '../venues/tokens.js';
 import type { Address } from 'viem';
 
 /**

@@ -20,7 +20,7 @@ import { one, query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
 import { runStrategy, type RunOutcome, type StrategyRow } from './run.js';
 import { nextRuns } from './schedule.js';
-import { TOKENS as VENUE_TOKENS, canonicalSymbol } from '../venues/oneinch.js';
+import { TOKENS as VENUE_TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { CHAIN_KEY } from '../evm/chains.js';
 import { readPolicy } from '../evm/delegation.js';
 import type { WalletRow } from '../routes/wallet-context.js';

@@ -22,10 +22,8 @@ import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { getLogsPaged } from '../evm/logs.js';
 import type { SettlementVenue } from '../executor/settle.js';
 import { currentRequestId, log } from '../http/request-id.js';
-import { bookAddress } from '../venues/aqua.js';
-import { oneinchHistory, type OneInchHistoryEvent } from '../venues/history.js';
-import { SETTLEMENT_SYMBOL, TOKENS } from '../venues/oneinch.js';
-import { swapVmBookAddress } from '../venues/swapvm.js';
+import { OKX_ROUTER } from '../venues/okxdex.js';
+import { SETTLEMENT_SYMBOL, TOKENS } from '../venues/tokens.js';
 import { requireWallet } from './wallet-context.js';
 
 export const historyRoutes = new Hono();
@@ -97,7 +95,7 @@ export type HistoryRun = {
 };
 
 export type HistoryItem = {
-  kind: 'spent' | 'closed' | '1inch';
+  kind: 'spent' | 'closed';
   txHash: string;
   block: number;
   /** The block's time, or null when that block could not be read — the settlement is no less true for it. */
@@ -105,13 +103,11 @@ export type HistoryItem = {
   /** The executor's name for a venue it settles on, otherwise the contract's address. */
   venue: string | null;
   token: HistoryToken | null;
-  /** In the token's base units, exactly as the chain carries it. Null only for a 1inch event that moved no token. */
+  /** In the token's base units, exactly as the chain carries it. */
   amount: string | null;
   /** Dollars only where the amount IS dollars — see `dollarsOf`. */
   usd: number | null;
   run?: HistoryRun;
-  /** What 1inch calls the event, and which way the token that stands for it moved. 1inch rows only. */
-  oneinch?: { type: string; direction: 'in' | 'out' | null };
   explorer: string;
 };
 
@@ -121,9 +117,9 @@ type Placed = { item: HistoryItem; txIndex: number; logIndex: number };
 /**
  * The token at an address, from the registry — or null, and the amount stays raw.
  *
- * `TOKENS` is all-mainnet on purpose (it is what 1inch is asked about), and on Base Sepolia the settlement USDC is
- * Circle's other deployment, `ADDRESSES.usdc`. So this chain's own USDC is checked first: without it every Sepolia
- * spend would read as an unknown token.
+ * `TOKENS` is all-mainnet on purpose (prices are a mainnet question), and on the testnet the settlement USDC is Circle's
+ * other deployment, `ADDRESSES.usdc`. So this chain's own USDC is checked first: without it every testnet spend would
+ * read as an unknown token.
  */
 function tokenAt(address: string): HistoryToken | null {
   const a = address.toLowerCase();
@@ -152,10 +148,9 @@ function dollarsOf(token: HistoryToken | null, amount: bigint): number | null {
  */
 function venueName(address: string): string {
   const named: [string | undefined, SettlementVenue][] = [
-    [ONEINCH_ROUTER, '1inch'],
+    [ADDRESSES.uniswapRouter ?? undefined, 'uniswap-v3'],
+    [OKX_ROUTER, 'okx-dex'],
     [IS_MAINNET_STATE ? AAVE_V3_POOL : undefined, 'aave'],
-    [bookAddress(), 'aqua'],
-    [swapVmBookAddress(), 'swapvm'],
   ];
   return named.find(([a]) => a?.toLowerCase() === address.toLowerCase())?.[1] ?? address;
 }
@@ -215,36 +210,6 @@ async function chainSettlements(owner: Address, fromBlock: bigint, toBlock: bigi
   return out;
 }
 
-/**
- * A 1inch event as a row. One token movement stands for it: what the wallet paid, preferring a token the registry knows,
- * else what it received — the same side a `Spent` or a `Closed` reports.
- */
-function placeOneInch(e: OneInchHistoryEvent, owner: string): Placed {
-  const d = e.details;
-  const actions = d.tokenActions ?? [];
-  const paid = actions.filter((a) => a.fromAddress.toLowerCase() === owner);
-  const received = actions.filter((a) => a.toAddress.toLowerCase() === owner);
-  const listed = (a: { address: string }) => tokenAt(a.address) !== null;
-  const action = paid.find(listed) ?? paid[0] ?? received.find(listed) ?? received[0];
-  const token = action ? tokenAt(action.address) : null;
-  const amount = action && /^\d+$/.test(action.amount) ? action.amount : null;
-  return {
-    txIndex: d.orderInBlock,
-    logIndex: e.eventOrderInTransaction,
-    item: {
-      kind: '1inch',
-      txHash: d.txHash,
-      block: d.blockNumber,
-      at: new Date(d.blockTimeSec * 1000).toISOString(),
-      venue: d.toAddress ? venueName(d.toAddress) : null,
-      token,
-      amount,
-      usd: amount === null ? null : dollarsOf(token, BigInt(amount)),
-      oneinch: { type: d.type, direction: action ? (paid.includes(action) ? 'out' : 'in') : null },
-      explorer: explorerTx(d.txHash),
-    },
-  };
-}
 
 /**
  * Each distinct block's time, read once: a block holding three of this wallet's events costs one read, not three. Null
@@ -284,17 +249,6 @@ historyRoutes.get('/history', async (c) => {
     );
   }
 
-  /*
-   * 1inch is asked alongside the chain — another host, another lane — and settled into an answer either way, so its
-   * failure can neither become an unhandled rejection nor take the chain's history down with it.
-   */
-  const fromOneInch =
-    CHAIN_KEY === 'xlayer'
-      ? oneinchHistory(owner, limit).then(
-          (events) => ({ events, reason: null }),
-          (e: unknown) => ({ events: [] as OneInchHistoryEvent[], reason: reasonOf(e) }),
-        )
-      : undefined;
 
   let head: bigint;
   let fromBlock: bigint;
@@ -318,19 +272,10 @@ historyRoutes.get('/history', async (c) => {
     );
   }
 
-  const oneinch = fromOneInch ? await fromOneInch : undefined;
-  const onChain = new Set(placed.map((p) => p.item.txHash.toLowerCase()));
-  for (const e of oneinch?.events ?? []) {
-    // A transaction that did not go through settled nothing. One the contract already reported is that report, joined
-    // to its run; 1inch's copy would list it twice.
-    if (e.details.status !== 'completed' || onChain.has(e.details.txHash.toLowerCase())) continue;
-    placed.push(placeOneInch(e, owner.toLowerCase()));
-  }
-
   // Newest first, in the order the chain put them: block, then transaction, then log.
   placed.sort((a, b) => b.item.block - a.item.block || b.txIndex - a.txIndex || b.logIndex - a.logIndex);
   const items = placed.slice(0, limit).map((p) => p.item);
-  const settlements = items.filter((i) => i.kind !== '1inch');
+  const settlements = items;
 
   // The runs behind the listed transactions, from this wallet's own strategies on this chain.
   const hashes = [...new Set(settlements.map((i) => i.txHash.toLowerCase()))];
@@ -367,7 +312,7 @@ historyRoutes.get('/history', async (c) => {
     }
   }
 
-  // 1inch rows carry their own time; the chain's are read — with the window's first block, so the answer can say since when.
+  // Each row's time is read from its block — with the window's first block, so the answer can say since when.
   const times = await blockTimes([...settlements.map((i) => BigInt(i.block)), fromBlock]);
   for (const i of settlements) {
     i.at = times.get(BigInt(i.block)) ?? null;
@@ -378,9 +323,9 @@ historyRoutes.get('/history', async (c) => {
   return c.json({
     owner: w.address,
     chain: CHAIN_KEY,
-    source: oneinch && oneinch.reason === null ? 'chain+1inch' : 'chain',
+    source: 'chain',
     window: { fromBlock: Number(fromBlock), toBlock: Number(head), since: times.get(fromBlock) ?? null },
-    unavailable: oneinch?.reason ? { source: '1inch', reason: oneinch.reason } : null,
+    unavailable: null,
     items,
   });
 });

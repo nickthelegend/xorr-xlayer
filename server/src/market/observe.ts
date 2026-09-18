@@ -12,11 +12,20 @@
  * ## Why this is paced rather than per-tick
  *
  * The scheduler ticks every thirty seconds and there are eleven xStocks, which would be more than
- * thirty thousand Jupiter quotes a day to build a series whose own window is a month. A reading
+ * thirty thousand Uniswap quotes a day to build a series whose own window is a month. A reading
  * every few minutes is a denser series than the range logic can use and is still polite to the
  * venue. The interval is the unit of resolution, not a rate limit worked around.
  *
  * ## What it does not do
+ *
+ * ## And the multiplier, in the same pass (P2.6)
+ *
+ * Each xStock's corporate-action multiplier (`venues/multiplier.ts`: wrapper `convertToAssets(1e18)`,
+ * cross-checked against the raw token) is read and written to `multiplier_observations` when it
+ * differs from the last value recorded. That table is the only history of splits and reinvested
+ * dividends this project has — the chain holds the current value and at most one scheduled one —
+ * and it is what `dividend-yield.ts` measures and `corporate-actions.ts` detects unscheduled
+ * changes from. A token that does not answer is listed as unreadable and nothing is written for it.
  *
  * It does not invent a reading when the venue does not answer. `xStockPriceUsd` returns null for a
  * symbol it cannot route, and a gap in the series is the honest record of a gap in what was
@@ -24,6 +33,7 @@
  */
 import { log } from '../http/request-id.js';
 import { XSTOCKS, xStockPriceUsd } from '../venues/xstocks.js';
+import { readMultiplier, recordMultiplierObservation } from '../venues/multiplier.js';
 
 /** How often a symbol is priced for the record. */
 export const OBSERVE_EVERY_MS = Number(process.env.OBSERVE_EVERY_MS ?? 5 * 60_000);
@@ -35,7 +45,19 @@ export function resetObserveClock(): void {
   lastRunAt = 0;
 }
 
-export type ObserveResult = { asked: number; recorded: number; unpriced: string[] };
+export type ObserveResult = {
+  asked: number;
+  recorded: number;
+  unpriced: string[];
+  multipliers: {
+    /** Symbols whose multiplier was written: a first reading, or one that differs from the last. */
+    changed: string[];
+    /** Symbols read but not written: same value as last time. */
+    unchanged: number;
+    /** Symbols whose multiplier could not be read, or whose row could not be written. */
+    unreadable: string[];
+  };
+};
 
 /**
  * One pass over the universe, or nothing if the last pass was recent.
@@ -50,6 +72,7 @@ export async function observeSweep(now: Date = new Date()): Promise<ObserveResul
   const symbols = Object.keys(XSTOCKS);
   const unpriced: string[] = [];
   let recorded = 0;
+  const multipliers: ObserveResult['multipliers'] = { changed: [], unchanged: 0, unreadable: [] };
 
   for (const symbol of symbols) {
     /*
@@ -60,10 +83,26 @@ export async function observeSweep(now: Date = new Date()): Promise<ObserveResul
     const price = await xStockPriceUsd(symbol).catch(() => null);
     if (price === null || !(price > 0)) unpriced.push(symbol);
     else recorded += 1;
+
+    /*
+     * Independent of the price: a symbol with no route still has a multiplier, and a split is
+     * exactly the moment a pool might stop quoting.
+     */
+    const reading = await readMultiplier(symbol, now.getTime()).catch(() => null);
+    const outcome = reading ? await recordMultiplierObservation(reading, now) : 'failed';
+    if (outcome === 'recorded') multipliers.changed.push(symbol);
+    else if (outcome === 'unchanged') multipliers.unchanged += 1;
+    else multipliers.unreadable.push(symbol);
   }
 
   if (unpriced.length > 0) {
     log.info(`[observe] priced ${recorded}/${symbols.length}; no route for ${unpriced.join(', ')}`);
   }
-  return { asked: symbols.length, recorded, unpriced };
+  if (multipliers.unreadable.length > 0) {
+    log.info(`[observe] multiplier unreadable for ${multipliers.unreadable.join(', ')}`);
+  }
+  if (multipliers.changed.length > 0) {
+    log.info(`[observe] multiplier recorded for ${multipliers.changed.join(', ')}`);
+  }
+  return { asked: symbols.length, recorded, unpriced, multipliers };
 }

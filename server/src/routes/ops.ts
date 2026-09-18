@@ -19,7 +19,6 @@ import { CHAIN_KEY } from '../evm/chains.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { gasStatus } from '../evm/gas.js';
 import { publicSurface } from '../auth/middleware.js';
-import { health as graphHealth, indexDescription } from '../graph/client.js';
 import { breakerState } from '../http/get.js';
 import { voiceConfigured } from '../bot/llm.js';
 
@@ -87,22 +86,6 @@ ops.get('/health', async (c) => {
       const g = await gasStatus();
       if (!g.enough) throw new Error(`${g.eth.toFixed(4)} ETH, below the ${g.floor} floor`);
       return `${g.eth.toFixed(4)} ETH`;
-    }),
-    /*
-     * The index a trade decision reads (PLAN.md 2.11). Not critical — a run the index cannot answer for
-     * is decided without it and says so — but a health check that never mentions it lets an index stuck
-     * behind, erroring, or pointed at another deployment's contract go unnoticed.
-     */
-    probe('subgraph', false, async () => {
-      const [h, index] = [await graphHealth(), indexDescription()];
-      if (!h.healthy) throw new Error(`indexing errors at block ${h.block}`);
-      if (!index.indexedDelegation) {
-        throw new Error(`at block ${h.block}, but SUBGRAPH_DELEGATION_ADDRESS is not set, so which contract it follows is unknown`);
-      }
-      if (!index.indexesThisDeployment) {
-        throw new Error(`at block ${h.block}, but indexing ${index.indexedDelegation}, not this deployment's ${index.activeDelegation}`);
-      }
-      return `at block ${h.block}, indexing ${index.indexedDelegation}`;
     }),
     // Upstreams the circuit breaker has shut out right now: prices and quotes fail fast while one is open.
     probe('upstreams', false, async () => {

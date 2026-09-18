@@ -1,32 +1,36 @@
 /**
  * GET /wallet/tokens — every token the signed-in wallet holds, in the chain's own words (PLAN.md 3.10).
  *
- * The Assets tab's Holdings are the ledger: positions the executor recorded from its own fills. A wallet holds more
- * than that book — the ETH that pays for gas, a deposit, a token sent in, anything bought elsewhere — and nothing
- * listed it. This does, from wherever this deployment can read the wallet truthfully:
+ * The Assets tab's Holdings are the ledger: positions the executor recorded from its own fills. A wallet holds more than
+ * that book — the OKB that pays for gas, a deposit, a token sent in, anything bought elsewhere — and this lists it, read
+ * from the chain on every network: native OKB, USDC, and every registry token in the multicall `/wallet/balance` makes.
+ * (The Base build used 1inch's Balance API on mainnet; 1inch does not run on X Layer.)
  *
- *   - On Base, 1inch's Balance API: every token on 1inch's list, native ETH included, not only the registry — named,
- *     sized and given a logo by 1inch's Token API (`venues/balance.ts`).
- *   - On a fork or a testnet, 1inch would describe Base mainnet, which is not the chain the executor is on. So the
- *     registry is read in the multicall `/wallet/balance` already makes, with USDC and native ETH beside it, and logos
- *     come from where the market screens get theirs.
- *
- * `source` says which answered. Each token is priced where a feed can be trusted to mean it, and is `null` where not
- * — never 0. A balance read that fails is a 502 naming what failed, never an empty list: that would say the wallet
- * is empty.
+ * Each token is priced where a feed can be trusted to mean it, and is `null` where not — never 0. A balance read that
+ * fails is a 502 naming what failed, never an empty list: that would say the wallet is empty.
  */
 import { Hono } from 'hono';
 import { formatUnits, getAddress, type Address } from 'viem';
 import { readChain } from '../http/chain-read.js';
-import { currentRequestId, log } from '../http/request-id.js';
 import { ADDRESSES, CHAIN_KEY } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
 import { cashUsd, holdings } from '../evm/balances.js';
-import { TOKENS } from '../venues/oneinch.js';
-import { holdingsOnBase, type BaseHoldings, type HeldToken } from '../venues/balance.js';
+import { TOKENS } from '../venues/tokens.js';
 import { logosFor } from '../market/logos.js';
 import { priceOf } from '../market/prices.js';
 import { requireWallet } from './wallet-context.js';
+
+/** A token the wallet holds: sized in its own units, with the feed that prices it (null: none) and its logo. */
+export type HeldToken = {
+  symbol: string;
+  address: Address;
+  decimals: number;
+  units: number;
+  /** The chain's own gas token, which has no contract. */
+  native?: boolean;
+  feed: string | null;
+  logo: string | null;
+};
 
 export const tokenRoutes = new Hono();
 
@@ -46,35 +50,6 @@ tokenRoutes.get('/wallet/tokens', async (c) => {
   const w = await requireWallet(c);
   const owner = getAddress(w.address);
 
-  if (CHAIN_KEY === 'xlayer') {
-    let held: BaseHoldings;
-    try {
-      held = await holdingsOnBase(owner);
-    } catch (e) {
-      /*
-       * The answer `readChain` gives a failed RPC read — a 502, a sentence saying what could not be read, the cause in
-       * the log — with the source named, since here it was 1inch that did not answer rather than the chain.
-       */
-      log.warn(`[tokens] 1inch could not read the wallet's tokens: ${e instanceof Error ? e.message : String(e)}`);
-      return c.json(
-        {
-          error: 'balance_read_failed',
-          source: '1inch',
-          message: 'Could not read your tokens from 1inch just now.',
-          requestId: currentRequestId(),
-        },
-        502,
-      );
-    }
-    return c.json({
-      owner,
-      chain: CHAIN_KEY,
-      source: '1inch',
-      tokens: await priced(held.tokens),
-      undescribed: held.undescribed,
-    });
-  }
-
   // A read that throws becomes `ChainReadFailed`, which the error handler answers with a 502, as for `/wallet/balance`.
   const read = await readChain('your tokens', () => chainHoldings(owner));
   // Logos are decoration. They are read after the balances, so they can never fail them, and `logosFor` never throws.
@@ -90,12 +65,12 @@ tokenRoutes.get('/wallet/tokens', async (c) => {
 });
 
 /**
- * What a fork or testnet wallet holds, read from the chain: native ETH, USDC, and every other registry token.
+ * What the wallet holds, read from the chain: native OKB, USDC, and every other registry token.
  *
  * `holdings` is the registry multicall behind `/wallet/balance`. It leaves out the two tokens it treats separately:
- * USDC, which that route counts as cash, and native ETH, which has no contract to batch. Both are read here beside it,
- * at this chain's addresses — Circle's USDC is a different deployment on Sepolia. If any of the three reads throws,
- * the list is not answered at all.
+ * USDC, which that route counts as cash, and native OKB, which has no contract to batch. Both are read here beside it, at
+ * this chain's addresses — Circle's USDC is a different deployment on the testnet. If any of the three reads throws, the
+ * list is not answered at all.
  */
 async function chainHoldings(owner: Address): Promise<Omit<HeldToken, 'logo'>[]> {
   const [registered, usdc, wei] = await Promise.all([
@@ -106,12 +81,13 @@ async function chainHoldings(owner: Address): Promise<Omit<HeldToken, 'logo'>[]>
   const rows: Omit<HeldToken, 'logo'>[] = [];
   if (wei > 0n) {
     rows.push({
-      symbol: 'ETH',
+      symbol: 'OKB',
       address: ADDRESSES.nativeToken,
       decimals: 18,
       units: Number(formatUnits(wei, 18)),
       native: true,
-      feed: 'ETH',
+      // OKB is priced as its wrapped twin, WOKB — the same asset.
+      feed: 'WOKB',
     });
   }
   // `cashUsd` answers in USDC's own units, read at its six decimals.

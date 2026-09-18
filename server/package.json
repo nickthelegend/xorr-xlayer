@@ -12,7 +12,6 @@
     "test:live": "LIVE=1 vitest run live.test",
     "setup:fork": "tsx src/fork-bootstrap.ts",
     "rebuild:fork": "tsx src/fork-bootstrap.ts && set -a && . \"./${FORK_ENV_FILE:-.env.fork}\" && set +a && tsx src/fork-grant.ts",
-    "ship:makers": "tsx src/fork/ship-makers.ts",
     "reconcile:orphans": "tsx src/fork/reconcile-orphans.ts",
     "mirror:mongo": "tsx src/db/mirror-to-mongo.ts",
     "readiness:base": "XORR_CHAIN=base ALLOW_MAINNET=yes tsx src/base-readiness.ts"
@@ -20,9 +19,6 @@
   "dependencies": {
     "@hono/node-server": "^1.19.6",
     "@privy-io/server-auth": "^1.32.5",
-    "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.99.0",
-    "bs58": "^6.0.0",
     "dotenv": "^17.2.3",
     "hono": "^4.10.7",
     "jose": "^6.2.12",

@@ -9,14 +9,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
-const h = vi.hoisted(() => ({
-  getJson: vi.fn(),
-  staleValue: vi.fn(),
-  xStockQuote: vi.fn(),
-  requireUser: vi.fn(),
-}));
+const h = vi.hoisted(() => {
+  // A unit test needs no chain, and the repo-root `.env` may name one this executor no longer knows.
+  process.env.XORR_CHAIN = 'xlayer-testnet';
+  return { xStockPriceUsd: vi.fn(), xStockQuote: vi.fn(), requireUser: vi.fn() };
+});
 
-vi.mock('../http/get.js', () => ({ getJson: h.getJson, staleValue: h.staleValue }));
+// The pool price each row carries; `venues/xstocks-catalog.test.ts` pins how a row is built from it.
+vi.mock('../venues/xstocks.js', async (orig) => ({
+  ...(await orig<typeof import('../venues/xstocks.js')>()),
+  xStockPriceUsd: h.xStockPriceUsd,
+}));
+vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
+vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
 // The catalog is public; the quote beside it is not. Authentication itself is `auth`'s to prove.
 vi.mock('../auth/middleware.js', () => ({ requireUser: h.requireUser, WrongPrincipalError: class extends Error {} }));
 vi.mock('../venues/xstocks-quote.js', async (orig) => ({
@@ -24,8 +29,6 @@ vi.mock('../venues/xstocks-quote.js', async (orig) => ({
   xStockQuote: h.xStockQuote,
 }));
 
-const NVDAX = 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh';
-const SPYX = 'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W';
 
 async function call(path = '/market/xstocks'): Promise<{ status: number; body: any }> {
   const { xstockRoutes } = await import('./xstocks.js');
@@ -36,21 +39,18 @@ async function call(path = '/market/xstocks'): Promise<{ status: number; body: a
 
 beforeEach(() => {
   vi.resetModules();
-  h.getJson.mockReset();
-  h.staleValue.mockReset().mockReturnValue(undefined);
+  h.xStockPriceUsd.mockReset().mockResolvedValue(null);
   h.requireUser.mockReset();
   h.xStockQuote.mockReset().mockResolvedValue({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 });
 
 describe('with prices', () => {
   beforeEach(() => {
-    h.getJson.mockResolvedValue({
-      [NVDAX]: { usdPrice: 215.92, priceChange24h: 1.08, stockData: { price: 215.68 } },
-      [SPYX]: { usdPrice: 759.95, priceChange24h: 0.31 },
-    });
+    const LIVE: Record<string, number> = { NVDAx: 215.92, SPYx: 759.95 };
+    h.xStockPriceUsd.mockImplementation(async (s: string) => LIVE[s] ?? null);
   });
 
-  it('returns every catalogued mint, priced or not', async () => {
+  it('returns every catalogued xStock, priced or not', async () => {
     const { status, body } = await call();
     const { XSTOCKS } = await import('../venues/xstocks.js');
 
@@ -81,15 +81,15 @@ describe('with prices', () => {
 
 describe('with no prices at all', () => {
   it('is still a full catalog and still a 200', async () => {
-    h.getJson.mockRejectedValue(new Error('ENOTFOUND lite-api.jup.ag'));
+    h.xStockPriceUsd.mockRejectedValue(new Error('ENOTFOUND rpc.xlayer.tech'));
 
     const { status, body } = await call();
     const { XSTOCKS } = await import('../venues/xstocks.js');
 
     /*
      * The screen renders this. An error here would put a retry button where the answer belongs —
-     * and the answer, on a cluster whose mints this feed does not know, is that these exist and
-     * cannot be priced. That is information, not a failure.
+     * and the answer, when the pools cannot be quoted, is that these exist and cannot be priced
+     * right now. That is information, not a failure.
      */
     expect(status).toBe(200);
     expect(body.rows).toHaveLength(Object.keys(XSTOCKS).length);
@@ -142,8 +142,8 @@ describe('the order breakdown', () => {
   });
 
   it('answers a pair nobody will price as no quote, not as a breakdown of zeroes', async () => {
-    const { UnpricedError } = await import('../venues/jupiter.js');
-    h.xStockQuote.mockRejectedValue(new UnpricedError('No Jupiter quote for USDC -> NVDAx: 429'));
+    const { UnpricedError } = await import('../venues/errors.js');
+    h.xStockQuote.mockRejectedValue(new UnpricedError('No liquidity for USDC -> NVDAx at this size (429)'));
 
     const { status, body } = await call('/market/xstocks/quote?symbol=NVDAx&side=buy&usd=250');
 

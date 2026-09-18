@@ -28,13 +28,15 @@
  * targeted symbol cannot be priced, the whole run stands down and says which one.
  */
 import { randomUUID } from 'node:crypto';
-import { one, query } from '../db/index.js';
+import { isAddress, type Address } from 'viem';
+import { query } from '../db/index.js';
 import { log } from '../http/request-id.js';
-import { append } from '../audit/log.js';
-import { guardAndSpend } from '../executor/place.js';
+import { placeOrder } from '../executor/order.js';
+import { placeSwap } from '../executor/swap.js';
 import { periodKey, type Cadence } from '../executor/schedule.js';
-import { getTokenBalance } from '../solana/balances.js';
+import { chainUnitsOf } from '../evm/balances.js';
 import { XSTOCKS, xStockKey, xStockPriceUsd } from '../venues/xstocks.js';
+import type { WalletRow } from '../routes/wallet-context.js';
 
 /** Below this, a leg is not worth the spread it would pay. Matches the executor's own floor. */
 const MIN_TRADE_USD = 10;
@@ -50,7 +52,7 @@ export type BasketRow = {
 export type Sleeve = {
   symbol: string;
   targetPct: number;
-  /** What the wallet actually holds, in units, read from the chain with the mint's multiplier. */
+  /** What the wallet actually holds, in wrapper units, read from the chain with ERC-20 `balanceOf`. */
   units: number;
   /** Null when nothing could price it — which stands the whole run down rather than reading as 0. */
   usd: number | null;
@@ -86,9 +88,11 @@ export function validateTargets(targets: Record<string, number>): string | null 
 /**
  * What the wallet actually holds against what it should, priced now.
  *
- * Holdings come from the chain rather than the ledger, and through `getTokenBalance`, which applies
- * the mint's Scaled UI multiplier — a basket measured on raw balances would misread every sleeve
- * whose issuer has ever split.
+ * Holdings come from the chain rather than the ledger: the wrapped xStock's ERC-20 `balanceOf` on
+ * X Layer, one multicall for every sleeve (`chainUnitsOf`). The wrapper is what trades and what is
+ * priced — the Uniswap v3 pools quote wrapper shares — so units and price are in the same terms, and
+ * a split moves the wrapper's `convertToAssets`, not its share count. Measured on the raw rebasing
+ * token instead, every sleeve whose issuer has ever split would be misread.
  */
 export async function readBasket(
   ownerAddress: string,
@@ -96,6 +100,17 @@ export async function readBasket(
 ): Promise<{ sleeves: Sleeve[]; totalUsd: number; unpriced: string[] }> {
   const sleeves: Sleeve[] = [];
   const unpriced: string[] = [];
+
+  const known = Object.keys(targets)
+    .map((raw) => xStockKey(raw))
+    .filter((k): k is string => k !== undefined && XSTOCKS[k] !== undefined);
+  /*
+   * One read for the whole basket. A read that fails, or an owner that is not an X Layer address,
+   * leaves every balance unknown — and an unknown balance is not a balance of zero.
+   */
+  const units: Map<string, number | null> = isAddress(ownerAddress)
+    ? await chainUnitsOf(ownerAddress as Address, known).catch(() => new Map<string, number | null>())
+    : new Map<string, number | null>();
 
   for (const [rawSymbol, targetPct] of Object.entries(targets)) {
     const key = xStockKey(rawSymbol);
@@ -106,13 +121,11 @@ export async function readBasket(
       continue;
     }
 
-    const [balance, price] = await Promise.all([
-      getTokenBalance(ownerAddress, token.address).catch(() => null),
-      xStockPriceUsd(token.symbol).catch(() => null),
-    ]);
+    const balance = units.get(token.symbol) ?? null;
+    const price = await xStockPriceUsd(token.symbol).catch(() => null);
 
     // A balance that could not be read is not a balance of zero, and neither is an unreadable price.
-    if (balance === null || price === null || !(price > 0)) {
+    if (balance === null || !Number.isFinite(balance) || price === null || !(price > 0)) {
       unpriced.push(token.symbol);
       sleeves.push({ symbol: token.symbol, targetPct, units: 0, usd: null, actualPct: null, driftPct: null });
       continue;
@@ -121,8 +134,8 @@ export async function readBasket(
     sleeves.push({
       symbol: token.symbol,
       targetPct,
-      units: balance.uiAmount,
-      usd: balance.uiAmount * price,
+      units: balance,
+      usd: balance * price,
       actualPct: null,
       driftPct: null,
     });
@@ -272,13 +285,9 @@ export async function rebalanceOnce(
   }
 
   const { leg } = plan;
-  const outcome = await guardAndSpend({
-    walletId: wallet.id,
-    ownerPubkey: wallet.address,
-    symbol: leg.symbol,
-    usd: leg.usd,
-    side: leg.side,
-  }).catch((e) => ({ placed: false as const, status: 'blocked' as const, reason: 'threw', detail: String(e) }));
+  const outcome = await placeLeg(wallet, leg, sleeves).catch(
+    (e): LegOutcome => ({ placed: false, detail: `The ${leg.side} could not be placed: ${e instanceof Error ? e.message : String(e)}` }),
+  );
 
   if (!outcome.placed) {
     await finish('failed', outcome.detail, { symbol: leg.symbol, side: leg.side, usd: leg.usd, driftPct: leg.driftPct });
@@ -297,27 +306,11 @@ export async function rebalanceOnce(
     signature: outcome.signature,
   });
 
-  await append({
-    walletId: wallet.id,
-    agent: 'Basket',
-    action: `${verb} ${leg.symbol} to rebalance`,
-    detail,
-    amount: `$${outcome.usd.toFixed(2)}`,
-    kind: 'trade',
-    signature: outcome.signature,
-    payload: {
-      basketRunId: runId,
-      periodKey: key,
-      symbol: leg.symbol,
-      side: leg.side,
-      usd: outcome.usd,
-      driftPct: leg.driftPct,
-      bandPct,
-      totalUsd,
-      targets: basket.targets,
-      sleeves: sleeves.map((s) => ({ symbol: s.symbol, targetPct: s.targetPct, actualPct: s.actualPct })),
-    },
-  }).catch((e) => log.error('[basket] could not write the audit row:', e));
+  /*
+   * No audit row here: the path that placed the leg (`placeOrder` or `placeSwap`, both through `executor/run.ts`) wrote
+   * the fill's row and sent its push. A second row would list one rebalance twice on Activity. The why — drift, band,
+   * sleeves — is on the basket run `finish` just recorded.
+   */
 
   return {
     status: 'filled',
@@ -327,6 +320,54 @@ export async function rebalanceOnce(
     signature: outcome.signature,
     driftPct: leg.driftPct,
   };
+}
+
+type LegOutcome = { placed: true; usd: number; signature: string } | { placed: false; detail: string };
+
+/**
+ * The one leg, through the same paths every other trade takes.
+ *
+ * A buy is a one-off order (`placeOrder`): the rules, the on-chain permission, the daily cap and
+ * `spend()` on the XorrDelegation contract, settled on Uniswap v3. A sell converts wrapper units
+ * back to USDC through `closePosition()` (`placeSwap`), which the contract charges to no cap —
+ * de-risking is not spending. Either way the fill is booked and audited by the path that placed
+ * it; this function only reports what happened.
+ *
+ * The units to sell are the drift's share of what the sleeve holds, never more than the chain says
+ * is there, and written to six places so the float never asks for wei the wallet does not have.
+ */
+async function placeLeg(
+  wallet: { id: string; address: string },
+  leg: { symbol: string; side: 'buy' | 'sell'; usd: number },
+  sleeves: Sleeve[],
+): Promise<LegOutcome> {
+  // Both paths read the wallet's id and address and nothing else.
+  const w = wallet as WalletRow;
+
+  if (leg.side === 'buy') {
+    const order = await placeOrder(w, leg.symbol, leg.usd, `Basket · rebalance into ${leg.symbol}`);
+    if (!order.placed) return { placed: false, detail: order.refusal.detail };
+    const out = order.outcome;
+    if (out.status === 'filled') return { placed: true, usd: leg.usd, signature: out.signature };
+    if (out.status === 'blocked') return { placed: false, detail: out.detail };
+    if (out.status === 'failed') return { placed: false, detail: out.error };
+    return { placed: false, detail: `The order did not run (${out.status}), so nothing was bought.` };
+  }
+
+  const sleeve = sleeves.find((s) => s.symbol === leg.symbol);
+  if (!sleeve || !(sleeve.usd !== null && sleeve.usd > 0) || !(sleeve.units > 0)) {
+    return { placed: false, detail: `There is no ${leg.symbol} on chain to sell.` };
+  }
+  const share = Math.min(1, leg.usd / sleeve.usd);
+  const units = Math.floor(sleeve.units * share * 1e6) / 1e6;
+  if (!(units > 0)) return { placed: false, detail: `The ${leg.symbol} to sell rounds to nothing.` };
+
+  const res = await placeSwap(w, { from: leg.symbol, to: 'USDC', amount: units.toFixed(6) });
+  const body = res.body as { status?: string; usd?: number; txHash?: string; detail?: string; error?: string };
+  if (body.status === 'filled' && typeof body.txHash === 'string') {
+    return { placed: true, usd: typeof body.usd === 'number' ? body.usd : leg.usd, signature: body.txHash };
+  }
+  return { placed: false, detail: body.detail ?? body.error ?? `The ${leg.symbol} sale did not settle.` };
 }
 
 function sleeveTarget(sleeves: Sleeve[], symbol: string): string {

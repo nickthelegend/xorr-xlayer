@@ -42,7 +42,7 @@ import { publicClient } from '../evm/client.js';
 import { AAVE_V3_POOL, ADDRESSES, explorerTx } from '../evm/chains.js';
 import { waitForTx } from '../evm/delegation.js';
 import { readChain } from '../http/chain-read.js';
-import { canonicalSymbol } from '../venues/oneinch.js';
+import { canonicalSymbol } from '../venues/tokens.js';
 import { snapshotWallet } from '../portfolio/snapshots.js';
 import { functioningHere } from './market.js';
 import {

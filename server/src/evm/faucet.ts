@@ -40,7 +40,7 @@ import { moneyOn, networkName } from './money.js';
 import { faucetAccount } from './gasDrip.js';
 import { readChain } from '../http/chain-read.js';
 import { markBroadcast } from '../http/request-id.js';
-import { WHALE as USDC_HOLDER, anvil } from '../fork/makers.js';
+import { FORK_USDC_RESERVE as USDC_HOLDER, anvil, dealErc20 } from '../fork/anvil.js';
 
 const USDC = ADDRESSES.usdc;
 const USDC_DECIMALS = 6;
@@ -50,8 +50,8 @@ const USDC_DECIMALS = 6;
  *
  * Five times the smallest daily cap the permission screen offers ($200), so a new wallet can grant a real cap and watch
  * days of fills spend against it, with a swap and a limit order besides; a fifth of the largest ($5,000), so it stays a
- * trial balance rather than the 25,000 `fork-bootstrap.ts` gives the operator's own wallet. The reserve it comes from
- * holds tens of millions, so a claim a day per wallet never runs it down.
+ * trial balance rather than the 25,000 `fork-bootstrap.ts` gives the operator's own wallet. It comes from a fork-only
+ * reserve (`fork/anvil.ts`) that is dealt more USDC whenever it runs short, so a claim a day per wallet never runs it down.
  */
 export const FORK_USDC = 1_000;
 
@@ -74,7 +74,10 @@ export const FORK_ETH_FLOOR = '0.05';
  */
 export const SEPOLIA_USDC_CAP = 10;
 
-/** Gas for the holder's own transfer: many times what one ERC-20 transfer costs on Base, and only ever topped up to. */
+/** What the fork-only reserve is refilled to when it runs short: 10,000,000 USDC. */
+const RESERVE_REFILL = parseUnits('10000000', USDC_DECIMALS);
+
+/** Gas for the holder's own transfer: many times what one ERC-20 transfer costs, and only ever topped up to. */
 const HOLDER_GAS = parseEther('0.01');
 
 /** A fork mines at once and a testnet in seconds. Past this nothing is recorded, and the hash is reported. */
@@ -183,28 +186,20 @@ async function forkOffer(): Promise<FaucetOffer> {
     };
   }
   const usdcRaw = parseUnits(String(FORK_USDC), USDC_DECIMALS);
-  const held = await readChain('the holder’s USDC', () => usdcOf(USDC_HOLDER));
-  if (held < usdcRaw) {
-    return {
-      available: false,
-      reason: 'holder_short',
-      detail: `Aave’s USDC reserve holds ${usdcShown(held)} USDC on this fork, less than the ${usdcShown(usdcRaw)} one request sends.`,
-    };
-  }
   return {
     available: true,
     source: 'fork-holder',
     from: USDC_HOLDER,
     usdcRaw,
     ethFloorWei: parseEther(FORK_ETH_FLOOR),
-    detail: `${usdcShown(usdcRaw)} USDC moved from Aave’s USDC reserve on this fork of Base, with the wallet’s ETH raised to ${FORK_ETH_FLOOR} for gas. Fork funds exist only on this node.`,
+    detail: `${usdcShown(usdcRaw)} USDC sent from a fork-only reserve on this fork of X Layer, with the wallet’s OKB raised to ${FORK_ETH_FLOOR} for gas. Fork funds exist only on this node.`,
   };
 }
 
 const noFaucetKey = (): Refused => ({
   available: false,
   reason: 'no_faucet_key',
-  detail: `This deployment has no faucet key, so it has no Base Sepolia USDC to send. ${CIRCLE}`,
+  detail: `This deployment has no faucet key, so it has no X Layer testnet USDC to send. ${CIRCLE}`,
 });
 
 async function sepoliaOffer(): Promise<FaucetOffer> {
@@ -215,7 +210,7 @@ async function sepoliaOffer(): Promise<FaucetOffer> {
     return {
       available: false,
       reason: 'no_testnet_usdc',
-      detail: `The faucet key (${faucet.address}) holds no Base Sepolia USDC, so there is none to send. ${CIRCLE}`,
+      detail: `The faucet key (${faucet.address}) holds no X Layer testnet USDC, so there is none to send. ${CIRCLE}`,
     };
   }
   const cap = parseUnits(String(SEPOLIA_USDC_CAP), USDC_DECIMALS);
@@ -252,6 +247,11 @@ export function sendTestFunds(offer: Offer, to: Address): Promise<FaucetSent | N
 
 async function sendFromHolder(offer: Offer & { source: 'fork-holder' }, to: Address): Promise<FaucetSent> {
   const usdcBefore = await readChain('your USDC', () => usdcOf(to));
+  // The reserve is dealt more whenever it runs short: it exists only on forks, and only to be sent from.
+  const reserveHeld = await readChain('the reserve’s USDC', () => usdcOf(USDC_HOLDER));
+  if (reserveHeld < offer.usdcRaw) {
+    await dealErc20({ rpc: rpcUrl, token: USDC, holder: USDC_HOLDER, amount: RESERVE_REFILL });
+  }
   const holderEth = await readChain('the holder’s ETH', () => publicClient.getBalance({ address: USDC_HOLDER }));
 
   await anvil(rpcUrl, 'anvil_impersonateAccount', [USDC_HOLDER]);

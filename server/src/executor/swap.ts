@@ -21,7 +21,7 @@ import { one, tx } from '../db/index.js';
 import { append } from '../audit/log.js';
 import { closeAsDelegate, readPolicy, waitForTx, DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { CHAIN_KEY, explorerTx } from '../evm/chains.js';
-import { CAN_SETTLE, SETTLEMENT_SYMBOL, TOKENS, canonicalSymbol } from '../venues/oneinch.js';
+import { CAN_SETTLE, SETTLEMENT_SYMBOL, TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { equitiesFunctional, isStock } from '../venues/stocks.js';
 import { priceOf } from '../market/prices.js';
 import { applyFill } from '../positions/index.js';
@@ -151,7 +151,6 @@ async function convert(w: WalletRow, from: string, to: string, req: SwapRequest)
         slippagePct: req.slippagePct,
       },
       owner,
-      preferred: undefined,
       // `closePosition()` sells what the owner holds: no book is asked, as on any exit.
       isClose: true,
       delegationFrom: DELEGATION_ADDRESS,

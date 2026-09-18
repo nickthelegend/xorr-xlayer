@@ -29,17 +29,15 @@ import {
   SELF_SIZING_KINDS,
   type StrategyRow,
 } from '../executor/run.js';
-import { TOKENS as VENUE_TOKENS, canonicalSymbol } from '../venues/oneinch.js';
+import { TOKENS as VENUE_TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { nextRuns, type Cadence } from '../executor/schedule.js';
 import { backingFor, backingSeries } from '../venues/proof-of-reserves.js';
 import { backingDetail } from '../venues/backing-detail.js';
 import { dividendYield } from '../venues/dividend-yield.js';
-import { checkEligibility } from '../solana/eligibility.js';
 import { XSTOCKS, xStockKey } from '../venues/xstocks.js';
 import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
 import { allowanceView, chainAllowance, routerAllowance, routerSpender } from '../evm/allowances.js';
 import { delegateAccount } from '../evm/client.js';
-import { basenameOf } from '../evm/basename.js';
 import { dripGasIfNeeded } from '../evm/gasDrip.js';
 import {
   delegatePublicKey,
@@ -57,15 +55,12 @@ import type { Address, Hex } from 'viem';
 import { priceOf } from '../market/prices.js';
 import { COINGECKO_IDS } from '../market/ids.js';
 import { totalValueUsd } from '../evm/balances.js';
-import { TOKENS } from '../venues/oneinch.js';
+import { TOKENS } from '../venues/tokens.js';
 import { publicClient } from '../evm/client.js';
 import { STOCKS, isStock, equitiesFunctional } from '../venues/stocks.js';
 import { getPosition, listPositions, realisedPnl } from '../positions/index.js';
 import { PUSH_KINDS } from '../notifications/push.js';
 import { SNAPSHOT_EVERY_MS, historySince, listSnapshots, snapshotWallet, thinPoints } from '../portfolio/snapshots.js';
-import { isSolanaCluster, getClusterConfig } from '../solana/clusters.js';
-import { readSolanaBalances } from '../solana/balances.js';
-import { readDelegation } from '../solana/delegation.js';
 
 /**
  * Every wallet lookup is scoped to the AUTHENTICATED Privy user.
@@ -331,22 +326,6 @@ routes.get('/wallet/balance', async (c) => {
   const w = await currentWallet(c);
   if (!w) return c.json({ usd: 0 });
 
-  if (isSolanaCluster(process.env.XORR_CHAIN ?? '') || !w.address.startsWith('0x')) {
-    const balances = await readSolanaBalances(w.address);
-    const delegation = await readDelegation(w.address);
-    return c.json({
-      usd: balances.usdc.amount,
-      cashUsd: balances.usdc.amount,
-      holdings: [
-        { symbol: 'USDC', units: balances.usdc.amount, usd: balances.usdc.amount },
-        { symbol: 'SOL', units: balances.sol.amount, usd: 0 },
-      ],
-      suppliedUsd: 0,
-      dailyCapUsd: delegation.delegatedUsd,
-      remainingTodayUsd: delegation.delegatedUsd,
-    });
-  }
-
   /*
    * A failed read is an error, not a zero (PLAN.md 1.7).
    *
@@ -466,12 +445,13 @@ routes.get('/delegation', async (c) => {
    *
    * This screen's whole subject is "who may do what with your money", and it named both parties
    * with truncated hex. Two addresses that differ only in the middle look identical truncated,
-   * which is the one place that matters. Basenames are Base's own answer and resolving one is a
-   * read of a Base contract — null where there is no name, which is most addresses.
+   * which is the one place that matters. X Layer has no name service this build resolves,
+   * so the screen shows the full addresses — which is what tells two of them apart.
    */
   const [ownerName, delegateName, recorded] = await Promise.all([
-    basenameOf(w.address as Address),
-    basenameOf(policy.delegate as Address),
+    // X Layer has no name service this build resolves (Basenames were Base's): the parties are named by address.
+    Promise.resolve(null as string | null),
+    Promise.resolve(null as string | null),
     /*
      * When the grant in force was made (PLAN.md 4.7) — the one fact about it the chain does not keep.
      *
@@ -778,19 +758,6 @@ routes.get('/xstocks/:symbol/backing/detail', async (c) => {
     return c.json({ error: 'unknown_symbol', message: `${symbol} is not an xStock this executor knows.` }, 404);
   }
   return c.json(detail);
-});
-
-routes.get('/xstocks/:symbol/eligibility', async (c) => {
-  const symbol = c.req.param('symbol');
-  const wallet = c.req.query('wallet');
-  const stock = XSTOCKS[xStockKey(symbol) ?? symbol];
-  if (!stock) {
-    return c.json({ error: 'unknown_symbol', message: `${symbol} is not an xStock this executor knows.` }, 404);
-  }
-  if (!wallet) {
-    return c.json({ error: 'wallet_required', message: 'Pass ?wallet= to check eligibility.' }, 400);
-  }
-  return c.json({ symbol: stock.symbol, ...(await checkEligibility(wallet, stock.address)) });
 });
 
 routes.get('/xstocks/:symbol/backing', async (c) => {

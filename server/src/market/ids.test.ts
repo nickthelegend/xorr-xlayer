@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { COINGECKO_IDS } from './ids.js';
-import { TOKENS } from '../venues/oneinch.js';
+import { TOKENS } from '../venues/tokens.js';
 import { DEFAULT_PROPOSAL_SYMBOL, PRICE_IDS } from '../bot/propose.js';
 import { isStock } from '../venues/stocks.js';
 

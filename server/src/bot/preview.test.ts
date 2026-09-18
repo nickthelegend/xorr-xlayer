@@ -5,6 +5,15 @@ const heartbeatMock = vi.fn<() => { tickMs: number; lastTickAt: number | null }>
 
 vi.mock('../db/index.js', () => ({ one: (sql: string, p?: unknown[]) => oneMock(sql, p) }));
 vi.mock('../executor/scheduler.js', () => ({ schedulerHeartbeat: () => heartbeatMock() }));
+/*
+ * `AGENT_DECISION` comes from the autonomous agent, which reaches the X Layer chain client, the
+ * delegation contract and the order path at import. None of them is under test here, and none of
+ * them may need a chain configured for a preview to be computed.
+ */
+vi.mock('../evm/client.js', () => ({ publicClient: {} }));
+vi.mock('../evm/delegation.js', () => ({ readPolicy: vi.fn() }));
+vi.mock('../executor/order.js', () => ({ placeOrder: vi.fn(), armExits: vi.fn() }));
+vi.mock('./llm.js', () => ({ speak: vi.fn() }));
 
 const { agentPreview } = await import('./preview.js');
 const { AGENT_DECISION } = await import('./autonomous.js');
@@ -52,6 +61,17 @@ describe('what the agent is about to do', () => {
     expect(preview.universe).toHaveLength(Object.keys(XSTOCKS).length);
     expect(preview.universe.map((u) => u.symbol)).toContain('NVDAx');
     expect(preview.universe[0]).toHaveProperty('name');
+  });
+
+  /* The X Layer registry and nothing else: every entry is a wrapped xStock with an EVM address. */
+  it('draws the universe from the X Layer wrapped-xStock registry', async () => {
+    const preview = await agentPreview('wallet-1');
+    for (const u of preview.universe) {
+      const token = XSTOCKS[u.symbol];
+      expect(token, u.symbol).toBeDefined();
+      expect(token!.address).toMatch(/^0x[0-9a-fA-F]{40}$/);
+      expect(u.name).toBe(token!.name);
+    }
   });
 
   it('is eligible when nothing is holding the wallet back', async () => {

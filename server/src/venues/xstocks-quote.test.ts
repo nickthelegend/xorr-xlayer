@@ -1,62 +1,54 @@
 /**
- * The order breakdown, with Jupiter stood in for.
+ * The order breakdown, with the Uniswap quoter stood in for.
  *
  * `xstocks-quote.ts` does no modelling — every number is read off the venue's answer — so what is
- * worth pinning is the reading: which field becomes which figure, in which token's units, and what
- * happens to a figure the venue did not send. The quote fixture is a real `api.jup.ag/swap/v1`
- * response for $250 of NVDAx, field for field.
+ * worth pinning is the reading: which field becomes which figure, in which token's units, which
+ * pools the route names, and what happens to a figure the venue did not produce. The route itself
+ * is the real `routeBetween` over the real registry: TSLAx has a USDC pool, NVDAx trades against
+ * USDG, and the ticket must say so.
  *
- * The case that matters most is the last one. A venue that returns no `priceImpactPct` must produce
- * a null, not a zero: on the screen this feeds, "0.00%" says the cost was measured and found to be
- * nothing, which is the opposite of not knowing.
+ * The case that matters most: a quote whose impact could not be measured must produce a null, not
+ * a zero. On the screen this feeds, "0.00%" says the cost was measured and found to be nothing,
+ * which is the opposite of not knowing.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({
-  quote: vi.fn(),
-  xStockPriceUsd: vi.fn(),
-  readMintScale: vi.fn(),
+const h = vi.hoisted(() => {
+  // A unit test needs no chain, and the repo-root `.env` may name one this executor no longer knows.
+  process.env.XORR_CHAIN = 'xlayer-testnet';
+  return { quote: vi.fn(), xStockPriceUsd: vi.fn() };
+});
+
+vi.mock('./uniswap.js', async (orig) => ({
+  ...(await orig<typeof import('./uniswap.js')>()),
+  quote: h.quote,
 }));
-
-class UnpricedError extends Error {}
-
-vi.mock('./jupiter.js', () => ({ quote: h.quote, UnpricedError }));
 vi.mock('./xstocks.js', async (orig) => ({
   ...(await orig<typeof import('./xstocks.js')>()),
   xStockPriceUsd: h.xStockPriceUsd,
 }));
-// The scaled-UI read a sell converts through. No validator is reached here.
-vi.mock('../solana/balances.js', async (orig) => ({
-  ...(await orig<typeof import('../solana/balances.js')>()),
-  readMintScale: h.readMintScale,
-}));
-vi.mock('../db/index.js', () => ({ query: vi.fn() }));
+vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
+vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
 
-const NVDAX = 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh';
-const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const MARK = 181.62;
 
-/** $250 of USDC into NVDAx, as Jupiter answered it. */
+/** $250 of USDC into NVDAx through USDG, in `uniswap.quote`'s own shape. */
 const BUY_QUOTE = {
-  inputMint: USDC,
-  inAmount: '250000000',
-  outputMint: NVDAX,
-  outAmount: '115331082',
-  otherAmountThreshold: '114754427',
-  swapMode: 'ExactIn',
-  slippageBps: 50,
-  platformFee: null,
-  priceImpactPct: '0.0005634572989743139578265942',
-  routePlan: [
-    { swapInfo: { label: 'Whirlpool', inAmount: '250000000', outAmount: '115331082' }, percent: 100 },
-  ],
+  inSymbol: 'USDC',
+  outSymbol: 'NVDAx',
+  inAmount: 250,
+  outAmount: 1.3741,
+  minimumOut: 1.3741 * (1 - 0.3 / 100),
+  slippagePct: 0.3,
+  venues: ['Uniswap v3'],
+  priceImpactPct: 0.12,
+  route: 'Uniswap v3 via USDG',
+  estimatedGas: 182_000,
 };
-
-const MARK = 216.8341;
 
 beforeEach(() => {
   h.quote.mockReset().mockResolvedValue(BUY_QUOTE);
   h.xStockPriceUsd.mockReset().mockResolvedValue(MARK);
-  h.readMintScale.mockReset().mockResolvedValue({ decimals: 8, multiplier: 1, pending: null });
 });
 
 afterEach(() => vi.resetModules());
@@ -66,108 +58,103 @@ describe('a buy', () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 
-    expect(q.pay).toBeCloseTo(250, 6);
+    expect(q.pay).toBe(250);
     expect(q.payToken).toBe('USDC');
-    expect(q.receive).toBeCloseTo(1.15331082, 8);
+    expect(q.receive).toBeCloseTo(1.3741, 8);
     expect(q.receiveToken).toBe('NVDAx');
   });
 
-  it('takes the floor from the venue rather than computing one', async () => {
+  it('asks the venue for the size given, at the tolerance given, as a percent', async () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
-    const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
+    await xStockQuote({ symbol: 'nvdax', side: 'buy', usd: 250, slippageBps: 25 });
 
-    // `otherAmountThreshold` is the number the swap is submitted with. Arithmetic on `outAmount`
-    // would show a floor the venue never agreed to.
-    expect(q.minimumReceive).toBeCloseTo(1.14754427, 8);
+    expect(h.quote).toHaveBeenCalledWith({ inSymbol: 'USDC', outSymbol: 'NVDAx', amount: 250, slippagePct: 0.25 });
   });
 
-  it('turns the wire’s fraction into a percentage, and into money', async () => {
+  it('takes the floor from the quote rather than computing another', async () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 
-    expect(q.priceImpactPct).toBeCloseTo(0.05634572989, 8);
-    expect(q.priceImpactUsd).toBeCloseTo(0.1408643, 6);
+    expect(q.minimumReceive).toBe(BUY_QUOTE.minimumOut);
+    expect(q.slippageBps).toBe(30);
+  });
+
+  it('carries the measured impact as a percentage, and into money', async () => {
+    const { xStockQuote } = await import('./xstocks-quote.js');
+    const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
+
+    expect(q.priceImpactPct).toBe(0.12);
+    expect(q.priceImpactUsd).toBeCloseTo(0.3, 8);
   });
 
   it('prices the tolerance in dollars, through the mark', async () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 
-    // (expected − floor) shares, valued at the mark. The percentage alone is homework.
-    expect(q.slippageWorstUsd).toBeCloseTo((1.15331082 - 1.14754427) * MARK, 4);
+    expect(q.slippageWorstUsd).toBeCloseTo((BUY_QUOTE.outAmount - BUY_QUOTE.minimumOut) * MARK, 8);
+    expect(q.effectivePrice).toBeCloseTo(250 / 1.3741, 8);
+    expect(q.markPrice).toBe(MARK);
+    expect(q.estimatedGas).toBe(182_000);
   });
 
-  it('reports the tolerance the venue echoed, not the one asked for', async () => {
-    h.quote.mockResolvedValue({ ...BUY_QUOTE, slippageBps: 100 });
+  it('names each pool of a USDG-pooled ticker, in order', async () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
+    const { hops } = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 
-    // A venue that clamped the tolerance would otherwise have the ticket promise a floor nobody
-    // agreed to.
-    const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250, slippageBps: 25 });
-    expect(q.slippageBps).toBe(100);
-    expect(h.quote).toHaveBeenCalledWith(expect.objectContaining({ slippageBps: 25 }));
-  });
-
-  it('names each hop of the route', async () => {
-    const { xStockQuote } = await import('./xstocks-quote.js');
-    expect((await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).hops).toEqual([
-      { label: 'Whirlpool', percent: 100 },
+    expect(hops).toEqual([
+      { label: 'Uniswap v3 USDC→USDG 0.01%', percent: 100, venue: 'Uniswap v3', from: 'USDC', to: 'USDG', feePct: 0.01 },
+      { label: 'Uniswap v3 USDG→NVDAx 0.05%', percent: 100, venue: 'Uniswap v3', from: 'USDG', to: 'NVDAx', feePct: 0.05 },
     ]);
   });
 
-  it('asks the venue in USDC base units for the size given', async () => {
+  it('names the single pool of a USDC-pooled ticker', async () => {
+    h.quote.mockResolvedValue({ ...BUY_QUOTE, outSymbol: 'TSLAx' });
     const { xStockQuote } = await import('./xstocks-quote.js');
-    await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
+    const { hops } = await xStockQuote({ symbol: 'TSLAx', side: 'buy', usd: 250 });
 
-    expect(h.quote).toHaveBeenCalledWith(
-      expect.objectContaining({ inSymbolOrMint: 'USDC', outSymbolOrMint: NVDAX, amountUnits: 250_000_000n }),
-    );
+    expect(hops).toEqual([
+      { label: 'Uniswap v3 USDC→TSLAx 0.05%', percent: 100, venue: 'Uniswap v3', from: 'USDC', to: 'TSLAx', feePct: 0.05 },
+    ]);
   });
 });
 
 describe('a sell', () => {
   const SELL_QUOTE = {
     ...BUY_QUOTE,
-    inputMint: NVDAX,
-    inAmount: '115300000',
-    outputMint: USDC,
-    outAmount: '249303604',
-    otherAmountThreshold: '248057086',
-    routePlan: [
-      { swapInfo: { label: 'Whirlpool', inAmount: '115300000', outAmount: '249303604' }, percent: 100 },
-    ],
+    inSymbol: 'NVDAx',
+    outSymbol: 'USDC',
+    inAmount: 250 / MARK,
+    outAmount: 249.1,
+    minimumOut: 249.1 * (1 - 0.3 / 100),
   };
 
-  it('converts the size through the mint’s scale, as the fill does', async () => {
-    // xStocks are Token-2022 with the Scaled UI Amount extension: an issuer multiplier decides how
-    // many raw units a displayed holding is. A preview on the wrong conversion quotes a different
-    // order from the one that would fill.
+  it('sells usd / mark wrapped shares — the wrapper does not rebase', async () => {
     h.quote.mockResolvedValue(SELL_QUOTE);
-    h.readMintScale.mockResolvedValue({ decimals: 8, multiplier: 1.001, pending: null });
     const { xStockQuote } = await import('./xstocks-quote.js');
-
     await xStockQuote({ symbol: 'NVDAx', side: 'sell', usd: 250 });
 
-    const asked = h.quote.mock.calls[0]![0].amountUnits as bigint;
-    expect(asked).toBe(BigInt(Math.floor((250 / MARK / 1.001) * 1e8)));
+    expect(h.quote).toHaveBeenCalledWith(
+      expect.objectContaining({ inSymbol: 'NVDAx', outSymbol: 'USDC', amount: 250 / MARK }),
+    );
   });
 
-  it('reads the received side in USDC', async () => {
+  it('reads the received side in USDC and walks the route backwards', async () => {
     h.quote.mockResolvedValue(SELL_QUOTE);
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'sell', usd: 250 });
 
     expect(q.receiveToken).toBe('USDC');
-    expect(q.receive).toBeCloseTo(249.303604, 6);
-    expect(q.minimumReceive).toBeCloseTo(248.057086, 6);
+    expect(q.payToken).toBe('NVDAx');
+    expect(q.receive).toBe(249.1);
     // A dollar is a dollar: the tolerance needs no mark on this side.
-    expect(q.slippageWorstUsd).toBeCloseTo(249.303604 - 248.057086, 6);
+    expect(q.slippageWorstUsd).toBeCloseTo(SELL_QUOTE.outAmount - SELL_QUOTE.minimumOut, 8);
+    expect(q.hops.map((x) => `${x.from}>${x.to}`)).toEqual(['NVDAx>USDG', 'USDG>USDC']);
   });
 });
 
 describe('what the venue did not say', () => {
   it('leaves price impact null rather than zero', async () => {
-    h.quote.mockResolvedValue({ ...BUY_QUOTE, priceImpactPct: undefined });
+    h.quote.mockResolvedValue({ ...BUY_QUOTE, priceImpactPct: null });
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
 
@@ -175,51 +162,51 @@ describe('what the venue did not say', () => {
     expect(q.priceImpactUsd).toBeNull();
   });
 
-  it('reports no platform fee as null, not as an absent line', async () => {
+  it('leaves the gas estimate null when the quoter gave none', async () => {
+    h.quote.mockResolvedValue({ ...BUY_QUOTE, estimatedGas: undefined });
     const { xStockQuote } = await import('./xstocks-quote.js');
-    expect((await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).platformFeeUsd).toBeNull();
+    expect((await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).estimatedGas).toBeNull();
   });
 
-  it('prices a platform fee in USD when there is one', async () => {
-    h.quote.mockResolvedValue({ ...BUY_QUOTE, platformFee: { amount: '115331', feeBps: 10 } });
+  it('reports no platform fee as null, not as an absent line', async () => {
     const { xStockQuote } = await import('./xstocks-quote.js');
     const q = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 });
-
-    expect(q.platformFeeUsd).toBeCloseTo((115331 / 1e8) * MARK, 6);
+    expect(q).toHaveProperty('platformFeeUsd', null);
   });
 });
 
 describe('what cannot be broken down', () => {
   it('a symbol that is not a tokenized equity here', async () => {
-    const { xStockQuote } = await import('./xstocks-quote.js');
-    await expect(xStockQuote({ symbol: 'WETH', side: 'buy', usd: 250 })).rejects.toBeInstanceOf(
-      UnpricedError,
-    );
+    const { xStockQuote, UnpricedError } = await import('./xstocks-quote.js');
+    await expect(xStockQuote({ symbol: 'WETH', side: 'buy', usd: 250 })).rejects.toBeInstanceOf(UnpricedError);
     expect(h.quote).not.toHaveBeenCalled();
   });
 
   it('a size of nothing', async () => {
-    const { xStockQuote } = await import('./xstocks-quote.js');
-    await expect(xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 0 })).rejects.toBeInstanceOf(
-      UnpricedError,
-    );
+    const { xStockQuote, UnpricedError } = await import('./xstocks-quote.js');
+    await expect(xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 0 })).rejects.toBeInstanceOf(UnpricedError);
   });
 
   it('a symbol with no mark, since every figure is read against one', async () => {
     h.xStockPriceUsd.mockResolvedValue(null);
-    const { xStockQuote } = await import('./xstocks-quote.js');
+    const { xStockQuote, UnpricedError } = await import('./xstocks-quote.js');
 
-    // Without a mark there is no honest way to put a token figure into money. A breakdown with a
-    // guessed denominator is worse than no breakdown.
-    await expect(xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).rejects.toBeInstanceOf(
-      UnpricedError,
-    );
+    await expect(xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).rejects.toBeInstanceOf(UnpricedError);
+    expect(h.quote).not.toHaveBeenCalled();
   });
 
-  it('passes the venue’s own refusal straight up', async () => {
-    h.quote.mockRejectedValue(new UnpricedError('No Jupiter quote for USDC -> NVDAx: 429'));
-    const { xStockQuote } = await import('./xstocks-quote.js');
+  it('turns the venue’s refusal into UnpricedError, keeping its words', async () => {
+    h.quote.mockRejectedValue(new Error('No liquidity for USDC -> NVDAx at this size'));
+    const { xStockQuote, UnpricedError } = await import('./xstocks-quote.js');
 
-    await expect(xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 })).rejects.toThrow(/429/);
+    const err = await xStockQuote({ symbol: 'NVDAx', side: 'buy', usd: 250 }).catch((e) => e);
+    expect(err).toBeInstanceOf(UnpricedError);
+    expect(err.message).toMatch(/No liquidity/);
+  });
+
+  it('is the same UnpricedError class the routes import from venues/errors', async () => {
+    const quoteMod = await import('./xstocks-quote.js');
+    const errors = await import('./errors.js');
+    expect(quoteMod.UnpricedError).toBe(errors.UnpricedError);
   });
 });

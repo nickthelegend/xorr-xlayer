@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeFunctionData, parseAbi } from 'viem';
 import type { AquaFill } from '../venues/aqua.js';
-import type { SwapCalldata, SwapQuote } from '../venues/oneinch.js';
+import type { SwapCalldata, SwapQuote } from '../venues/tokens.js';
 import type { SwapVmFill } from '../venues/swapvm.js';
 import type { TradeIntent } from './kinds/index.js';
 import type { SettlementSend } from './settle.js';

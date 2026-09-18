@@ -1,21 +1,23 @@
 /**
- * Tokenized equities on Solana: Backed Finance xStocks (PLAN.md §8.4).
+ * xStocks on X Layer — the catalog view of the wrapped-xStock registry (2026-09-19).
  *
- * Backed Finance issues tokenized equities on Solana under the SPL Token-2022 program.
- * Tickers carry the `x` suffix (NVDAx, TSLAx, AAPLx, MSFTx, etc.).
+ * `venues/stocks.ts` is the registry the trade path reads (wrapper address, raw token, decimals, pool route). This module
+ * adds what a browsable catalog needs on top — the sector — and keeps the names the market, bot and catalog modules have
+ * always imported (`XSTOCKS`, `xStockKey`, `xStockPriceUsd`, `xStocksFunctional`), so they did not change shape when the
+ * product moved from Solana mints to X Layer ERC-4626 wrappers.
  *
- * Every address is the real Solana mainnet mint for that asset.
- * Pricing is derived from real Jupiter quotes (USDC -> xStock).
+ * `address` is the WRAPPER — what trades in the Uniswap pools, what a wallet holds, what a grant approves. `raw` is the
+ * rebasing xStock behind it, whose `multiplier()` equals the wrapper's `convertToAssets(1e18)`: the corporate-action
+ * signal (`venues/corporate-actions.ts`).
  */
-import { PublicKey } from '@solana/web3.js';
-import { query } from '../db/index.js';
+import type { Address } from 'viem';
+import { STOCKS, equitiesFunctional, resetEquitiesFunctional, stockKey, stockPriceUsd, clearStockPriceCache } from './stocks.js';
+
+export { recordObservation } from './stocks.js';
 
 /**
- * What the underlying listing is, in GICS sector names.
- *
- * `Index funds` is not a GICS sector and is not pretending to be one. SPYx and QQQx track baskets
- * that span every sector on this list, so filing them under any single one would be a claim about
- * their holdings that is simply false. They get a bucket that says what they are.
+ * What the underlying listing is, in GICS sector names. `Index funds` is not a GICS sector and is not pretending to be:
+ * SPYx and QQQx track baskets spanning every sector, so filing them under one would be false.
  */
 export type XStockSector =
   | 'Technology'
@@ -25,178 +27,73 @@ export type XStockSector =
   | 'Index funds';
 
 export type XStockToken = {
-  /** The on-chain symbol (e.g. NVDAx, TSLAx). */
+  /** The symbol the app shows (e.g. TSLAx). */
   symbol: string;
-  /** The underlying listed company. */
+  /** The listed company or fund. */
   name: string;
-  /** Solana mint base58 address. */
-  address: string;
+  /** The share it tracks (TSLA). */
+  ticker: string;
+  /** The ERC-4626 wrapper on X Layer — what trades. */
+  address: Address;
+  /** The raw rebasing xStock behind the wrapper. */
+  raw: Address;
   decimals: number;
-  /**
-   * The sector of the company this token tracks.
-   *
-   * Reference data about the listing, like `name` beside it — not a market observation. It is the
-   * one fact a browsable catalog needs that no price feed carries, and it never goes stale in the
-   * way a number does.
-   */
   sector: XStockSector;
 };
 
-export const XSTOCKS: Record<string, XStockToken> = {
-  NVDAx: {
-    symbol: 'NVDAx',
-    name: 'NVIDIA Corporation xStock',
-    address: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh',
-    decimals: 8,
-    sector: 'Technology',
-  },
-  TSLAx: {
-    symbol: 'TSLAx',
-    name: 'Tesla Inc. xStock',
-    address: 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
-    decimals: 8,
-    sector: 'Consumer Discretionary',
-  },
-  AAPLx: {
-    symbol: 'AAPLx',
-    name: 'Apple Inc. xStock',
-    address: 'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp',
-    decimals: 8,
-    sector: 'Technology',
-  },
-  MSFTx: {
-    symbol: 'MSFTx',
-    name: 'Microsoft Corporation xStock',
-    address: 'XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX',
-    decimals: 8,
-    sector: 'Technology',
-  },
-  AMZNx: {
-    symbol: 'AMZNx',
-    name: 'Amazon.com Inc. xStock',
-    address: 'Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg',
-    decimals: 8,
-    sector: 'Consumer Discretionary',
-  },
-  GOOGLx: {
-    symbol: 'GOOGLx',
-    name: 'Alphabet Inc. xStock',
-    address: 'XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN',
-    decimals: 8,
-    sector: 'Communication Services',
-  },
-  METAx: {
-    symbol: 'METAx',
-    name: 'Meta Platforms Inc. xStock',
-    address: 'Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu',
-    decimals: 8,
-    sector: 'Communication Services',
-  },
-  MSTRx: {
-    symbol: 'MSTRx',
-    name: 'MicroStrategy Inc. xStock',
-    address: 'XsP7xzNPvEHS1m6qfanPUGjNmdnmsLKEoNAnHjdxxyZ',
-    decimals: 8,
-    sector: 'Technology',
-  },
-  COINx: {
-    symbol: 'COINx',
-    name: 'Coinbase Global Inc. xStock',
-    address: 'Xs7ZdzSHLU9ftNJsii5fCeJhoRWSC32SQGzGQtePxNu',
-    decimals: 8,
-    sector: 'Financials',
-  },
-  SPYx: {
-    symbol: 'SPYx',
-    name: 'SPDR S&P 500 ETF Trust xStock',
-    address: 'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W',
-    decimals: 8,
-    sector: 'Index funds',
-  },
-  QQQx: {
-    symbol: 'QQQx',
-    name: 'Invesco QQQ Trust xStock',
-    address: 'Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ',
-    decimals: 8,
-    sector: 'Index funds',
-  },
+/** Reference data about each listing, like its name — not a market observation. */
+const SECTORS: Record<string, XStockSector> = {
+  NVDAx: 'Technology',
+  AAPLx: 'Technology',
+  MSFTx: 'Technology',
+  MSTRx: 'Technology',
+  TSLAx: 'Consumer Discretionary',
+  AMZNx: 'Consumer Discretionary',
+  GOOGLx: 'Communication Services',
+  METAx: 'Communication Services',
+  COINx: 'Financials',
+  SPYx: 'Index funds',
+  QQQx: 'Index funds',
 };
 
-/**
- * Case-insensitive lookup for xStock symbol.
- */
+export const XSTOCKS: Record<string, XStockToken> = Object.fromEntries(
+  Object.values(STOCKS).map((s) => [
+    s.symbol,
+    {
+      symbol: s.symbol,
+      name: s.name,
+      ticker: s.ticker,
+      address: s.address,
+      raw: s.raw,
+      decimals: s.decimals,
+      sector: SECTORS[s.symbol] ?? 'Technology',
+    },
+  ]),
+);
+
+/** Case-insensitive lookup — `TSLAX` finds `TSLAx`. */
 export function xStockKey(symbol: string): string | undefined {
-  const want = symbol.trim().toUpperCase();
-  return Object.keys(XSTOCKS).find((k) => k.toUpperCase() === want);
+  return stockKey(symbol);
 }
 
 export function isXStock(symbol: string): boolean {
   return xStockKey(symbol) !== undefined;
 }
 
-const PROBE_USD = 1_000;
-const cache = new Map<string, { at: number; price: number }>();
-const TTL_MS = 30_000;
+/** A wrapped xStock's price in USD, from the Uniswap pools that would fill it (`stocks.ts`). Null when unpriced. */
+export function xStockPriceUsd(symbol: string): Promise<number | null> {
+  return stockPriceUsd(symbol);
+}
 
 export function clearXStockPriceCache(): void {
-  cache.clear();
+  clearStockPriceCache();
 }
 
-/**
- * Calculate tokenized equity price in USD from Jupiter quotes.
- */
-export async function xStockPriceUsd(symbol: string): Promise<number | null> {
-  const key = xStockKey(symbol);
-  if (!key) return null;
-  const token = XSTOCKS[key];
-  if (!token) return null;
-
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.price;
-
-  const { quote } = await import('./jupiter.js');
-  const q = await quote({
-    inSymbolOrMint: 'USDC',
-    outSymbolOrMint: token.address,
-    amountUnits: PROBE_USD * 1e6, // 1000 USDC
-  }).catch(() => null);
-
-  if (!q || !(Number(q.outAmount) > 0)) return null;
-
-  const outTokens = Number(q.outAmount) / 10 ** token.decimals;
-  const price = PROBE_USD / outTokens;
-  cache.set(key, { at: Date.now(), price });
-  recordObservation(key, price);
-  return price;
-}
-
-export function recordObservation(symbol: string, usd: number): void {
-  if (!(usd > 0)) return;
-  void query(`INSERT INTO price_observations (symbol, usd) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [
-    symbol,
-    usd,
-  ]).catch(() => undefined);
-}
-
-let functional: Promise<boolean> | undefined;
-
-/**
- * Check if xStocks actually function on this cluster.
- */
+/** Whether the wrappers have code and a supply on the chain this executor is on (mainnet or its fork: yes; testnet: no). */
 export function xStocksFunctional(): Promise<boolean> {
-  functional ??= (async () => {
-    try {
-      const { connection } = await import('../solana/connection.js');
-      const probeMint = new PublicKey(XSTOCKS.NVDAx!.address);
-      const acc = await connection.getAccountInfo(probeMint);
-      return acc !== null;
-    } catch {
-      return false;
-    }
-  })();
-  return functional;
+  return equitiesFunctional();
 }
 
 export function resetXStocksFunctional(): void {
-  functional = undefined;
+  resetEquitiesFunctional();
 }

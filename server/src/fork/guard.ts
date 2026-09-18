@@ -10,7 +10,7 @@
  * overrides a variable already set.
  */
 
-const BASE_CHAIN_ID = 8453;
+const XLAYER_CHAIN_ID = 196;
 
 /** The three variables that say which executor a fork script rewrites. */
 export type NamedTargets = {
@@ -29,7 +29,7 @@ export type NamedTargets = {
 export async function assertBaseFork(env: NamedTargets, rpc: (method: string) => Promise<unknown>): Promise<void> {
   if (env.XORR_CHAIN !== 'xlayer-fork') {
     throw new Error(
-      `XORR_CHAIN=${env.XORR_CHAIN ?? '(unset)'}: this reconciles a base-fork executor only, and refuses every other chain.`,
+      `XORR_CHAIN=${env.XORR_CHAIN ?? '(unset)'}: this reconciles an xlayer-fork executor only, and refuses every other chain.`,
     );
   }
   if (!env.FORK_RPC) throw new Error('FORK_RPC is required: the fork node the executor serves, named on purpose.');
@@ -39,5 +39,5 @@ export async function assertBaseFork(env: NamedTargets, rpc: (method: string) =>
     throw new Error(`The node answers as "${node}", not anvil. A missing transaction on a real chain is not an orphan.`);
   }
   const chainId = Number(await rpc('eth_chainId'));
-  if (chainId !== BASE_CHAIN_ID) throw new Error(`The node is chain ${chainId}, not a fork of Base (${BASE_CHAIN_ID}).`);
+  if (chainId !== XLAYER_CHAIN_ID) throw new Error(`The node is chain ${chainId}, not a fork of X Layer (${XLAYER_CHAIN_ID}).`);
 }

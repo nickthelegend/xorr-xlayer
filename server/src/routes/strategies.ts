@@ -26,12 +26,7 @@ import {
 } from '../executor/run.js';
 import { stackOn, stackSummary } from '../executor/stack.js';
 import { sleevesFor } from '../positions/sleeves.js';
-import {
-  SETTLEMENT_SYMBOL,
-  TOKENS as VENUE_TOKENS,
-  TOKENS,
-  canonicalSymbol,
-} from '../venues/oneinch.js';
+import { SETTLEMENT_SYMBOL, TOKENS as VENUE_TOKENS, TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { nextRuns, type Cadence } from '../executor/schedule.js';
 import { nextRunOnResume, resumeMovedSchedule, stateOnResume } from '../executor/resume.js';
 import { CHAIN_KEY } from '../evm/chains.js';

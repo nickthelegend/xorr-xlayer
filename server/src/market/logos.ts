@@ -30,7 +30,7 @@
  */
 import { getJson } from '../http/get.js';
 import { COINGECKO_IDS, COINGECKO_IMAGE_URL, type CoingeckoMarket } from './ids.js';
-import { TOKENS } from '../venues/oneinch.js';
+import { TOKENS } from '../venues/tokens.js';
 import { ONEINCH_CHAIN_ID } from '../evm/chains.js';
 
 const ONEINCH_TOKEN_API = 'https://api.1inch.dev/token/v1.2';

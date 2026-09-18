@@ -1,20 +1,29 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const queryMock = vi.fn<(sql: string, p?: unknown[]) => Promise<unknown[]>>();
-const guardAndSpendMock = vi.fn();
+const placeOrderMock = vi.fn();
+const placeSwapMock = vi.fn();
 const appendMock = vi.fn();
-const balanceMock = vi.fn<(owner: string, mint: string) => Promise<{ uiAmount: number }>>();
+/** Wrapper units per symbol, as one `chainUnitsOf` multicall answers: null = not checked. */
+const unitsMock = vi.fn<(owner: string, symbols: string[]) => Promise<Map<string, number | null>>>();
 const priceMock = vi.fn<(symbol: string) => Promise<number | null>>();
 
 vi.mock('../db/index.js', () => ({
   one: vi.fn(),
   query: (sql: string, p?: unknown[]) => queryMock(sql, p),
 }));
-vi.mock('../executor/place.js', () => ({ guardAndSpend: (...a: unknown[]) => guardAndSpendMock(...a) }));
+vi.mock('../executor/order.js', () => ({ placeOrder: (...a: unknown[]) => placeOrderMock(...a) }));
+vi.mock('../executor/swap.js', () => ({ placeSwap: (...a: unknown[]) => placeSwapMock(...a) }));
 vi.mock('../audit/log.js', () => ({ append: (...a: unknown[]) => appendMock(...a) }));
-vi.mock('../solana/balances.js', () => ({
-  getTokenBalance: (owner: string, mint: string) => balanceMock(owner, mint),
+vi.mock('../evm/balances.js', () => ({
+  chainUnitsOf: (owner: string, symbols: string[]) => unitsMock(owner, symbols),
 }));
+
+/** Every asked symbol answered from `bySymbol`; a symbol it does not name holds `fallback`. */
+function holding(bySymbol: Record<string, number | null>, fallback: number | null = 2) {
+  return async (_owner: string, symbols: string[]) =>
+    new Map(symbols.map((s) => [s, s in bySymbol ? bySymbol[s]! : fallback] as [string, number | null]));
+}
 vi.mock('../venues/xstocks.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../venues/xstocks.js')>()),
   xStockPriceUsd: (symbol: string) => priceMock(symbol),
@@ -22,7 +31,8 @@ vi.mock('../venues/xstocks.js', async (importOriginal) => ({
 
 const { planBasket, readBasket, rebalanceOnce, validateTargets } = await import('./basket.js');
 
-const WALLET = { id: 'w1', address: 'OwnerPubkey111' };
+const OWNER = '0x1111111111111111111111111111111111111111';
+const WALLET = { id: 'w1', address: OWNER };
 const BASKET = {
   wallet_id: 'w1',
   targets: { NVDAx: 50, TSLAx: 50 },
@@ -158,12 +168,12 @@ describe('planBasket', () => {
 describe('readBasket', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    balanceMock.mockResolvedValue({ uiAmount: 2 });
+    unitsMock.mockImplementation(holding({}));
     priceMock.mockResolvedValue(100);
   });
 
   it('values each sleeve from the chain balance and a live price', async () => {
-    const { sleeves, totalUsd, unpriced } = await readBasket('Owner', { NVDAx: 50, TSLAx: 50 });
+    const { sleeves, totalUsd, unpriced } = await readBasket(OWNER, { NVDAx: 50, TSLAx: 50 });
 
     expect(unpriced).toEqual([]);
     expect(totalUsd).toBe(400);
@@ -173,36 +183,53 @@ describe('readBasket', () => {
   });
 
   /* A balance that could not be read is not a balance of zero. */
-  it('marks a sleeve unpriced when the balance read fails', async () => {
-    balanceMock.mockImplementation(async (_o, mint) => {
-      if (mint.startsWith('Xsc9')) throw new Error('rpc down');
-      return { uiAmount: 2 };
-    });
+  it('marks a sleeve unpriced when its balance was not checked', async () => {
+    unitsMock.mockImplementation(holding({ NVDAx: null }));
 
-    const { unpriced, sleeves } = await readBasket('Owner', { NVDAx: 50, TSLAx: 50 });
+    const { unpriced, sleeves } = await readBasket(OWNER, { NVDAx: 50, TSLAx: 50 });
     expect(unpriced).toContain('NVDAx');
     expect(sleeves.find((s) => s.symbol === 'NVDAx')?.usd).toBeNull();
     // With anything unpriced, no percentages are computed at all — they would be wrong.
     expect(sleeves.every((s) => s.actualPct === null)).toBe(true);
   });
 
+  it('marks every sleeve unpriced when the balance read itself fails', async () => {
+    unitsMock.mockRejectedValue(new Error('rpc down'));
+
+    const { unpriced, totalUsd } = await readBasket(OWNER, { NVDAx: 50, TSLAx: 50 });
+    expect(unpriced).toEqual(['NVDAx', 'TSLAx']);
+    expect(totalUsd).toBe(0);
+  });
+
+  it('reads the wrapped xStocks by their registry symbols, in one call', async () => {
+    await readBasket(OWNER, { nvdax: 50, TSLAx: 50 });
+    expect(unitsMock).toHaveBeenCalledTimes(1);
+    expect(unitsMock).toHaveBeenCalledWith(OWNER, ['NVDAx', 'TSLAx']);
+  });
+
+  it('reads nothing for an owner that is not an X Layer address', async () => {
+    const { unpriced } = await readBasket('OwnerPubkey111', { NVDAx: 50, TSLAx: 50 });
+    expect(unpriced).toEqual(['NVDAx', 'TSLAx']);
+    expect(unitsMock).not.toHaveBeenCalled();
+  });
+
   it('marks a sleeve unpriced when nothing can price it', async () => {
     priceMock.mockImplementation(async (s) => (s === 'TSLAx' ? null : 100));
-    const { unpriced } = await readBasket('Owner', { NVDAx: 50, TSLAx: 50 });
+    const { unpriced } = await readBasket(OWNER, { NVDAx: 50, TSLAx: 50 });
     expect(unpriced).toEqual(['TSLAx']);
   });
 
   it('marks a symbol that is not an xStock at all', async () => {
-    const { unpriced } = await readBasket('Owner', { WETH: 100 });
+    const { unpriced } = await readBasket(OWNER, { WETH: 100 });
     expect(unpriced).toEqual(['WETH']);
-    expect(balanceMock).not.toHaveBeenCalled();
+    expect(unitsMock).not.toHaveBeenCalledWith(OWNER, expect.arrayContaining(['WETH']));
   });
 });
 
 describe('rebalanceOnce', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    balanceMock.mockResolvedValue({ uiAmount: 2 });
+    unitsMock.mockImplementation(holding({}));
     priceMock.mockResolvedValue(100);
     appendMock.mockResolvedValue({ seq: '1' });
     // Default: the claim succeeds, every other write is a no-op.
@@ -219,7 +246,8 @@ describe('rebalanceOnce', () => {
     queryMock.mockImplementation(async () => []);
 
     expect(await rebalanceOnce(WALLET, BASKET)).toBeNull();
-    expect(guardAndSpendMock).not.toHaveBeenCalled();
+    expect(placeOrderMock).not.toHaveBeenCalled();
+    expect(placeSwapMock).not.toHaveBeenCalled();
     expect(appendMock).not.toHaveBeenCalled();
   });
 
@@ -232,9 +260,9 @@ describe('rebalanceOnce', () => {
       }
       return [];
     });
-    balanceMock.mockImplementation(async () => {
+    unitsMock.mockImplementation(async (_o, symbols) => {
       order.push('read');
-      return { uiAmount: 2 };
+      return new Map(symbols.map((s) => [s, 2] as [string, number | null]));
     });
 
     await rebalanceOnce(WALLET, BASKET);
@@ -252,51 +280,61 @@ describe('rebalanceOnce', () => {
     const out = await rebalanceOnce(WALLET, BASKET);
 
     expect(out?.status).toBe('skipped');
-    expect(guardAndSpendMock).not.toHaveBeenCalled();
+    expect(placeOrderMock).not.toHaveBeenCalled();
+    expect(placeSwapMock).not.toHaveBeenCalled();
     const update = queryMock.mock.calls.find(([sql]) => sql.includes('UPDATE basket_runs'));
     expect(update?.[1]?.[1]).toBe('skipped');
     // A schedule showing nothing on the quiet days looks like a strategy that stopped running.
     expect(String(update?.[1]?.[2])).toContain('inside the 5% band');
   });
 
-  it('trades through the chokepoint and writes the trail when a sleeve is out of band', async () => {
+  it('sells the over-weight sleeve through closePosition and writes the trail', async () => {
     // NVDAx worth $600 against TSLAx at $400: 10 points over a 50/50 target.
-    balanceMock.mockImplementation(async (_o, mint) => ({ uiAmount: mint.startsWith('Xsc9') ? 6 : 4 }));
-    guardAndSpendMock.mockResolvedValue({
-      placed: true,
-      signature: 'RebalSig1',
-      slot: 1,
-      inUnits: 1n,
-      outUnits: 1n,
-      filledUnits: 1,
-      fillPrice: 100,
-      symbol: 'NVDAx',
-      usd: 100,
-      side: 'sell',
+    unitsMock.mockImplementation(holding({ NVDAx: 6, TSLAx: 4 }));
+    placeSwapMock.mockResolvedValue({
+      status: 200,
+      body: { status: 'filled', from: 'NVDAx', to: 'USDC', sold: 1, received: 99.5, usd: 99.5, txHash: '0xRebalSig1' },
     });
 
     const out = await rebalanceOnce(WALLET, BASKET);
 
-    expect(out).toMatchObject({ status: 'filled', symbol: 'NVDAx', side: 'sell', signature: 'RebalSig1' });
-    expect(guardAndSpendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ walletId: 'w1', ownerPubkey: WALLET.address, symbol: 'NVDAx', side: 'sell' }),
+    expect(out).toMatchObject({ status: 'filled', symbol: 'NVDAx', side: 'sell', signature: '0xRebalSig1', usd: 99.5 });
+    // $100 of a $600 sleeve is a sixth of its six units: one, sold into the settlement token.
+    expect(placeSwapMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'w1', address: OWNER }),
+      { from: 'NVDAx', to: 'USDC', amount: '1.000000' },
     );
-    expect(appendMock).toHaveBeenCalledTimes(1);
-    expect(appendMock.mock.calls[0]?.[0]).toMatchObject({
-      kind: 'trade',
-      signature: 'RebalSig1',
-      amount: '$100.00',
-    });
-    expect(appendMock.mock.calls[0]?.[0].payload).toMatchObject({ periodKey: expect.any(String) });
+    expect(placeOrderMock).not.toHaveBeenCalled();
+    // The swap path wrote the fill's audit row; the basket does not write a second.
+    expect(appendMock).not.toHaveBeenCalled();
   });
 
-  it('records a refusal from the chokepoint without writing a trade to the trail', async () => {
-    balanceMock.mockImplementation(async (_o, mint) => ({ uiAmount: mint.startsWith('Xsc9') ? 6 : 4 }));
-    guardAndSpendMock.mockResolvedValue({
-      placed: false,
-      status: 'blocked',
-      reason: 'cap_exceeded',
-      detail: 'That would go past the daily cap.',
+  it('buys the under-weight sleeve as a one-off order', async () => {
+    unitsMock.mockImplementation(holding({ NVDAx: 4, TSLAx: 6 }));
+    placeOrderMock.mockResolvedValue({
+      placed: true,
+      orderId: 'order-1',
+      outcome: { status: 'filled', runId: 'run-9', signature: '0xRebalBuy', units: 1, price: 100 },
+    });
+
+    const out = await rebalanceOnce(WALLET, BASKET);
+
+    expect(out).toMatchObject({ status: 'filled', symbol: 'NVDAx', side: 'buy', signature: '0xRebalBuy' });
+    expect(placeOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'w1', address: OWNER }),
+      'NVDAx',
+      expect.closeTo(100, 5),
+      expect.stringContaining('NVDAx'),
+    );
+    expect(placeSwapMock).not.toHaveBeenCalled();
+  });
+
+  it('records a refusal from the order path without writing a trade to the trail', async () => {
+    unitsMock.mockImplementation(holding({ NVDAx: 4, TSLAx: 6 }));
+    placeOrderMock.mockResolvedValue({
+      placed: true,
+      orderId: 'order-1',
+      outcome: { status: 'blocked', runId: 'run-9', reason: 'onchain_daily_cap', detail: 'That would go past the daily cap.' },
     });
 
     const out = await rebalanceOnce(WALLET, BASKET);
@@ -307,12 +345,36 @@ describe('rebalanceOnce', () => {
     expect(update?.[1]?.[1]).toBe('failed');
   });
 
+  it('records a refused sale without writing a trade to the trail', async () => {
+    unitsMock.mockImplementation(holding({ NVDAx: 6, TSLAx: 4 }));
+    placeSwapMock.mockResolvedValue({
+      status: 409,
+      body: { status: 'blocked', reason: 'delegation_inactive', detail: 'The trading permission is revoked or expired.' },
+    });
+
+    const out = await rebalanceOnce(WALLET, BASKET);
+
+    expect(out).toMatchObject({ status: 'failed', detail: 'The trading permission is revoked or expired.' });
+    expect(appendMock).not.toHaveBeenCalled();
+  });
+
+  it('records an order path that threw as a failed run', async () => {
+    unitsMock.mockImplementation(holding({ NVDAx: 4, TSLAx: 6 }));
+    placeOrderMock.mockRejectedValue(new Error('rpc down'));
+
+    const out = await rebalanceOnce(WALLET, BASKET);
+    expect(out?.status).toBe('failed');
+    expect(out?.status === 'failed' && out.detail).toContain('rpc down');
+    expect(appendMock).not.toHaveBeenCalled();
+  });
+
   it('stands down and records why when a sleeve cannot be priced', async () => {
     priceMock.mockImplementation(async (s) => (s === 'TSLAx' ? null : 100));
 
     const out = await rebalanceOnce(WALLET, BASKET);
     expect(out?.status).toBe('skipped');
     expect(out?.status === 'skipped' && out.detail).toContain('TSLAx');
-    expect(guardAndSpendMock).not.toHaveBeenCalled();
+    expect(placeOrderMock).not.toHaveBeenCalled();
+    expect(placeSwapMock).not.toHaveBeenCalled();
   });
 });

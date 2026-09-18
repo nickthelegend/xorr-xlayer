@@ -1,31 +1,65 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { Keypair } from '@solana/web3.js';
 
 const oneMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
 const queryMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown[]>>();
 const evaluateMock = vi.fn();
-const readDelegationMock = vi.fn();
-const guardAndSpendMock = vi.fn();
+const readPolicyMock = vi.fn();
+const placeOrderMock = vi.fn();
 const armExitsMock = vi.fn();
 const notifyEntryMock = vi.fn();
 const earningsCalendarMock = vi.fn();
 const xStockPriceMock = vi.fn<(symbol: string) => Promise<number | null>>();
 const referencePriceMock = vi.fn<(symbol: string) => Promise<number | null>>();
-const readMintScaleMock = vi.fn();
+/**
+ * The corporate-action state of one wrapped xStock, keyed by its WRAPPER address: the multiplier
+ * `convertToAssets(1e18)` answers, and a change the raw token has scheduled (or null).
+ */
+const scaleMock = vi.fn<
+  (wrapper: string) => Promise<{ multiplier: number; pending: { nextMultiplier: number; effectiveAtMs: number } | null }>
+>();
 const appendMock = vi.fn();
 
 /*
  * Four xStocks rather than main's eleven, so a test asserting "it picked NVDAx" is asserting a
  * ranking rather than the contents of the registry.
  */
+const NVDA_WRAPPER = '0xa8ddb5cd96b5222afe198316e9a57caa642850d5';
+const STOCKS = {
+  NVDAx: { symbol: 'NVDAx', name: 'NVIDIA', ticker: 'NVDA', address: NVDA_WRAPPER, raw: '0xc845b2894dBddd03858fd2D643B4eF725fE0849d', decimals: 18 },
+  TSLAx: { symbol: 'TSLAx', name: 'Tesla', ticker: 'TSLA', address: '0xc3fdbe3a68ee5de461d30415a8165cf9aefe1171', raw: '0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0', decimals: 18 },
+  AAPLx: { symbol: 'AAPLx', name: 'Apple', ticker: 'AAPL', address: '0x943bf64d566c32a2bcd41ac92fb63c111cc9de8f', raw: '0x9d275685dC284C8eB1C79f6ABA7a63Dc75ec890a', decimals: 18 },
+  MSFTx: { symbol: 'MSFTx', name: 'Microsoft', ticker: 'MSFT', address: '0x166fbe68274b6a47e025f4ba17388c539f1fa1d0', raw: '0x5621737f42dAE558b81269FcB9E9E70c19Aa6b35', decimals: 18 },
+};
 vi.mock('../venues/xstocks.js', () => ({
-  XSTOCKS: {
-    NVDAx: { symbol: 'NVDAx', name: 'NVIDIA', address: 'Xsc9NVDA', decimals: 8 },
-    TSLAx: { symbol: 'TSLAx', name: 'Tesla', address: 'XsDoTSLA', decimals: 8 },
-    AAPLx: { symbol: 'AAPLx', name: 'Apple', address: 'XsbEAAPL', decimals: 8 },
-    MSFTx: { symbol: 'MSFTx', name: 'Microsoft', address: 'XspzMSFT', decimals: 8 },
-  },
+  XSTOCKS: STOCKS,
   xStockPriceUsd: (symbol: string) => xStockPriceMock(symbol),
+}));
+
+/*
+ * The chain, as the two contracts per xStock answer it: the ERC-4626 wrapper's `convertToAssets`
+ * and the raw token's `newMultiplier` / `newMultiplierActivationTime`. Driven by `scaleMock`.
+ */
+const readContractMock = vi.fn(async (req: { address: string; functionName: string; args?: readonly unknown[] }) => {
+  const byWrapper = Object.values(STOCKS).find((s) => s.address === req.address);
+  const byRaw = Object.values(STOCKS).find((s) => s.raw === req.address);
+  if (req.functionName === 'convertToAssets' && byWrapper) {
+    const { multiplier } = await scaleMock(byWrapper.address);
+    expect(req.args?.[0]).toBe(10n ** 18n);
+    return BigInt(Math.round(multiplier * 1e6)) * 10n ** 12n;
+  }
+  if (byRaw) {
+    const { multiplier, pending } = await scaleMock(byRaw.address);
+    if (req.functionName === 'newMultiplier') {
+      return BigInt(Math.round((pending?.nextMultiplier ?? multiplier) * 1e6)) * 10n ** 12n;
+    }
+    if (req.functionName === 'newMultiplierActivationTime') {
+      return BigInt(Math.floor((pending?.effectiveAtMs ?? 0) / 1000));
+    }
+  }
+  throw new Error(`unexpected read ${req.functionName} on ${req.address}`);
+});
+vi.mock('../evm/client.js', () => ({
+  publicClient: { readContract: (req: never) => readContractMock(req) },
 }));
 
 // The session arithmetic and the drift thresholds stay real; only the second price source is faked.
@@ -34,27 +68,19 @@ vi.mock('../market/nasdaq.js', async (importOriginal) => ({
   referencePriceUsd: (symbol: string) => referencePriceMock(symbol),
 }));
 
-const applyFillMock = vi.fn();
-
 vi.mock('../db/index.js', () => ({
   one: (sql: string, params?: unknown[]) => oneMock(sql, params),
   query: (sql: string, params?: unknown[]) => queryMock(sql, params),
-  // The cycle books its fill inside a transaction; the client is never touched by these tests.
-  tx: (fn: (c: unknown) => unknown) => fn({}),
 }));
-vi.mock('../positions/index.js', () => ({ applyFill: (...a: unknown[]) => applyFillMock(...a) }));
 
 vi.mock('../rules/engine.js', () => ({ evaluate: (...a: unknown[]) => evaluateMock(...a) }));
-vi.mock('../solana/delegation.js', () => ({
-  readDelegation: (...a: unknown[]) => readDelegationMock(...a),
+vi.mock('../evm/delegation.js', () => ({
+  readPolicy: (...a: unknown[]) => readPolicyMock(...a),
 }));
-vi.mock('../solana/balances.js', () => ({
-  readMintScale: (...a: unknown[]) => readMintScaleMock(...a),
+vi.mock('../executor/order.js', () => ({
+  armExits: (...a: unknown[]) => armExitsMock(...a),
+  placeOrder: (...a: unknown[]) => placeOrderMock(...a),
 }));
-vi.mock('../executor/place.js', () => ({
-  guardAndSpend: (...a: unknown[]) => guardAndSpendMock(...a),
-}));
-vi.mock('../executor/order.js', () => ({ armExits: (...a: unknown[]) => armExitsMock(...a) }));
 vi.mock('../notifications/alerts.js', () => ({
   notifyEntry: (...a: unknown[]) => notifyEntryMock(...a),
 }));
@@ -68,30 +94,51 @@ const { evaluateBestSetup, runAutonomousCycle, autonomousAgentSweep, AGENT_DECIS
   await import('./autonomous.js');
 const { RISK_SETTINGS, settingsFor } = await import('./risk-profile.js');
 
-const OWNER = Keypair.generate().publicKey.toBase58();
+const OWNER = '0x1111111111111111111111111111111111111111';
 
 /** Wednesday 11:00 ET — Nasdaq regular hours, so the off-hours guard is not the thing under test. */
 const REGULAR_HOURS = new Date('2026-10-14T15:00:00Z');
 /** Saturday 14:00 ET — the exchange is shut. */
 const WEEKEND = new Date('2026-10-17T18:00:00Z');
 
+/** What `placeOrder` answers for a one-shot buy that settled. */
 const FILL = {
-  placed: true as const,
-  signature: '5K3yTestAutonomousEntrySignature',
-  slot: 289412950,
-  inUnits: 25_000_000n,
-  outUnits: 11_540_000n,
+  signature: '0x5a3e0000000000000000000000000000000000000000000000000000000000aa',
+  runId: 'run-1',
   filledUnits: 0.1154,
   fillPrice: 216.5,
   symbol: 'NVDAx',
   usd: 25,
-  side: 'buy' as const,
 };
+const FILLED = {
+  placed: true as const,
+  orderId: 'order-1',
+  outcome: { status: 'filled' as const, runId: FILL.runId, signature: FILL.signature, units: FILL.filledUnits, price: FILL.fillPrice },
+};
+
+/** A live XorrDelegation policy, as `readPolicy` returns it. */
+function livePolicy(overrides: Record<string, unknown> = {}) {
+  return {
+    delegate: '0x2222222222222222222222222222222222222222',
+    dailyCapUsd: 1000,
+    expiresAt: Date.now() + 30 * 86_400_000,
+    revoked: false,
+    remainingTodayUsd: 1000,
+    spentTodayUsd: 0,
+    ...overrides,
+  };
+}
 
 /** `n` readings spanning `low`..`high`, ending on `last` — the shape `price_observations` returns. */
 function readings(low: number, high: number, last: number, n = 8) {
   const span = Array.from({ length: n - 1 }, (_, i) => low + ((high - low) * i) / (n - 2));
   return [...span, last].map((usd) => ({ usd: String(usd) }));
+}
+
+/** The decision record the agent stored on its proposal row — where the explain screen reads the why. */
+function proposalRecord(): Record<string, unknown> | undefined {
+  const insert = queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO proposals'));
+  return insert ? JSON.parse(String((insert[1] as unknown[])[3])) : undefined;
 }
 
 describe('autonomous xStocks trading agent', () => {
@@ -110,9 +157,9 @@ describe('autonomous xStocks trading agent', () => {
      */
     xStockPriceMock.mockResolvedValue(238);
     referencePriceMock.mockResolvedValue(238);
-    readMintScaleMock.mockResolvedValue({ decimals: 8, multiplier: 1, pending: null });
+    scaleMock.mockResolvedValue({ multiplier: 1, pending: null });
     appendMock.mockResolvedValue({ seq: '1' });
-    applyFillMock.mockResolvedValue(undefined);
+    readPolicyMock.mockResolvedValue(livePolicy());
   });
 
   afterEach(() => {
@@ -223,6 +270,20 @@ describe('autonomous xStocks trading agent', () => {
       expect(best?.suggestedSlippageBps).toBe(50);
     });
 
+    /* The multiplier is the ERC-4626 wrapper's own `convertToAssets(1e18)`, read on X Layer. */
+    it('reads the multiplier from the wrapped xStock, not from a default', async () => {
+      queryMock.mockImplementation(async (sql: string) =>
+        sql.includes('price_observations') ? readings(200, 240, 238) : [],
+      );
+      scaleMock.mockResolvedValue({ multiplier: 1.0525, pending: null });
+
+      const best = await evaluateBestSetup();
+      expect(best?.corporateAction.multiplier).toBeCloseTo(1.0525, 6);
+      expect(readContractMock).toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'convertToAssets', address: best?.stock.address }),
+      );
+    });
+
     /*
      * A scheduled multiplier change is a reason not to open anything on that symbol, not a reason
      * to prefer something else on it. A markdown still lets the candidate win on a quiet day,
@@ -236,8 +297,7 @@ describe('autonomous xStocks trading agent', () => {
       const undisturbed = await evaluateBestSetup();
       expect(undisturbed?.strategyKind).toBe('momentum');
 
-      readMintScaleMock.mockResolvedValue({
-        decimals: 8,
+      scaleMock.mockResolvedValue({
         multiplier: 1,
         pending: { nextMultiplier: 2, effectiveAtMs: Date.now() + 12 * 3_600_000 },
       });
@@ -252,14 +312,10 @@ describe('autonomous xStocks trading agent', () => {
           ? { symbol, cik: 1045810, reported: [], nextAt: Date.now() + 6 * 86_400_000, gapDays: [], medianGapDays: 91, errorDays: 2 }
           : null,
       );
-      readMintScaleMock.mockImplementation(async (mint: string) =>
-        mint === 'Xsc9NVDA'
-          ? {
-              decimals: 8,
-              multiplier: 1,
-              pending: { nextMultiplier: 2, effectiveAtMs: Date.now() + 6 * 3_600_000 },
-            }
-          : { decimals: 8, multiplier: 1, pending: null },
+      scaleMock.mockImplementation(async (wrapper: string) =>
+        wrapper === NVDA_WRAPPER
+          ? { multiplier: 1, pending: { nextMultiplier: 2, effectiveAtMs: Date.now() + 6 * 3_600_000 } }
+          : { multiplier: 1, pending: null },
       );
 
       const best = await evaluateBestSetup();
@@ -275,8 +331,7 @@ describe('autonomous xStocks trading agent', () => {
       const undisturbed = await evaluateBestSetup();
       if (!undisturbed) throw new Error('expected a setup');
 
-      readMintScaleMock.mockResolvedValue({
-        decimals: 8,
+      scaleMock.mockResolvedValue({
         multiplier: 1,
         pending: { nextMultiplier: 2, effectiveAtMs: Date.now() + 10 * 86_400_000 },
       });
@@ -344,52 +399,170 @@ describe('autonomous xStocks trading agent', () => {
   });
 
   describe('runAutonomousCycle', () => {
+    /** A wallet that is ready to trade, with a momentum setup on the table. */
+    const ready = () => {
+      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
+      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
+      queryMock.mockImplementation(async (sql: string) =>
+        sql.includes('price_observations') ? readings(200, 240, 238) : [],
+      );
+      placeOrderMock.mockResolvedValue(FILLED);
+      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
+    };
+
     it('refuses when the wallet has agents stopped by the kill switch', async () => {
       oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: true });
 
       const result = await runAutonomousCycle('wallet-1');
       expect(result.executed).toBe(false);
       if (!result.executed) expect(result.reason).toBe('agents_stopped');
-      expect(guardAndSpendMock).not.toHaveBeenCalled();
+      expect(placeOrderMock).not.toHaveBeenCalled();
     });
 
-    it('refuses when the on-chain SPL delegation is revoked', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 500, isRevoked: true });
+    it('refuses when the on-chain XorrDelegation policy is revoked', async () => {
+      ready();
+      readPolicyMock.mockResolvedValue(livePolicy({ revoked: true }));
 
       const result = await runAutonomousCycle('wallet-1');
       expect(result.executed).toBe(false);
       if (!result.executed) expect(result.reason).toBe('delegation_revoked');
-      expect(guardAndSpendMock).not.toHaveBeenCalled();
+      expect(readPolicyMock).toHaveBeenCalledWith(OWNER);
+      expect(placeOrderMock).not.toHaveBeenCalled();
     });
 
-    it('executes through guardAndSpend, arms exits, writes a proposal and notifies', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
+    it('refuses when no permission was ever granted', async () => {
+      ready();
+      readPolicyMock.mockResolvedValue(null);
+
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'no_delegation' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the permission has expired', async () => {
+      ready();
+      readPolicyMock.mockResolvedValue(livePolicy({ expiresAt: Date.now() - 1 }));
+
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'delegation_expired' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses when today's on-chain cap is used up", async () => {
+      ready();
+      readPolicyMock.mockResolvedValue(livePolicy({ remainingTodayUsd: 0, spentTodayUsd: 1000 }));
+
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'daily_cap' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    /*
+     * The Solana version read the delegation with `.catch(() => null)` and sized against a $1,000
+     * default when it came back empty. A permission that cannot be read is not a permission.
+     */
+    it('refuses when the permission cannot be read, rather than assuming a cap', async () => {
+      ready();
+      readPolicyMock.mockRejectedValue(new Error('rpc timeout'));
+
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'delegation_unreadable' });
+      expect(evaluateMock).not.toHaveBeenCalled();
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a wallet whose address is not an X Layer address', async () => {
+      ready();
+      oneMock.mockResolvedValue({ id: 'wallet-1', address: 'So1anaPubkey1111111111111111111111', agents_stopped: false });
+
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'no_wallet' });
+      expect(readPolicyMock).not.toHaveBeenCalled();
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    /*
+     * The fail-open bug (PLAN.md G-SEC2): the chokepoint caught a rules-engine error into
+     * `allowed: true`, so a database blip let a trade through unchecked. It must refuse.
+     */
+    it('fails closed when the rules engine throws', async () => {
+      ready();
+      evaluateMock.mockRejectedValue(new Error('connection terminated'));
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result.executed).toBe(false);
+      if (!result.executed) {
+        expect(result.reason).toBe('rules_unavailable');
+        expect(result.detail).toContain('could not be checked');
+      }
+      expect(placeOrderMock).not.toHaveBeenCalled();
+      expect(armExitsMock).not.toHaveBeenCalled();
+      expect(appendMock).not.toHaveBeenCalled();
+      expect(notifyEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('passes the rules engine the permission the chain holds', async () => {
+      ready();
+      const policy = livePolicy({ dailyCapUsd: 300 });
+      readPolicyMock.mockResolvedValue(policy);
+
+      await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(evaluateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          walletId: 'wallet-1',
+          dailyCapUsd: 300,
+          delegationExpiresAt: new Date(policy.expiresAt),
+          delegationRevoked: false,
+          killed: false,
+        }),
       );
-      guardAndSpendMock.mockResolvedValue(FILL);
+    });
+
+    it('refuses a rules verdict, naming its reason', async () => {
+      ready();
+      evaluateMock.mockResolvedValue({ allowed: false, reason: 'daily_cap', detail: 'Cap reached.' });
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result).toMatchObject({ executed: false, reason: 'daily_cap', detail: 'Cap reached.' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    /* The contract is final: our own tally saying $800 is left does not beat the chain saying $30. */
+    it('sizes against what the contract says is left today', async () => {
+      ready();
+      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false, risk_profile: 'aggressive' });
+      readPolicyMock.mockResolvedValue(livePolicy({ remainingTodayUsd: 30 }));
+
+      await runAutonomousCycle('wallet-1');
+      const usd = placeOrderMock.mock.calls[0]?.[2] as number;
+      expect(usd).toBeGreaterThan(0);
+      expect(usd).toBeLessThanOrEqual(30);
+    });
+
+    it('places the order through placeOrder, arms exits, writes a proposal and notifies', async () => {
+      ready();
       armExitsMock.mockResolvedValue({ strategyId: 'strat-exit-123', sentence: 'Exit set' });
 
       const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
       expect(result.executed).toBe(true);
       if (result.executed) {
         expect(result.receipt.signature).toBe(FILL.signature);
+        expect(result.receipt.runId).toBe(FILL.runId);
+        expect(result.receipt.orderId).toBe('order-1');
         expect(result.exitStrategyId).toBe('strat-exit-123');
         expect(result.proposalId).toBeDefined();
       }
 
-      expect(guardAndSpendMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          walletId: 'wallet-1',
-          ownerPubkey: OWNER,
-          usd: 25,
-          side: 'buy',
-          slippageBps: 50,
-        }),
-      );
+      expect(placeOrderMock).toHaveBeenCalledTimes(1);
+      const [w, symbol, usd, label, extra] = placeOrderMock.mock.calls[0]!;
+      expect(w).toMatchObject({ id: 'wallet-1', address: OWNER });
+      expect(typeof symbol).toBe('string');
+      expect(usd).toBe(25);
+      // The one-shot's label is what the order path attributes the booked fill to: it names the agent.
+      expect(label).toContain('Momentum Scout');
+      // 50 bps is 0.5%: the order path takes slippage in percent.
+      expect(extra).toEqual({ slippagePct: 0.5 });
+
       expect(armExitsMock).toHaveBeenCalledTimes(1);
       // Exits hang off the price it filled at, not the price the setup was written at.
       expect(armExitsMock.mock.calls[0]?.[1]).toMatchObject({ entryPrice: FILL.fillPrice });
@@ -398,15 +571,9 @@ describe('autonomous xStocks trading agent', () => {
         expect.stringContaining('INSERT INTO proposals'),
         expect.arrayContaining(['wallet-1']),
       );
-      expect(notifyEntryMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          walletId: 'wallet-1',
-          notionalUsd: 25,
-          signature: FILL.signature,
-          units: FILL.filledUnits,
-          price: FILL.fillPrice,
-        }),
-      );
+      // The order path already notified and wrote the fill's audit row: the agent adds neither a second push nor a row.
+      expect(notifyEntryMock).not.toHaveBeenCalled();
+      expect(appendMock).not.toHaveBeenCalled();
     });
 
     /*
@@ -414,11 +581,7 @@ describe('autonomous xStocks trading agent', () => {
      * trade could differ from the one the caller had just shown somebody and been told to take.
      */
     it('places the setup the caller brought instead of scanning for a new one', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      guardAndSpendMock.mockResolvedValue(FILL);
-      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
+      ready();
 
       // No readings and no earnings, so a fresh scan would find nothing at all.
       queryMock.mockResolvedValue([]);
@@ -426,7 +589,7 @@ describe('autonomous xStocks trading agent', () => {
 
       const chosen = {
         symbol: 'AAPLx',
-        stock: { symbol: 'AAPLx', name: 'Apple', address: 'XsbEAAPL', decimals: 8, sector: 'Technology' as const },
+        stock: { ...STOCKS.AAPLx, address: STOCKS.AAPLx.address as `0x${string}`, raw: STOCKS.AAPLx.raw as `0x${string}`, sector: 'Technology' as const },
         strategyKind: 'dca' as const,
         persona: 'yield-keeper' as const,
         personaName: 'Yield Keeper',
@@ -450,46 +613,41 @@ describe('autonomous xStocks trading agent', () => {
 
       const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25, setup: chosen });
       expect(result.executed).toBe(true);
-      expect(guardAndSpendMock).toHaveBeenCalledWith(
-        expect.objectContaining({ symbol: 'AAPLx', usd: 25 }),
+      expect(placeOrderMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'AAPLx',
+        25,
+        expect.any(String),
+        expect.anything(),
       );
     });
 
     /*
-     * A fill that never reaches `audit_log` did not happen as far as the app is concerned:
-     * Activity is the one screen whose whole promise is showing what the agents did, and
-     * `/agent/explain` starts from a row on it. `guardAndSpend` does not write one.
+     * The order path writes the fill's row, which knows nothing about why. The decision record goes on the proposal,
+     * carrying the transaction hash, which is how `/activity/:seq/explain` finds the reason for that row.
      */
-    it('puts the fill on the audit trail, carrying the signature', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
-      );
-      guardAndSpendMock.mockResolvedValue(FILL);
-      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
+    it('stores the decision on the proposal, carrying the transaction hash', async () => {
+      ready();
 
-      await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      const symbol = result.executed ? result.setup.symbol : '';
 
-      expect(appendMock).toHaveBeenCalledTimes(1);
-      const entry = appendMock.mock.calls[0]?.[0];
-      expect(entry).toMatchObject({
-        walletId: 'wallet-1',
-        kind: 'trade',
-        signature: FILL.signature,
-        amount: '$25.00',
-      });
-      expect(entry.action).toContain(FILL.symbol);
-      // The whole decision record rides along, so explaining the trade needs no second lookup.
-      expect(entry.payload).toMatchObject({
-        symbol: FILL.symbol,
+      const insert = queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO proposals'));
+      expect(insert).toBeDefined();
+      const record = JSON.parse(String((insert![1] as unknown[])[3]));
+      expect(record).toMatchObject({
+        symbol,
         strategyKind: 'momentum',
         signature: FILL.signature,
+        runId: FILL.runId,
+        units: FILL.filledUnits,
+        price: FILL.fillPrice,
         slippageBps: 50,
+        multiplier: 1,
         exitStrategyId: 'exit-1',
       });
-      expect(typeof entry.payload.proposalId).toBe('string');
+      expect(record).not.toHaveProperty('slot');
+      expect(appendMock).not.toHaveBeenCalled();
     });
 
     /*
@@ -498,14 +656,7 @@ describe('autonomous xStocks trading agent', () => {
      * whole feature reads back was never there, and the sweep's cooldown never matched.
      */
     it('stores the decision under a word the proposals constraint accepts', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
-      );
-      guardAndSpendMock.mockResolvedValue(FILL);
-      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
+      ready();
 
       await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
 
@@ -516,76 +667,79 @@ describe('autonomous xStocks trading agent', () => {
     });
 
     /*
-     * The fill has to reach the book, or the agent moves real money into a position the app cannot
-     * see: Holdings shows nothing, P&L counts nothing, and the sleeve breakdown has nothing to
-     * attribute. Found by driving the demo path on the fork and reading the tables afterwards.
+     * `placeOrder` answers with a refusal as readily as a fill, and a refusal is not a fill:
+     * nothing downstream of it — exits, proposal, audit, notification — may run.
      */
-    it('books the fill into the position ledger, attributed to the agent', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
-      );
-      guardAndSpendMock.mockResolvedValue(FILL);
-      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
-
-      await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
-
-      expect(applyFillMock).toHaveBeenCalledTimes(1);
-      const booked = applyFillMock.mock.calls[0]?.[1];
-      expect(booked).toMatchObject({
-        walletId: 'wallet-1',
-        symbol: FILL.symbol,
-        units: FILL.filledUnits,
-        usd: FILL.usd,
-      });
-      expect(booked.attribution).toMatchObject({ source: 'agent', label: 'Momentum Scout' });
-      // The proposal that decided it, so the sleeve names the run rather than a live strategy.
-      expect(typeof booked.attribution.id).toBe('string');
-    });
-
-    /* A sale is negative units, or the book would count a close as another buy. */
-    it('books a sale as negative units', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
-      );
-      guardAndSpendMock.mockResolvedValue({ ...FILL, side: 'sell' });
-      armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
-
-      await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
-
-      const booked = applyFillMock.mock.calls[0]?.[1];
-      expect(booked.units).toBe(-FILL.filledUnits);
-      expect(booked.usd).toBe(-FILL.usd);
-    });
-
-    /*
-     * `guardAndSpend` answers with a refusal as readily as a receipt, and a refusal is not a fill:
-     * nothing downstream of it — exits, proposal, notification — may run.
-     */
-    it('reports the chokepoint refusal without arming exits or notifying', async () => {
-      oneMock.mockResolvedValue({ id: 'wallet-1', address: OWNER, agents_stopped: false });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
-      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
-      queryMock.mockImplementation(async (sql: string) =>
-        sql.includes('price_observations') ? readings(200, 240, 238) : [],
-      );
-      guardAndSpendMock.mockResolvedValue({
+    it('passes an order-path refusal through without arming exits or notifying', async () => {
+      ready();
+      placeOrderMock.mockResolvedValue({
         placed: false,
-        status: 'blocked',
-        reason: 'spread_too_wide',
-        detail: 'The route moved more than the guard allows.',
+        refusal: { status: 'blocked', reason: 'not_tradable', detail: 'NVDAx cannot be settled on xlayer.' },
       });
 
       const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
-      expect(result.executed).toBe(false);
-      if (!result.executed) expect(result.reason).toBe('spread_too_wide');
+      expect(result).toMatchObject({ executed: false, reason: 'not_tradable' });
+      expect(armExitsMock).not.toHaveBeenCalled();
+      expect(appendMock).not.toHaveBeenCalled();
+      expect(notifyEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('passes a run the executor blocked through under its own reason', async () => {
+      ready();
+      placeOrderMock.mockResolvedValue({
+        placed: true,
+        orderId: 'order-1',
+        outcome: { status: 'blocked', runId: 'run-2', reason: 'onchain_daily_cap', detail: 'The contract allows 3.00 more today.' },
+      });
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result).toMatchObject({
+        executed: false,
+        reason: 'onchain_daily_cap',
+        detail: 'The contract allows 3.00 more today.',
+      });
       expect(armExitsMock).not.toHaveBeenCalled();
       expect(notifyEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('reports a failed run as order_failed with the sentence a person reads', async () => {
+      ready();
+      placeOrderMock.mockResolvedValue({
+        placed: true,
+        orderId: 'order-1',
+        outcome: { status: 'failed', runId: 'run-3', error: 'The venue rejected the order, so nothing was placed.', raw: '0xc2e441e5' },
+      });
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result).toMatchObject({
+        executed: false,
+        reason: 'order_failed',
+        detail: 'The venue rejected the order, so nothing was placed.',
+      });
+      expect(notifyEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('reports an order path that threw as order_failed', async () => {
+      ready();
+      placeOrderMock.mockRejectedValue(new Error('insert failed'));
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result).toMatchObject({ executed: false, reason: 'order_failed' });
+      if (!result.executed) expect(result.detail).toContain('insert failed');
+      expect(notifyEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('treats a skipped run as nothing bought', async () => {
+      ready();
+      placeOrderMock.mockResolvedValue({
+        placed: true,
+        orderId: 'order-1',
+        outcome: { status: 'skipped', reason: 'already_ran_this_period' },
+      });
+
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25 });
+      expect(result).toMatchObject({ executed: false, reason: 'order_not_filled' });
+      expect(armExitsMock).not.toHaveBeenCalled();
     });
   });
 
@@ -636,8 +790,7 @@ describe('autonomous xStocks trading agent', () => {
         sql.includes('price_observations') ? readings(200, 240, 238) : [],
       );
       // 72 hours out: inside conservative's 96, outside balanced's 48 and aggressive's 24.
-      readMintScaleMock.mockResolvedValue({
-        decimals: 8,
+      scaleMock.mockResolvedValue({
         multiplier: 1,
         pending: { nextMultiplier: 2, effectiveAtMs: Date.now() + 72 * 3_600_000 },
       });
@@ -671,35 +824,30 @@ describe('autonomous xStocks trading agent', () => {
         agents_stopped: false,
         ...(profile === undefined ? {} : { risk_profile: profile }),
       });
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
+      readPolicyMock.mockResolvedValue(livePolicy());
       evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 800 });
       // Twelve readings, so even conservative's ten-observation floor has a band to work with.
       queryMock.mockImplementation(async (sql: string) =>
         sql.includes('price_observations') ? readings(200, 240, 238, 12) : [],
       );
-      guardAndSpendMock.mockResolvedValue(FILL);
+      placeOrderMock.mockResolvedValue(FILLED);
       armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
     };
 
     it('sizes the entry from the profile rather than a fixed default', async () => {
       readyWallet('aggressive');
       await runAutonomousCycle('wallet-1');
-      expect(guardAndSpendMock).toHaveBeenCalledWith(
-        expect.objectContaining({ usd: RISK_SETTINGS.aggressive.maxTradeUsd }),
-      );
+      expect(placeOrderMock.mock.calls[0]?.[2]).toBe(RISK_SETTINGS.aggressive.maxTradeUsd);
 
       vi.clearAllMocks();
       appendMock.mockResolvedValue({ seq: '1' });
-    applyFillMock.mockResolvedValue(undefined);
-      readMintScaleMock.mockResolvedValue({ decimals: 8, multiplier: 1, pending: null });
+      scaleMock.mockResolvedValue({ multiplier: 1, pending: null });
       xStockPriceMock.mockResolvedValue(238);
       referencePriceMock.mockResolvedValue(238);
       earningsCalendarMock.mockResolvedValue(null);
       readyWallet('conservative');
       await runAutonomousCycle('wallet-1');
-      expect(guardAndSpendMock).toHaveBeenCalledWith(
-        expect.objectContaining({ usd: RISK_SETTINGS.conservative.maxTradeUsd }),
-      );
+      expect(placeOrderMock.mock.calls[0]?.[2]).toBe(RISK_SETTINGS.conservative.maxTradeUsd);
     });
 
     /*
@@ -711,7 +859,7 @@ describe('autonomous xStocks trading agent', () => {
       readyWallet('conservative');
       await runAutonomousCycle('wallet-1');
 
-      expect(appendMock.mock.calls[0]?.[0].payload).toMatchObject({
+      expect(proposalRecord()).toMatchObject({
         riskProfile: 'conservative',
       });
     });
@@ -725,13 +873,13 @@ describe('autonomous xStocks trading agent', () => {
       const result = await runAutonomousCycle('wallet-1');
 
       expect(result.executed).toBe(true);
-      expect(appendMock.mock.calls[0]?.[0].payload).toMatchObject({ riskProfile: 'balanced' });
+      expect(proposalRecord()).toMatchObject({ riskProfile: 'balanced' });
     });
 
     it('treats a wallet with no profile column as the default', async () => {
       readyWallet(undefined);
       await runAutonomousCycle('wallet-1');
-      expect(appendMock.mock.calls[0]?.[0].payload).toMatchObject({ riskProfile: 'balanced' });
+      expect(proposalRecord()).toMatchObject({ riskProfile: 'balanced' });
     });
   });
 
@@ -758,9 +906,9 @@ describe('autonomous xStocks trading agent', () => {
         return null;
       });
 
-      readDelegationMock.mockResolvedValue({ delegatedUsd: 1000, isRevoked: false });
+      readPolicyMock.mockResolvedValue(livePolicy());
       evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 500 });
-      guardAndSpendMock.mockResolvedValue({ ...FILL, signature: '5K3ySweepSig' });
+      placeOrderMock.mockResolvedValue(FILLED);
       armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
 
       expect(await autonomousAgentSweep()).toBe(1);

@@ -26,7 +26,8 @@ import {
   explorerTx,
   rpcUrl,
 } from './evm/chains.js';
-import { TOKENS, quote } from './venues/oneinch.js';
+import { TOKENS } from './venues/tokens.js';
+import { quote } from './venues/uniswap.js';
 import { STOCKS } from './venues/stocks.js';
 import { usdcSupplyYield } from './market/yield.js';
 

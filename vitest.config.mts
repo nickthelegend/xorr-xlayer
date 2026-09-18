@@ -41,7 +41,7 @@ export default defineConfig({
     /*
      * Placeholder credentials for the unit run, only where none are set.
      *
-     * `venues/oneinch.ts` and `auth/privy.ts` throw at import without their keys — deliberately, since
+     * `auth/privy.ts` throws at import without its keys — deliberately, since
      * neither has an offline mode — and unit suites import them transitively. They passed only because
      * this file loads the developer's `.env`; a clean checkout, CI included, could not even collect
      * them. No unit test calls 1inch or Privy, and the live run (LIVE=1) still requires the real keys.
@@ -49,7 +49,13 @@ export default defineConfig({
     env: process.env.LIVE
       ? {}
       : {
-          ONEINCH_API_KEY: process.env.ONEINCH_API_KEY ?? 'unit-test-placeholder',
+          /*
+           * The chain is pinned, not inherited: a developer's `.env` naming another network (the Base build's
+           * `base-sepolia`, carried over in a copy) made every suite that loads the chain config fail to collect.
+           * The unit tests describe X Layer's testnet; the fork and mainnet runs set their own.
+           */
+          XORR_CHAIN: 'xlayer-testnet',
+          EXPO_PUBLIC_XORR_CHAIN: 'xlayer-testnet',
           PRIVY_APP_ID: process.env.PRIVY_APP_ID ?? 'unit-test-placeholder',
           PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET ?? 'unit-test-placeholder',
         },

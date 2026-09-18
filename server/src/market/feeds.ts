@@ -17,7 +17,7 @@
  *
  * `feeds.test.ts` holds this to `priceOf` in both directions.
  */
-import { canonicalSymbol } from '../venues/oneinch.js';
+import { canonicalSymbol } from '../venues/tokens.js';
 import { isStock } from '../venues/stocks.js';
 import { isXStock } from '../venues/xstocks.js';
 import { COINGECKO_IDS } from './ids.js';
@@ -27,7 +27,7 @@ import { COINGECKO_IDS } from './ids.js';
  *
  *   crypto — CoinGecko's table, the market-data feed.
  *   equity — a tokenized equity on an EVM chain, priced by the venue that would fill it.
- *   xstock — a tokenized equity on Solana, priced by the Jupiter route that would fill it.
+ *   xstock — a wrapped xStock on X Layer, priced by the Uniswap v3 pools that would fill it.
  *
  * The last two are not one case: they are different chains, different venues and different
  * registries, and a symbol that is an equity here is not necessarily one there.

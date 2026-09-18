@@ -8,7 +8,7 @@
 import 'dotenv/config';
 import { PERSONAS, systemPrompt, type PersonaId, type Venue } from './personas.js';
 import { CHAIN_KEY } from '../evm/chains.js';
-import { TOKENS } from '../venues/oneinch.js';
+import { TOKENS } from '../venues/tokens.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -98,7 +98,7 @@ const REPAIR_HINT: Record<VoiceViolation, string> = {
  * error than describing a market that does not exist here at all.
  */
 const VENUE: Venue = {
-  chain: CHAIN_KEY === 'xlayer-testnet' ? 'Base Sepolia' : 'Base',
+  chain: CHAIN_KEY === 'xlayer-testnet' ? 'X Layer testnet' : 'X Layer',
   tradable: Object.keys(TOKENS),
 };
 

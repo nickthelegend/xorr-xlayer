@@ -18,7 +18,7 @@
  * this says so rather than inventing one. That is the correct answer and the honest one.
  */
 import { one } from '../db/index.js';
-import { explorerTx } from '../solana/connection.js';
+import { explorerTx } from '../evm/chains.js';
 import { sleevesFor, type SleeveBreakdown } from '../positions/sleeves.js';
 import type { AuditKind } from '../audit/log.js';
 import type { DecisionRecord } from './autonomous.js';
@@ -129,7 +129,21 @@ export async function explainTrade(
     explorer: row.signature ? explorerTx(row.signature) : null,
   };
 
-  const payload = row.payload ?? {};
+  /*
+   * The fill row an agent trade writes is the executor's (`executor/run.ts`), which knows the fill but not the reason.
+   * The reason is the decision record the agent stored on its proposal, keyed by the same transaction hash — one trade,
+   * one row on Activity, and the why still one tap away. A row that carries a record itself (older trades) reads as is.
+   */
+  let payload: Record<string, unknown> = row.payload ?? {};
+  if (!isDecisionRecord(payload) && row.signature) {
+    const proposal = await one<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM proposals
+        WHERE wallet_id = $1 AND payload->>'signature' = $2
+        ORDER BY decided_at DESC NULLS LAST LIMIT 1`,
+      [walletId, row.signature],
+    ).catch(() => null);
+    if (proposal?.payload) payload = proposal.payload;
+  }
   if (!isDecisionRecord(payload)) return { status: 'no_record', ...base };
 
   /*

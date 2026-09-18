@@ -18,7 +18,8 @@ import { getJson, staleValue } from '../http/get.js';
 import { readChain } from '../http/chain-read.js';
 import { log } from '../http/request-id.js';
 import { COINGECKO_IDS, COINGECKO_PRICE_URL, type CoingeckoPrices } from '../market/ids.js';
-import { CAN_SETTLE, TOKENS, canonicalSymbol, quote } from '../venues/oneinch.js';
+import { CAN_SETTLE, TOKENS, canonicalSymbol } from '../venues/tokens.js';
+import { quote } from '../venues/uniswap.js';
 import { STOCKS, equitiesFunctional, isStock, observedHistory } from '../venues/stocks.js';
 import { classificationFor, earningsCalendar } from '../market/edgar.js';
 import { aavePoolIsDeployedHere, usdcSupplyYield, usdcReserve } from '../market/yield.js';
@@ -29,7 +30,6 @@ import { publicClient } from '../evm/client.js';
 import { ADDRESSES } from '../evm/chains.js';
 import { currentWallet } from './wallet-context.js';
 import { isAddress, type Address } from 'viem';
-import { addressOfBasename, basenameOf } from '../evm/basename.js';
 import type { Context } from 'hono';
 import { findPerp, perpMetrics, PriceTooSlow } from '../market/perp.js';
 import { PERP_RANGES, perpCandles, perpMarkets, type PerpRange } from '../market/hyperliquid.js';
@@ -926,23 +926,6 @@ market.post('/yield/withdraw-calldata', async (c) => {
   });
 });
 
-/**
- * Basename lookup, both directions. Public: a name is a public record on a public chain.
- *
- * `?name=` resolves forward, `?address=` resolves in reverse. Null is a normal answer and comes
- * back as a 200 — most addresses have no name, and treating that as an error would make every
- * screen that asks have to special-case the common case.
- */
-market.get('/basename', async (c) => {
-  const name = c.req.query('name');
-  const address = c.req.query('address');
-  if (name) return c.json({ name, address: await addressOfBasename(name) });
-  if (address && isAddress(address)) {
-    return c.json({ address, name: await basenameOf(address as Address) });
-  }
-  // A code where a client reads one; the sentence it used to carry in `error` is the detail.
-  return c.json({ error: 'invalid_query', detail: 'Pass ?name=<basename> or a valid ?address=0x….' }, 400);
-});
 
 /**
  * The same asset, priced two ways. Public, like every other price route.

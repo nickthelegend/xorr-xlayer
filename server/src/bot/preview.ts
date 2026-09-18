@@ -7,8 +7,8 @@
  *
  * ## What it deliberately does not do
  *
- * It does not evaluate the setups. Doing that would mean a Jupiter quote, a 1inch quote and a mint
- * read for every symbol on every load of a preview screen — and worse, the answer would be a
+ * It does not evaluate the setups. Doing that would mean a Uniswap v3 quote, a reference price and
+ * a wrapper read for every X Layer xStock on every load of a preview screen — and worse, the answer would be a
  * prediction of what the agent is going to decide, which is a thing this module cannot know. The
  * sweep filters on conditions read AT TICK TIME, and a preview that named a winner would be wrong
  * the moment a price moved, on the one screen whose job is to set expectations accurately.
@@ -39,7 +39,10 @@ export type AgentPreview = {
    */
   nextTickAt: number | null;
   lastTickAt: number | null;
-  /** The symbols the sweep will consider. Each is then filtered on conditions read at tick time. */
+  /**
+   * The symbols the sweep will consider — the wrapped xStocks in the X Layer registry. Each is then
+   * filtered on conditions read at tick time.
+   */
   universe: { symbol: string; name: string }[];
   /** Why this wallet would be skipped, if it would be. */
   wallet: {

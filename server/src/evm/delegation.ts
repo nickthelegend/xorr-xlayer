@@ -16,7 +16,7 @@ import {
 } from 'viem';
 import { publicClient, walletClient, delegateAccount } from './client.js';
 import { markBroadcast } from '../http/request-id.js';
-import { ADDRESSES, SETTLEMENT_VENUES, ONEINCH_ROUTER } from './chains.js';
+import { ADDRESSES, SETTLEMENT_VENUES } from './chains.js';
 import 'dotenv/config';
 
 export const DELEGATION_ADDRESS = (process.env.DELEGATION_ADDRESS ??
@@ -67,6 +67,43 @@ export const DELEGATION_ABI = [
     inputs: [
       { name: 'owner', type: 'address' },
       { name: 'token', type: 'address' },
+      { name: 'venue', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'minOut', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [{ name: 'result', type: 'bytes' }],
+  },
+  /*
+   * The same two calls for a venue that pulls through a separate approval contract (OKX DEX's router takes the input
+   * through its approve spender, not for itself). The contract approves `spender` instead of `venue`; both must be on
+   * the owner's allowlist, and the cap, expiry and output floor hold exactly as for `spend`.
+   */
+  {
+    type: 'function',
+    name: 'spendVia',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'venue', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'minOut', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [{ name: 'result', type: 'bytes' }],
+  },
+  {
+    type: 'function',
+    name: 'closePositionVia',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'spender', type: 'address' },
       { name: 'venue', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'tokenOut', type: 'address' },
@@ -343,27 +380,38 @@ export async function spendAsDelegate(
     owner: Address;
     token?: Address;
     venue?: Address;
+    /** Set when the venue pulls through a separate approval contract: the call becomes `spendVia`. */
+    spender?: Address;
     usd: number;
     data: Hex;
   } & OutputFloor,
 ): Promise<Hex> {
+  const venue = params.venue ?? ADDRESSES.uniswapRouter;
+  if (!venue) throw new Error('This chain has no settlement venue for a spend.');
+  const token = params.token ?? ADDRESSES.usdc;
+  const amount = usdToUnits(params.usd);
+  // Simulate first, so a policy violation is caught before anything is signed and surfaces as the
+  // contract's own named error rather than as a mined failure.
+  if (params.spender) {
+    const call = {
+      account: delegateAccount,
+      address: DELEGATION_ADDRESS,
+      abi: DELEGATION_ABI,
+      functionName: 'spendVia',
+      args: [params.owner, token, params.spender, venue, amount, params.tokenOut, params.minOut, params.data],
+    } as const;
+    const { request } = await publicClient.simulateContract(call);
+    const gas = withHeadroom(await publicClient.estimateContractGas(call));
+    await markBroadcast();
+    return walletClient.writeContract({ ...request, gas });
+  }
   const call = {
     account: delegateAccount,
     address: DELEGATION_ADDRESS,
     abi: DELEGATION_ABI,
     functionName: 'spend',
-    args: [
-      params.owner,
-      params.token ?? ADDRESSES.usdc,
-      params.venue ?? ONEINCH_ROUTER,
-      usdToUnits(params.usd),
-      params.tokenOut,
-      params.minOut,
-      params.data,
-    ],
+    args: [params.owner, token, venue, amount, params.tokenOut, params.minOut, params.data],
   } as const;
-  // Simulate first, so a policy violation is caught before anything is signed and surfaces as the
-  // contract's own named error rather than as a mined failure.
   const { request } = await publicClient.simulateContract(call);
   const gas = withHeadroom(await publicClient.estimateContractGas(call));
   // Recorded before it is signed: from here on, a retry of the request that asked for this must replay, never send.
@@ -605,10 +653,25 @@ export async function closeAsDelegate(
     owner: Address;
     token: Address;
     venue: Address;
+    /** Set when the venue pulls through a separate approval contract: the call becomes `closePositionVia`. */
+    spender?: Address;
     amount: bigint;
     data: Hex;
   } & OutputFloor,
 ): Promise<Hex> {
+  if (params.spender) {
+    const call = {
+      account: delegateAccount,
+      address: DELEGATION_ADDRESS,
+      abi: DELEGATION_ABI,
+      functionName: 'closePositionVia',
+      args: [params.owner, params.token, params.spender, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
+    } as const;
+    const { request } = await publicClient.simulateContract(call);
+    const gas = withHeadroom(await publicClient.estimateContractGas(call));
+    await markBroadcast();
+    return walletClient.writeContract({ ...request, gas });
+  }
   const call = {
     account: delegateAccount,
     address: DELEGATION_ADDRESS,

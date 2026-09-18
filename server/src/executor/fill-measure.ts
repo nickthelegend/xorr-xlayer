@@ -13,7 +13,7 @@
 import { erc20Abi, formatUnits, type Address } from 'viem';
 import { publicClient } from '../evm/client.js';
 import { ADDRESSES } from '../evm/chains.js';
-import { TOKENS as VENUE_TOKENS } from '../venues/oneinch.js';
+import { TOKENS as VENUE_TOKENS } from '../venues/tokens.js';
 import { priceOf } from '../market/prices.js';
 
 /** The owner's balance of a token, exactly as the chain holds it. Undefined if it cannot be read. */

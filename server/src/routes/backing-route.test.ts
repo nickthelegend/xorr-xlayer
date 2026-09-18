@@ -8,7 +8,10 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-process.env.XORR_CHAIN ??= 'xlayer-testnet';
+// Forced, not defaulted: the repo-root `.env` may name a chain this executor no longer knows, and a route test needs none.
+vi.hoisted(() => {
+  process.env.XORR_CHAIN = 'xlayer-testnet';
+});
 
 vi.mock('../db/index.js', () => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn(), pool: { query: vi.fn() } }));
 vi.mock('../evm/client.js', () => ({
@@ -119,5 +122,15 @@ describe('GET /xstocks/:symbol/backing', () => {
     vi.mocked(backingFor).mockResolvedValue({ status: 'unverified', reason: 'nope' });
     await app.request('/xstocks/TSLAx/backing');
     expect(backingFor).toHaveBeenCalledWith('TSLAx');
+  });
+});
+
+describe('GET /xstocks/:symbol/backing/detail', () => {
+  it('is a 404 naming the symbol for something that is not an xStock, before any chain read', async () => {
+    const res = await app.request('/xstocks/NOTASTOCK/backing/detail');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.error).toBe('unknown_symbol');
+    expect(String(body.message)).toMatch(/NOTASTOCK/);
   });
 });

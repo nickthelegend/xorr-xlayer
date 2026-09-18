@@ -21,10 +21,8 @@ import { erc20Abi, formatUnits } from 'viem';
 import { publicClient } from '../evm/client.js';
 import { gasStatus } from '../evm/gas.js';
 import { explorerTx, ADDRESSES } from '../evm/chains.js';
-import { buildSwap, quote, slippageFor, SLIPPAGE, TOKENS } from '../venues/oneinch.js';
-import { buildAquaFill } from '../venues/aqua.js';
-import { buildSwapVmFill } from '../venues/swapvm.js';
-import { decide } from '../graph/decide.js';
+import { slippageFor, SLIPPAGE, TOKENS } from '../venues/tokens.js';
+import { buildSwap, quote } from '../venues/uniswap.js';
 import type { Address } from 'viem';
 import { periodKey, advance, type Cadence } from './schedule.js';
 import { humanFailure, isTransient } from './failure.js';
@@ -36,18 +34,11 @@ import { send } from '../notifications/push.js';
 import { PLANNERS, observationFor, type TradeIntent } from './kinds/index.js';
 import { chooseSettlement, type SettlementVenue } from './settle.js';
 import { claimedSellUnits } from './stack.js';
-import { canonicalSymbol, TOKENS as VENUE_TOKENS } from '../venues/oneinch.js';
+import { canonicalSymbol, TOKENS as VENUE_TOKENS } from '../venues/tokens.js';
 import { agentForKind } from '../agents/attribution.js';
 import { isStock } from '../venues/stocks.js';
 import { snapshotWallet } from '../portfolio/snapshots.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
-
-/**
- * Our XorrAquaBook deployment, when there is one. Aqua only exists on Base mainnet, so on Sepolia
- * this is unset and every route falls to the aggregator — which the decision says out loud rather
- * than pretending it considered a book.
- */
-const AQUA_BOOK_ADDRESS = process.env.AQUA_BOOK_ADDRESS;
 
 /** The address that holds the tokens when the router is called: the delegation contract. */
 const DELEGATION_FROM = DELEGATION_ADDRESS;
@@ -422,40 +413,10 @@ async function runStrategyInner(
   try {
     const owner = ownerAddress;
 
-    /**
-     * Ask The Graph first. This is the agent reasoning over indexed chain data, and it can stop
-     * the run for reasons our own database cannot see — a permission revoked from another device,
-     * a cap already consumed by a trade we did not make, or realised flow that says the book is
-     * being picked off.
-     */
-    // `canonicalSymbol` because this is a value out of the database, written by whatever created
-    // the strategy — a raw lookup here misses any equity whose casing was normalised on the way in.
-    const outToken = TOKENS[canonicalSymbol(strategy.symbol === 'ETH' ? 'WETH' : strategy.symbol)];
-    const graphCall = await decide({
-      owner,
-      wantUsd: usd,
-      token: ADDRESSES.usdc,
-      // The second index needs to know which app's books to look in and how much of the bought
-      // token has to come out of one for it to be a candidate.
-      aquaApp: AQUA_BOOK_ADDRESS,
-      tokenOut: outToken?.address,
-      amountOut: outToken ? await estimateOutUnits(usd, strategy.symbol, outToken.decimals) : undefined,
-    }).catch(() => null);
-    // "The index is about another contract" is not a reason to refuse the trade — it is the index
-    // declining to have an opinion. Treating it as a block would stop every run on a fork, where
-    // there is no subgraph at all. The contract check below is the authority either way.
-    if (graphCall && !graphCall.act && graphCall.reason !== 'index_is_for_another_deployment') {
-      return finishBlocked(runId, walletId, strategy, graphCall.reason, graphCall.rationale);
-    }
     /*
-     * The route the decision made, kept for the settlement branch below.
-     *
-     * This is the line that was missing. `decide()` joins two subgraphs to answer "which venue" and
-     * returned `{ venue: 'aqua', maker, strategyHash }` — and nothing read it. Every fill went to
-     * the aggregator regardless, so the join was a computation with no consequence, and
-     * `XorrAquaBook` was a deployed contract the product never called.
+     * No index is asked first (The Graph is not part of the X Layer build, PLAN.md D4): the contract's own checks below
+     * are the authority on whether a run may spend, as they always were.
      */
-    const preferred = graphCall?.act ? graphCall.route.venue : undefined;
 
     /*
      * Can the bot pay for the transaction at all?
@@ -681,7 +642,7 @@ async function runStrategyInner(
      * authorised by the same policy and does not touch the cap, because de-risking is not spending.
      */
     /*
-     * Where this leg fills — Aqua, a maker's SwapVM program, or the aggregator.
+     * Where this leg fills — Uniswap v3 on X Layer, or OKX DEX when its answer beats it.
      *
      * The ordering rules and the reasons for them live in `settle.ts`. They were 109 lines in the
      * middle of this function, between the gate checks and the transaction bookkeeping, and they
@@ -699,10 +660,9 @@ async function runStrategyInner(
     const soldToken = VENUE_TOKENS[intent.inSymbol];
     if (!soldToken) throw new Error(`No token registry entry for ${intent.inSymbol}`);
     const closeAmount = intent.amountInRaw ?? BigInt(Math.floor(intent.amountIn * 10 ** soldToken.decimals));
-    const { payToken, swap, venue, floor } = await chooseSettlement({
+    const { payToken, swap, venue, floor, spender } = await chooseSettlement({
       intent,
       owner,
-      preferred,
       isClose: isCloseIntent(intent),
       delegationFrom: DELEGATION_FROM,
       send: isClose ? { via: 'closePosition', amount: closeAmount } : { via: 'spend', amount: usdToUnits(intent.usd) },
@@ -730,6 +690,8 @@ async function runStrategyInner(
           owner,
           token: payToken.address,
           venue: swap.to as Address,
+          // OKX DEX pulls through its approval contract, so the close goes through `closePositionVia`.
+          spender,
           // The amount the route was measured with on a fork — see `closeAmount` above.
           amount: closeAmount,
           data: swap.data,
@@ -739,6 +701,7 @@ async function runStrategyInner(
           owner,
           token: payToken.address,
           venue: swap.to,
+          spender,
           usd: intent.usd,
           data: swap.data,
           ...floor,
@@ -1272,16 +1235,12 @@ function isCloseIntent(intent: TradeIntent): boolean {
  */
 function describeLeg(intent: TradeIntent, units: number, venue?: SettlementVenue): string {
   if (intent.direct) {
-    return `Supplied $${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${intent.inSymbol} to Aave`;
+    return `Supplied ${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${intent.inSymbol} to Aave on X Layer`;
   }
   // Naming the venue in the activity log is the difference between "the bot bought something" and
   // a user being able to check where it went.
   const where =
-    venue === 'aqua'
-      ? ' on an Aqua book'
-      : venue === 'swapvm'
-        ? " against a maker's SwapVM program"
-        : '';
+    venue === 'uniswap-v3' ? ' on Uniswap v3' : venue === 'okx-dex' ? ' through OKX DEX' : '';
   return intent.outSymbol === 'USDC'
     ? `Sold ${units.toFixed(4)} ${intent.inSymbol}${where}`
     : `Bought ${units.toFixed(4)} ${intent.outSymbol}${where}`;

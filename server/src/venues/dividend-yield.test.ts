@@ -12,7 +12,8 @@ vi.mock('../db/index.js', () => ({ query: QUERY }));
 
 const { dividendYield, stepsFrom, accrualFrom, SPLIT_STEP } = await import('./dividend-yield.js');
 
-const MINT = 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh';
+// The wrapped NVDAx on X Layer — observations are keyed on the wrapper address.
+const MINT = '0xa8ddb5cd96b5222afe198316e9a57caa642850d5';
 const day = (n: number) => new Date(Date.now() - n * 86_400_000);
 
 beforeEach(() => {

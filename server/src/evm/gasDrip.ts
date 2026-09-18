@@ -10,7 +10,7 @@
  * a testnet affordance, and it is fenced accordingly:
  *
  *   - **Testnet only.** `IS_MAINNET_STATE` covers Base and any fork of it, and this refuses on
- *     both. Sending real ETH to an address because someone signed up is not a thing this should be
+ *     both. Sending real OKB to an address because someone signed up is not a thing this should be
  *     able to do by accident.
  *   - **Once per wallet, and only a verified one.** The guarantee is `inserted` from `bindWallet`
  *     (`auth/walletBinding.ts`): the insert itself reports whether it created the row, so two
@@ -54,15 +54,15 @@ export function faucetAccount(): PrivateKeyAccount | undefined {
 export async function dripGasIfNeeded(to: Address): Promise<DripResult> {
   /*
    * Never on Base's own state, and never on a chain whose money is real (`evm/money.ts`). Only the first was here, so a
-   * mainnet under any other key, with a faucet key set, would have been sent real ETH from that key.
+   * mainnet under any other key, with a faucet key set, would have been sent real OKB from that key.
    */
   if (IS_MAINNET_STATE || moneyOn(CHAIN_KEY) === 'real') {
-    return { sent: false, reason: `refusing to send real ETH on ${CHAIN_KEY}` };
+    return { sent: false, reason: `refusing to send real OKB on ${CHAIN_KEY}` };
   }
 
   const faucet = faucetAccount();
   if (!faucet) {
-    return { sent: false, reason: 'this deployment has no faucet key, so no test ETH was sent' };
+    return { sent: false, reason: 'this deployment has no faucet key, so no test OKB was sent' };
   }
 
   const [balance, faucetBalance] = await Promise.all([
@@ -76,7 +76,7 @@ export async function dripGasIfNeeded(to: Address): Promise<DripResult> {
   if (faucetBalance < parseEther(FAUCET_FLOOR_ETH) + drip) {
     return {
       sent: false,
-      reason: `the faucet holds ${formatEther(faucetBalance)} ETH, too little to send ${DRIP_ETH}`,
+      reason: `the faucet holds ${formatEther(faucetBalance)} OKB, too little to send ${DRIP_ETH}`,
     };
   }
 

@@ -1,10 +1,11 @@
 /**
  * The autonomous agent: pick a setup across the xStocks universe, then place it — PLAN.md §8.6.
  *
- * It reads what is actually knowable about each tokenized equity — a live Jupiter price, the
- * readings this app has recorded for it, the SEC's filing cadence, the mint's own Scaled UI
- * multiplier, the Nasdaq clock — scores the strategies that the conditions support, and sends the
- * best one through the executor's spend chokepoint with no approval step in between.
+ * It reads what is actually knowable about each wrapped xStock on X Layer — a live Uniswap v3
+ * price, the readings this app has recorded for it, the SEC's filing cadence, the ERC-4626
+ * wrapper's own corporate-action multiplier, the Nasdaq clock — scores the strategies that the
+ * conditions support, and places the best one as a one-off order (`placeOrder`, which settles
+ * through the XorrDelegation contract's `spend()`) with no approval step in between.
  *
  * ## What it refuses to do
  *
@@ -19,21 +20,18 @@
  * numbers nobody produced.
  */
 import { randomUUID } from 'node:crypto';
-import { PublicKey } from '@solana/web3.js';
-import { one, query, tx } from '../db/index.js';
-import { append } from '../audit/log.js';
-import { applyFill } from '../positions/index.js';
+import { isAddress, type Address } from 'viem';
+import { one, query } from '../db/index.js';
 import { log } from '../http/request-id.js';
-import { evaluate } from '../rules/engine.js';
+import { evaluate, type RuleVerdict } from '../rules/engine.js';
 import { XSTOCKS, xStockPriceUsd, type XStockToken } from '../venues/xstocks.js';
-import { guardAndSpend, type SpendReceipt } from '../executor/place.js';
-import { armExits } from '../executor/order.js';
-import { notifyEntry } from '../notifications/alerts.js';
+import { armExits, placeOrder, type OrderResult } from '../executor/order.js';
+import { readPolicy, type OnChainPolicy } from '../evm/delegation.js';
+import { publicClient } from '../evm/client.js';
+import type { WalletRow } from '../routes/wallet-context.js';
 import { speak } from './llm.js';
 import { TONE_INSTRUCTIONS, type ToneId } from './tone.js';
 import { earningsCalendar } from '../market/edgar.js';
-import { readMintScale } from '../solana/balances.js';
-import { readDelegation } from '../solana/delegation.js';
 import type { PersonaId } from './personas.js';
 import {
   DEFAULT_RISK_PROFILE,
@@ -118,13 +116,15 @@ export type DecisionRecord = {
   price: number;
   stopPrice: number;
   targetPrice: number;
+  /** The X Layer transaction hash of the fill. */
   signature: string;
-  slot: number;
+  /** The executor run that settled it (`strategy_runs.id`), where venue and measured units live. */
+  runId: string;
   /** The persona's sentence, model-written where the model answered and deterministic where not. */
   opening: string;
   reason: string;
   marketCondition: string;
-  /** The Scaled UI multiplier in force at the moment of the trade. */
+  /** The wrapped xStock's ERC-4626 multiplier (`convertToAssets(1e18) / 1e18`) at the moment of the trade. */
   multiplier: number;
   /** A multiplier change that was already published when this was decided, if there was one. */
   pendingMultiplier: number | null;
@@ -148,7 +148,7 @@ export type DecisionRecord = {
 function decisionRecord(p: {
   setup: CandidateSetup;
   usd: number;
-  receipt: SpendReceipt;
+  receipt: AutonomousReceipt;
   opening: string;
   exitStrategyId: string | null;
   riskProfile: RiskProfile;
@@ -166,7 +166,7 @@ function decisionRecord(p: {
     stopPrice: setup.stopPrice,
     targetPrice: setup.targetPrice,
     signature: receipt.signature,
-    slot: receipt.slot,
+    runId: receipt.runId,
     opening: p.opening,
     reason: setup.reason,
     marketCondition: setup.marketCondition,
@@ -183,8 +183,29 @@ function decisionRecord(p: {
   };
 }
 
+/**
+ * What a filled autonomous entry settled as, read off the order path's own outcome.
+ *
+ * Only a buy: the autonomous agent opens positions, and its exits are `exit-rules` strategies that
+ * close through `closePosition()` on their own schedule.
+ */
+export type AutonomousReceipt = {
+  /** The X Layer transaction hash. */
+  signature: string;
+  /** The `strategy_runs` row that settled it. */
+  runId: string;
+  /** The one-shot order (`strategies.id`) `placeOrder` created for it. */
+  orderId: string;
+  /** Units delivered, measured on chain by the run. */
+  filledUnits: number;
+  fillPrice: number;
+  symbol: string;
+  usd: number;
+  side: 'buy';
+};
+
 export type CorporateActionSignal = {
-  /** The multiplier the mint is scaling by right now. 1 on a mint with no extension. */
+  /** The multiplier the wrapped xStock is scaling by right now. 1 when it could not be read. */
   multiplier: number;
   /** A change the issuer has already published, if one is due inside the window. */
   pending: { nextMultiplier: number; effectiveAtMs: number } | null;
@@ -212,7 +233,7 @@ export type AutonomousTradeResult =
   | {
       executed: true;
       setup: CandidateSetup;
-      receipt: SpendReceipt;
+      receipt: AutonomousReceipt;
       exitStrategyId: string | null;
       proposalId: string;
     }
@@ -276,24 +297,105 @@ async function earningsWindow(symbol: string): Promise<{ days: number; errorDays
   };
 }
 
+/** The two reads the corporate-action signal is made of. Only these functions, nothing else. */
+const ERC4626_ABI = [
+  {
+    type: 'function',
+    name: 'convertToAssets',
+    stateMutability: 'view',
+    inputs: [{ name: 'shares', type: 'uint256' }],
+    outputs: [{ name: 'assets', type: 'uint256' }],
+  },
+] as const;
+
 /**
- * What the mint itself says about splits and dividends.
+ * The raw (rebasing) xStock's published schedule. Both functions exist on the X Layer raw tokens —
+ * read on chain against TSLAx on 2026-09-19 (`newMultiplier` = 1e18, `newMultiplierActivationTime`
+ * = 0: nothing scheduled) — and a token without them reverts, which reads as "nothing pending".
+ */
+const XSTOCK_SCHEDULE_ABI = [
+  {
+    type: 'function',
+    name: 'newMultiplier',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'newMultiplierActivationTime',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+const ONE_SHARE = 10n ** 18n;
+
+/**
+ * The wrapped xStock's corporate-action multiplier: how many raw tokens one wrapper share is worth.
  *
- * Token-2022 publishes a corporate action as a new Scaled UI multiplier with the timestamp it takes
- * effect, so the chain holds the schedule and there is nothing to look up anywhere else. A read
- * that fails reports multiplier 1 and no pending action, which is what a mint without the extension
- * looks like too.
+ * The wrapper is an ERC-4626 vault over the rebasing raw token, so `convertToAssets(1e18)` equals the
+ * raw token's `multiplier()` — a split or a reinvested dividend moves it, and nothing else does.
+ * Throws when the read fails; the caller decides what a failed read means.
+ */
+export async function readWrapperMultiplier(stock: Pick<XStockToken, 'address'>): Promise<number> {
+  const assets = await publicClient.readContract({
+    address: stock.address as Address,
+    abi: ERC4626_ABI,
+    functionName: 'convertToAssets',
+    args: [ONE_SHARE],
+  });
+  const multiplier = Number(assets) / 1e18;
+  if (!Number.isFinite(multiplier) || multiplier <= 0) {
+    throw new Error(`${String(assets)} is not a multiplier`);
+  }
+  return multiplier;
+}
+
+/** A multiplier change the issuer has already written on chain and not yet activated, or null. */
+async function readScheduledMultiplier(
+  stock: Pick<XStockToken, 'raw'>,
+  current: number,
+): Promise<{ nextMultiplier: number; effectiveAtMs: number } | null> {
+  const [next, activation] = await Promise.all([
+    publicClient.readContract({
+      address: stock.raw as Address,
+      abi: XSTOCK_SCHEDULE_ABI,
+      functionName: 'newMultiplier',
+    }),
+    publicClient.readContract({
+      address: stock.raw as Address,
+      abi: XSTOCK_SCHEDULE_ABI,
+      functionName: 'newMultiplierActivationTime',
+    }),
+  ]);
+  const effectiveAtMs = Number(activation) * 1000;
+  const nextMultiplier = Number(next) / 1e18;
+  // Zero, or a time already passed, is not a schedule: the change has either never been set or is in force.
+  if (!(effectiveAtMs > Date.now())) return null;
+  if (!(nextMultiplier > 0) || nextMultiplier === current) return null;
+  return { nextMultiplier, effectiveAtMs };
+}
+
+/**
+ * What the chain itself says about splits and dividends.
+ *
+ * The multiplier in force is the ERC-4626 wrapper's `convertToAssets(1e18)`; a change the issuer has
+ * already scheduled is on the raw token, with the timestamp it takes effect — so the chain holds the
+ * schedule and there is nothing to look up anywhere else. A read that fails reports multiplier 1 and
+ * no pending action, which is also what a token that has never had a corporate action looks like.
  */
 async function corporateActionSignal(stock: XStockToken): Promise<CorporateActionSignal> {
-  const scale = await readMintScale(stock.address).catch(() => null);
-  if (!scale) return { multiplier: 1, pending: null, hoursUntil: null };
+  const multiplier = await readWrapperMultiplier(stock).catch(() => null);
+  if (multiplier === null) return { multiplier: 1, pending: null, hoursUntil: null };
 
-  const pending = scale.pending;
-  if (!pending) return { multiplier: scale.multiplier, pending: null, hoursUntil: null };
+  const pending = await readScheduledMultiplier(stock, multiplier).catch(() => null);
+  if (!pending) return { multiplier, pending: null, hoursUntil: null };
 
   const untilMs = pending.effectiveAtMs - Date.now();
   return {
-    multiplier: scale.multiplier,
+    multiplier,
     pending,
     hoursUntil: Math.round(untilMs / 3_600_000),
   };
@@ -428,6 +530,95 @@ export async function evaluateBestSetup(
   return candidates[0] ?? null;
 }
 
+type Refusal = { executed: false; reason: string; detail: string };
+
+/**
+ * The permission as the XorrDelegation contract holds it, or the refusal that stands in for it.
+ *
+ * Every failure here refuses. The Solana version read the delegation with `.catch(() => null)` and
+ * then sized against a $1,000 default when the read came back empty — so an RPC failure sized a
+ * trade against a cap nobody granted. A permission that cannot be read is not a permission.
+ */
+async function readPermission(
+  address: string,
+): Promise<{ ok: true; policy: OnChainPolicy } | { ok: false; refusal: Refusal }> {
+  const refuse = (reason: string, detail: string) => ({
+    ok: false as const,
+    refusal: { executed: false as const, reason, detail },
+  });
+  if (!isAddress(address)) {
+    return refuse('no_wallet', 'This wallet has no X Layer address on file.');
+  }
+  let policy: OnChainPolicy | null;
+  try {
+    policy = await readPolicy(address);
+  } catch (e) {
+    log.error('[autonomous] could not read the permission:', e instanceof Error ? e.message : e);
+    return refuse(
+      'delegation_unreadable',
+      'The on-chain trading permission could not be read on X Layer, so nothing was placed.',
+    );
+  }
+  if (!policy) {
+    return refuse('no_delegation', 'No trading permission has been granted on X Layer.');
+  }
+  if (policy.revoked) {
+    return refuse('delegation_revoked', 'The on-chain trading permission has been revoked.');
+  }
+  if (policy.expiresAt <= Date.now()) {
+    return refuse('delegation_expired', 'The on-chain trading permission has expired. Renew it to let the agent trade.');
+  }
+  if (!(policy.remainingTodayUsd > 0)) {
+    return refuse('daily_cap', "Today's on-chain cap is used up. Nothing was placed.");
+  }
+  return { ok: true, policy };
+}
+
+/**
+ * The order path's answer, in the agent's vocabulary.
+ *
+ * A refusal before anything ran (`not_tradable`, `no_delegation`, `delegation_expired`) and a run
+ * the executor blocked (`onchain_daily_cap`, `delegation_revoked_onchain`, `agent_out_of_gas`, a
+ * rules reason, ...) pass their own reason and sentence straight through. A run that failed says so
+ * as `order_failed` with the human sentence the run wrote; anything that is not a fill is not one.
+ */
+function receiptFrom(
+  order: OrderResult,
+  symbol: string,
+  usd: number,
+): { ok: true; receipt: AutonomousReceipt } | { ok: false; refusal: Refusal } {
+  const refuse = (reason: string, detail: string) => ({
+    ok: false as const,
+    refusal: { executed: false as const, reason, detail },
+  });
+  if (!order.placed) return refuse(order.refusal.reason, order.refusal.detail);
+  const outcome = order.outcome;
+  switch (outcome.status) {
+    case 'filled':
+      return {
+        ok: true,
+        receipt: {
+          signature: outcome.signature,
+          runId: outcome.runId,
+          orderId: order.orderId,
+          filledUnits: outcome.units,
+          fillPrice: outcome.price,
+          symbol,
+          usd,
+          side: 'buy',
+        },
+      };
+    case 'blocked':
+      return refuse(outcome.reason, outcome.detail);
+    case 'failed':
+      return refuse('order_failed', outcome.error);
+    case 'watch':
+      return refuse('order_not_filled', 'The order ran in watch mode, so nothing was bought.');
+    case 'skipped':
+      return refuse('order_not_filled', `The order did not run (${outcome.reason}), so nothing was bought.`);
+  }
+}
+
 /**
  * Runs the autonomous propose -> decide -> execute -> notify cycle for one wallet.
  */
@@ -439,7 +630,7 @@ export async function runAutonomousCycle(
     /**
      * A setup the caller has already chosen, to execute instead of scanning for a new one.
      *
-     * `evaluateBestSetup` is a Jupiter quote, a 1inch quote and a mint read per symbol, so a caller
+     * `evaluateBestSetup` is a Uniswap v3 quote, a reference price and a wrapper read per symbol, so a caller
      * that has just done that work and wants the trade placed should not pay for it twice — and
      * more importantly should not get a DIFFERENT setup than the one it showed somebody.
      */
@@ -464,15 +655,10 @@ export async function runAutonomousCycle(
     };
   }
 
-  // 2. The on-chain SPL delegation, which is what actually authorises any of this.
-  const onChainDel = await readDelegation(new PublicKey(wallet.address)).catch(() => null);
-  if (onChainDel && onChainDel.isRevoked) {
-    return {
-      executed: false,
-      reason: 'delegation_revoked',
-      detail: 'The on-chain SPL delegation has been revoked.',
-    };
-  }
+  // 2. The on-chain XorrDelegation policy, which is what actually authorises any of this.
+  const permission = await readPermission(wallet.address);
+  if (!permission.ok) return permission.refusal;
+  const policy = permission.policy;
 
   /*
    * How careful to be, as the user set it.
@@ -493,29 +679,48 @@ export async function runAutonomousCycle(
     return {
       executed: false,
       reason: 'no_setup',
-      detail: 'Nothing in the xStocks universe reads as a setup right now.',
+      detail: 'Nothing in the X Layer xStocks universe reads as a setup right now.',
     };
   }
 
-  // 4. Size it, inside the daily cap the delegation set.
-  const dailyCap = onChainDel ? Math.max(onChainDel.delegatedUsd, 100) : 1000;
-  const verdict = await evaluate({
-    walletId,
-    usd: 1,
-    dailyCapUsd: dailyCap,
-    delegationExpiresAt: new Date(Date.now() + 30 * 86_400_000),
-    delegationRevoked: false,
-    killed: Boolean(wallet.agents_stopped),
-  });
+  // 4. Size it, inside the daily cap the delegation set — as the chain reports it, not a default.
+  /*
+   * The rules engine is a gate, so an engine that cannot answer is a closed gate.
+   *
+   * The Solana chokepoint caught an `evaluate` error into `{ allowed: true }` — a database blip in
+   * the kill-switch/daily-spend read let a trade through unchecked, on the one path that places
+   * trades with nobody watching. A rules error now refuses, with the reason named.
+   */
+  let verdict: RuleVerdict;
+  try {
+    verdict = await evaluate({
+      walletId,
+      usd: 1,
+      dailyCapUsd: policy.dailyCapUsd,
+      delegationExpiresAt: new Date(policy.expiresAt),
+      delegationRevoked: policy.revoked,
+      killed: Boolean(wallet.agents_stopped),
+    });
+  } catch (e) {
+    log.error('[autonomous] rules engine failed; refusing:', e instanceof Error ? e.message : e);
+    return {
+      executed: false,
+      reason: 'rules_unavailable',
+      detail:
+        'The spending rules could not be checked, so nothing was placed. An unchecked trade is not one the agent makes.',
+    };
+  }
   if (!verdict.allowed) {
     return { executed: false, reason: verdict.reason, detail: verdict.detail };
   }
 
+  // What is left today is the smaller of our own tally and the contract's: the contract is final.
+  const remainingUsd = Math.min(verdict.remainingUsd, policy.remainingTodayUsd);
   const sizeUsd = Math.min(
     options.fixedUsd ?? settings.maxTradeUsd,
-    Math.max(settings.minTradeUsd, Math.floor(verdict.remainingUsd * settings.allowanceShare)),
+    Math.max(settings.minTradeUsd, Math.floor(remainingUsd * settings.allowanceShare)),
   );
-  if (sizeUsd < settings.minTradeUsd) {
+  if (sizeUsd < settings.minTradeUsd || sizeUsd > remainingUsd) {
     return {
       executed: false,
       reason: 'insufficient_budget',
@@ -535,19 +740,25 @@ export async function runAutonomousCycle(
       ? llmRes.text
       : `${bestSetup.personaName} took the setup: ${bestSetup.reason}`;
 
-  // 6. Through the chokepoint. Everything above this line is analysis; this is the spend.
-  const outcome = await guardAndSpend({
-    walletId,
-    ownerPubkey: wallet.address,
-    symbol: bestSetup.symbol,
-    usd: sizeUsd,
-    side: 'buy',
-    slippageBps: bestSetup.suggestedSlippageBps,
-  });
-  if (!outcome.placed) {
-    return { executed: false, reason: outcome.reason, detail: outcome.detail };
-  }
-  const receipt = outcome;
+  // 6. The order. Everything above this line is analysis; this is the spend.
+  const order = await placeOrder(
+    // `placeOrder` reads the wallet's id and address and nothing else.
+    wallet as WalletRow,
+    bestSetup.symbol,
+    sizeUsd,
+    `${bestSetup.personaName} · $${sizeUsd.toFixed(2)} of ${bestSetup.symbol}`,
+    { slippagePct: bestSetup.suggestedSlippageBps / 100 },
+  ).catch((e: unknown): OrderResult => ({
+    placed: false,
+    refusal: {
+      status: 'blocked',
+      reason: 'order_failed',
+      detail: `The order could not be placed: ${e instanceof Error ? e.message : String(e)}`,
+    },
+  }));
+  const filled = receiptFrom(order, bestSetup.symbol, sizeUsd);
+  if (!filled.ok) return filled.refusal;
+  const receipt = filled.receipt;
 
   // 7. Arm the exits against the price it actually filled at.
   let exitStrategyId: string | null = null;
@@ -564,33 +775,15 @@ export async function runAutonomousCycle(
   }
 
   /*
-   * 8. Book the fill, so the position the agent just opened is a position the app knows about.
+   * 8. The fill is already in the book.
    *
-   * `guardAndSpend` places the swap and hands back a receipt; it does not touch `positions`, and
-   * nothing on this path did either. So an autonomous buy reached the chain, moved real money and
-   * sent a notification — and then did not appear in the book at all: Holdings showed nothing, P&L
-   * counted nothing, and the sleeve breakdown had nothing to attribute. Found by driving the whole
-   * demo path on the fork and reading the tables afterwards.
-   *
-   * Attributed to the agent and to the proposal that decided it, so the sleeve says which run
-   * opened it rather than crediting it to whichever strategy happened to be live.
-   *
-   * A sale is negative units; `side` decides the sign. Not fatal if it fails — the money has
-   * already moved, and throwing here would turn a bookkeeping failure into a second one.
+   * The order path (`executor/run.ts`) books the measured units with `applyFill`, attributed to the
+   * one-shot order whose label names this persona, and counts it against the day's spend — in the
+   * same transaction as the run row. Booking it again here would double the position. What this
+   * adds is the decision: the proposal row the cooldown keys on, and the audit row `/agent/explain`
+   * reads back.
    */
   const proposalId = randomUUID();
-  const signedUnits = receipt.side === 'sell' ? -receipt.filledUnits : receipt.filledUnits;
-  const signedUsd = receipt.side === 'sell' ? -receipt.usd : receipt.usd;
-  await tx((client) =>
-    applyFill(client, {
-      walletId,
-      symbol: bestSetup.symbol,
-      units: signedUnits,
-      usd: signedUsd,
-      attribution: { source: 'agent', id: proposalId, label: bestSetup.personaName },
-    }),
-  ).catch((e) => log.error('[autonomous] failed to book the fill:', e));
-
   const record = decisionRecord({
     setup: bestSetup,
     usd: sizeUsd,
@@ -607,40 +800,10 @@ export async function runAutonomousCycle(
   ).catch((e) => log.error('[autonomous] failed to insert proposal:', e));
 
   /*
-   * The audit row, without which the trade did not happen as far as the app is concerned.
-   *
-   * `guardAndSpend` places the swap and returns a receipt; it does not write to `audit_log`, and
-   * nothing else on this path did either. So an autonomous fill reached the chain, moved real
-   * money, sent a push — and then did not appear on Activity, which is the one screen whose entire
-   * promise is that it shows what the agents did. The trail is also where `/agent/explain` starts
-   * from, so a trade missing from it cannot be asked about.
-   *
-   * Not fatal if it fails. The money has already moved and throwing here would turn a bookkeeping
-   * failure into a second one, but it is logged loudly rather than swallowed.
+   * No second audit row and no second push. The order path already wrote the fill's row and sent its notification (in
+   * the transaction that booked the fill); a row here would list one trade twice on Activity and buzz the phone twice.
+   * The WHY lives on the proposal above, keyed by the transaction hash, which is where `/activity/:seq/explain` finds it.
    */
-  await append({
-    walletId,
-    agent: bestSetup.personaName,
-    action: `Bought ${bestSetup.symbol}`,
-    detail: openingLine,
-    amount: `$${sizeUsd.toFixed(2)}`,
-    kind: 'trade',
-    signature: receipt.signature,
-    payload: { proposalId, ...record },
-  }).catch((e) => log.error('[autonomous] failed to write the audit row:', e));
-
-  // 9. Tell the user, with the signature they can go and check.
-  await notifyEntry({
-    walletId,
-    symbol: bestSetup.symbol,
-    strategyKind: bestSetup.strategyKind,
-    notionalUsd: sizeUsd,
-    units: receipt.filledUnits,
-    price: receipt.fillPrice,
-    signature: receipt.signature,
-    rationale: openingLine,
-    agentName: bestSetup.personaName,
-  });
 
   return { executed: true, setup: bestSetup, receipt, exitStrategyId, proposalId };
 }

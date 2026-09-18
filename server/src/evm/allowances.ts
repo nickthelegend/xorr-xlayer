@@ -2,15 +2,13 @@
  * Who may pull a token from this wallet, and how much (PLAN.md 3.12).
  *
  * Two spenders matter. The delegation contract is the one the app asks the user to approve, so the executor can
- * trade inside the cap. The 1inch router is the one the app never needs approved — the delegation approves it for
- * exactly one trade and resets it to zero — so an allowance from the wallet to the router was granted somewhere
- * else, and is worth seeing and taking back. On Base the router and its allowances come from 1inch's own Approve
- * API; anywhere else from the chain.
+ * trade inside the cap. The Uniswap v3 router is the one the app never needs approved — the delegation approves it for
+ * exactly one trade and resets it to zero — so an allowance from the wallet to the router was granted somewhere else,
+ * and is worth seeing and taking back. Both are read from the chain.
  */
 import { erc20Abi, formatUnits, type Address } from 'viem';
 import { publicClient } from './client.js';
-import { ADDRESSES, CHAIN_KEY, ONEINCH_ROUTER } from './chains.js';
-import { oneinchApi } from '../venues/oneinch.js';
+import { ADDRESSES, QUOTE_ADDRESSES } from './chains.js';
 
 /**
  * An allowance at least this large is unlimited: no token's supply comes near 2^254.
@@ -55,29 +53,17 @@ export async function chainAllowance(token: Address, owner: Address, spender: Ad
     .catch(() => undefined);
 }
 
-/** The 1inch router, and where its allowances are read from on this chain. */
-export async function routerSpender(): Promise<{ address: Address; source: '1inch' | 'chain' }> {
-  if (CHAIN_KEY === 'xlayer') {
-    const r = await oneinchApi<{ address: string }>('/swap/v6.0/8453/approve/spender', 3_600_000);
-    return { address: r.address as Address, source: '1inch' };
-  }
-  return { address: ONEINCH_ROUTER, source: 'chain' };
+/** The swap router a wallet might have approved elsewhere, read from the chain. */
+export async function routerSpender(): Promise<{ address: Address; source: 'chain' }> {
+  return { address: (ADDRESSES.uniswapRouter ?? QUOTE_ADDRESSES.uniswapRouter) as Address, source: 'chain' };
 }
 
-/** The wallet's allowance to the router — from 1inch's Approve API or the chain, as `routerSpender` said. */
+/** The wallet's allowance to the router, from the token contract. */
 export async function routerAllowance(
   token: Address,
   owner: Address,
-  source: '1inch' | 'chain',
+  _source: 'chain',
   router: Address,
 ): Promise<bigint | undefined> {
-  if (source === '1inch') {
-    return oneinchApi<{ allowance: string }>(
-      `/swap/v6.0/8453/approve/allowance?tokenAddress=${token}&walletAddress=${owner}`,
-      10_000,
-    )
-      .then((r) => BigInt(r.allowance))
-      .catch(() => undefined);
-  }
   return chainAllowance(token, owner, router);
 }

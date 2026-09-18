@@ -1,84 +1,146 @@
 /**
- * Tokenized equities on Base.
+ * Tokenized US equities on X Layer — xStocks (2026-09-19).
  *
- * The design handoff listed nine stocks with an `x` suffix as a placeholder for "tokenized". They
- * are real: Ondo Global Markets issues them on Base under the `0xb2000…` vanity prefix with a `c`
- * suffix, and 1inch routes USDC into every one of them. So a "Buy $250 of NVDA" in this app is a
- * real swap into a real token that tracks a real share — not a paper position in a database.
+ * Backed Finance issues xStocks; X Layer carries them since June 2026. Each comes as a raw token that rebases for
+ * corporate actions (`multiplier()`), and an ERC-4626 wrapper whose share never rebases — the wrapper is what trades:
+ * the Uniswap v3 pools that hold real liquidity on X Layer are all against wrappers. So the registry's address is the
+ * wrapper, and "Buy $50 of TSLAx" is a real swap into the token those pools hold.
  *
- * Every address here was resolved from the 1inch Base token list and confirmed routable with a
- * live quote; `stocks.live.test.ts` re-confirms that, so a delisting fails the suite rather than
- * silently turning a Buy button into a dead end.
+ * Every address was read from Backed's public API (`GET https://api.xstocks.fi/api/v2/public/assets/{SYMBOL}`,
+ * `deployments[].network == "XLayer"`: `address` = raw, `wrapperAddressV2` = wrapper) and matched on chain: `symbol()`
+ * answers `w<ticker>`, the wrapper's `asset()` is the raw token, 18 decimals. The pools are Uniswap v3 pools read from the
+ * factory with their live balances on 2026-09-19; tickers whose USDC pool is empty route through USDG.
  */
 import type { Address } from 'viem';
+import { query } from '../db/index.js';
 
 export type StockToken = {
-  /** The on-chain symbol. What the app shows, so the screen matches the block explorer. */
+  /** The symbol the app shows: the ticker with the xStocks `x`. */
   symbol: string;
-  /** The underlying listed company. */
+  /** The listed company or fund. */
   name: string;
+  /** The share it tracks, for filings and market hours. */
+  ticker: string;
+  /** The ERC-4626 wrapper — what trades, what a wallet holds, what the grant approves. */
   address: Address;
+  /** The raw rebasing xStock behind the wrapper. */
+  raw: Address;
   decimals: number;
+  /** The pools to USDC. See `venues/tokens.ts`. */
+  toUsdc: { via: string; fee: number }[];
 };
 
+const VIA_USDC = [{ via: 'USDC', fee: 500 }];
+const VIA_USDG = [
+  { via: 'USDG', fee: 500 },
+  { via: 'USDC', fee: 100 },
+];
+
 export const STOCKS: Record<string, StockToken> = {
-  NVDAc: {
-    symbol: 'NVDAc',
-    name: 'NVIDIA Corporation',
-    address: '0xb20000000000000000000078ee7ce2fE4908108C',
-    decimals: 8,
+  TSLAx: {
+    symbol: 'TSLAx',
+    name: 'Tesla, Inc.',
+    ticker: 'TSLA',
+    address: '0xc3fdbe3a68ee5de461d30415a8165cf9aefe1171',
+    raw: '0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0',
+    decimals: 18,
+    toUsdc: VIA_USDC,
   },
-  AAPLc: {
-    symbol: 'AAPLc',
-    name: 'Apple Inc.',
-    address: '0xb200000000000000000000C2e324d24d7eEcd1fb',
-    decimals: 8,
+  QQQx: {
+    symbol: 'QQQx',
+    name: 'Invesco QQQ Trust',
+    ticker: 'QQQ',
+    address: '0x4c1ae29c159838fc1b224636e28e086eb69101f7',
+    raw: '0xa753A7395cAe905Cd615Da0B82A53E0560f250af',
+    decimals: 18,
+    toUsdc: VIA_USDC,
   },
-  TSLAc: {
-    symbol: 'TSLAc',
-    name: 'Tesla Inc.',
-    address: '0xb2000000000000000000001e800a7f5189430cD0',
-    decimals: 8,
-  },
-  METAc: {
-    symbol: 'METAc',
-    name: 'Meta Platforms Inc.',
-    address: '0xb2000000000000000000008bC8786B856E61707C',
-    decimals: 8,
-  },
-  MSFTc: {
-    symbol: 'MSFTc',
-    name: 'Microsoft Corporation',
-    address: '0xB200000000000000000000Ab99cFa739E253872B',
-    decimals: 8,
-  },
-  AMZNc: {
-    symbol: 'AMZNc',
-    name: 'Amazon.com Inc.',
-    address: '0xb200000000000000000000d9192b6B456483C2E8',
-    decimals: 8,
-  },
-  GOOGLc: {
-    symbol: 'GOOGLc',
+  GOOGLx: {
+    symbol: 'GOOGLx',
     name: 'Alphabet Inc.',
-    address: '0xb2000000000000000000002D0BA3164cc74f58B7',
-    decimals: 8,
+    ticker: 'GOOGL',
+    address: '0xf8c5308f80e459bb53d9ebe689854d9cbb2caa6f',
+    raw: '0xe92f673Ca36C5E2Efd2DE7628f815f84807e803F',
+    decimals: 18,
+    toUsdc: VIA_USDC,
   },
-  MSTRc: {
-    symbol: 'MSTRc',
-    name: 'MicroStrategy Inc.',
-    address: '0xb2000000000000000000004884b426556b92883d',
-    decimals: 8,
+  COINx: {
+    symbol: 'COINx',
+    name: 'Coinbase Global, Inc.',
+    ticker: 'COIN',
+    address: '0x44c7ed7ffdf8465c9d27f60aec845eed3d49d56e',
+    raw: '0x364f210f430eC2448Fc68A49203040F6124096F0',
+    decimals: 18,
+    toUsdc: VIA_USDC,
+  },
+  SPYx: {
+    symbol: 'SPYx',
+    name: 'SPDR S&P 500 ETF Trust',
+    ticker: 'SPY',
+    address: '0xe7e553cd128f0011777323a0b44a7b96ea1cb540',
+    raw: '0x90A2a4c76b5D8c0bc892A69EA28Aa775a8f2dD48',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  NVDAx: {
+    symbol: 'NVDAx',
+    name: 'NVIDIA Corporation',
+    ticker: 'NVDA',
+    address: '0xa8ddb5cd96b5222afe198316e9a57caa642850d5',
+    raw: '0xc845b2894dBddd03858fd2D643B4eF725fE0849d',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  AAPLx: {
+    symbol: 'AAPLx',
+    name: 'Apple Inc.',
+    ticker: 'AAPL',
+    address: '0x943bf64d566c32a2bcd41ac92fb63c111cc9de8f',
+    raw: '0x9d275685dC284C8eB1C79f6ABA7a63Dc75ec890a',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  MSFTx: {
+    symbol: 'MSFTx',
+    name: 'Microsoft Corporation',
+    ticker: 'MSFT',
+    address: '0x166fbe68274b6a47e025f4ba17388c539f1fa1d0',
+    raw: '0x5621737f42dAE558b81269FcB9E9E70c19Aa6b35',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  METAx: {
+    symbol: 'METAx',
+    name: 'Meta Platforms, Inc.',
+    ticker: 'META',
+    address: '0xe840946ffebcd66b7c4e95095effafadfa0d0e56',
+    raw: '0x96702be57Cd9777f835117a809C7124fe4ec989A',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  MSTRx: {
+    symbol: 'MSTRx',
+    name: 'Strategy Inc.',
+    ticker: 'MSTR',
+    address: '0x30987adf0b11dc698438a99ba04ec3a1ab2c7eab',
+    raw: '0xAE2f842EF90C0d5213259Ab82639D5BBF649b08E',
+    decimals: 18,
+    toUsdc: VIA_USDG,
+  },
+  AMZNx: {
+    symbol: 'AMZNx',
+    name: 'Amazon.com, Inc.',
+    ticker: 'AMZN',
+    address: '0x910cabde3eba7fc1ce64fd14bd680b9f60fa0f90',
+    raw: '0x3557Ba345B01EFa20A1bdDC61F573BFD87195081',
+    decimals: 18,
+    toUsdc: VIA_USDG,
   },
 };
 
 /**
- * Case-insensitively, because the suffix is the whole point and callers lose it.
- *
- * `symbol in STOCKS` missed `NVDAC` — and `/price/:symbol` uppercases its parameter, so every
- * equity price request answered "No price feed for NVDAC" for an asset the app lists on its own
- * markets screen. Same family as the `canonicalSymbol` fix: the lowercase `c` marks the tokenized
- * form, and anything that normalises it away is asking about a company that has no token.
+ * Case-insensitively, because the suffix is the whole point and callers lose it: `/price/:symbol` uppercases its
+ * parameter, and `TSLAX` must still find `TSLAx`.
  */
 export function stockKey(symbol: string): string | undefined {
   const want = symbol.trim().toUpperCase();
@@ -89,22 +151,13 @@ export function isStock(symbol: string): boolean {
   return stockKey(symbol) !== undefined;
 }
 
-/**
- * What a tokenized equity is worth, from the venue that would actually fill it.
- *
- * There is no CoinGecko feed for these and the NYSE print would be the wrong number anyway: what a
- * user pays is what 1inch routes on Base right now. So the price is derived from a real quote —
- * swap a fixed amount of USDC in, see how many tokens come out.
- *
- * This lived inside the `/market/stocks` route handler, which meant the SERVER could not price an
- * equity for itself. `priceOf` keys into CoinGecko's id table and threw `No price feed for NVDAc`,
- * so the executor could not size, cap-check or record any equity trade — found by running tier 7,
- * whose entire remit is equities, and watching its first real entry fail. The UI had the number all
- * along; the executor could not reach it.
- */
-import { query } from '../db/index.js';
+/** The share a symbol tracks (`TSLAx` → `TSLA`), for SEC filings and market hours. Undefined for anything else. */
+export function underlyingTicker(symbol: string): string | undefined {
+  const key = stockKey(symbol);
+  return key ? STOCKS[key]!.ticker : undefined;
+}
 
-/** Big enough that the route is representative, small enough not to move the pool it is measuring. */
+/** Big enough that the route is representative, small enough not to move the pools it is measuring. */
 const PROBE_USD = 1_000;
 
 const cache = new Map<string, { at: number; price: number }>();
@@ -115,80 +168,43 @@ export function clearStockPriceCache(): void {
   cache.clear();
 }
 
+/**
+ * What one wrapped xStock is worth, from the pools that would actually fill it: quote $1,000 of USDC in and see how many
+ * shares come out. There is no CoinGecko feed for these, and the exchange print would be the wrong number anyway —
+ * what a person pays is what the pool gives.
+ *
+ * `skipPriceImpact` is load-bearing: impact is measured against a mid from `priceOf`, and for an equity `priceOf` comes
+ * back here — the cycle that took the Base executor to a fatal 2GB heap.
+ */
 export async function stockPriceUsd(symbol: string): Promise<number | null> {
-  // Resolve to the registry's own spelling first — the venue is asked with the symbol it knows.
   const key = stockKey(symbol);
   if (!key) return null;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.price;
 
-  /*
-   * `skipPriceImpact` is load-bearing, not an optimisation.
-   *
-   * Price impact is measured against a mid from `priceOf`, and for an equity `priceOf` comes back
-   * here. That cycle took the deployed executor to a 2GB heap and a fatal OOM fifty seconds after
-   * boot. It is also meaningless here: this call is establishing what the price is.
-   */
-  /*
-   * Imported here rather than at the top, to break a cycle that only bites on import ORDER.
-   *
-   * `oneinch.ts` builds its `TOKENS` map from `STOCKS` at module scope, and this file needs
-   * `quote`. With a static import the two form a loop: whichever loads second is fine, and
-   * whichever loads FIRST hits `Object.values(STOCKS)` before `STOCKS` exists —
-   * `ReferenceError: Cannot access 'STOCKS' before initialization`. It never fired through the
-   * routes, which always reach `oneinch.ts` first, and fired immediately for a script that imports
-   * this module directly.
-   */
-  const { quote } = await import('./oneinch.js');
-  const q = await quote({
-    inSymbol: 'USDC',
-    outSymbol: key,
-    amount: PROBE_USD,
-    skipPriceImpact: true,
-  }).catch(() => null);
+  // Imported here to keep `tokens.ts` → `stocks.ts` free of a load-order cycle through the venue.
+  const { quote } = await import('./uniswap.js');
+  const q = await quote({ inSymbol: 'USDC', outSymbol: key, amount: PROBE_USD, skipPriceImpact: true }).catch(() => null);
   if (!q || !(q.outAmount > 0)) return null;
   const price = PROBE_USD / q.outAmount;
   cache.set(key, { at: Date.now(), price });
-  // Every fresh reading is a data point these assets have no other way of getting.
   recordObservation(key, price);
   return price;
 }
 
 /**
- * Record what we saw, so these assets can eventually have a shape.
- *
- * The tokenized equities have no CoinGecko series and no free candle source anywhere: the price is
- * derived from a live 1inch route, which is a spot reading. The asset screen therefore says "no
- * price history for this market" and shows a number with nothing around it — honest, and not much
- * use for deciding anything.
- *
- * Our own observations are the one real source available. `stockPriceUsd` already computes a price
- * from a real route; writing it down, timestamped, builds a genuine series. Short at first, and
- * true from the first row. It cannot reconstruct the past and does not pretend to: the chart starts
- * when we started watching, and the screen says so.
- *
- * Fire-and-forget on purpose. A price read must never fail because a write failed — the number is
- * what the caller asked for, and the history is a side effect.
+ * Record what we saw, so these assets build a real series from the first reading. Fire-and-forget: a price read must
+ * never fail because a write failed.
  */
 export function recordObservation(symbol: string, usd: number): void {
   if (!(usd > 0)) return;
-  void query(`INSERT INTO price_observations (symbol, usd) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [
-    symbol,
-    usd,
-  ]).catch(() => undefined);
+  void query(`INSERT INTO price_observations (symbol, usd) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [symbol, usd]).catch(
+    () => undefined,
+  );
 }
 
-/**
- * The series we have actually seen, oldest first. Empty until something has looked.
- *
- * A read that fails throws. It was caught into `[]`, and an empty series is exactly what `/market/stocks/history`
- * words as "No readings yet" — so a query Postgres refused (`hours=abc` reached it as "NaN hours") told a screen that an
- * equity with a history had none.
- */
-export async function observedHistory(
-  symbol: string,
-  hours = 24 * 30,
-): Promise<{ at: number; usd: number }[]> {
+/** The series we have actually seen, oldest first. Empty until something has looked. A read that fails throws. */
+export async function observedHistory(symbol: string, hours = 24 * 30): Promise<{ at: number; usd: number }[]> {
   const key = stockKey(symbol);
   if (!key) return [];
   const rows = await query<{ at: Date; usd: string }>(
@@ -201,61 +217,23 @@ export async function observedHistory(
 }
 
 /**
- * Do the tokenized equities actually WORK on the chain this executor is pointed at?
- *
- * They are listed in `STOCKS` because the addresses are real on Base. That is not the same question
- * as whether they can be traded here, and conflating the two produced the worst kind of bug this
- * codebase can have: `/market/tradable` returned all eight on a fork, so `isTradable('NVDAc')` was
- * true, so `/order/NVDAc` rendered a complete ticket — live price, unit conversion, an enabled
- * "Buy $250 of NVDAc" — and the fill reverted `TF`. The app made a confident offer it could not
- * honour.
- *
- * The test is the same one `/verify` uses, and it is a call rather than a code-length check for the
- * reason recorded there: these tokens carry a single byte of code and answer anyway on real Base,
- * while on an anvil fork of the same block the same call reverts. `eth_getCode` cannot tell those
- * apart; `totalSupply()` can.
- *
- * Cached for the process lifetime rather than by a timer. A chain does not stop serving a token
- * halfway through a deployment's life, and re-asking on every request would put an RPC round trip
- * in front of a route the market list calls on mount.
+ * Do the xStocks work on the chain this executor is pointed at? On X Layer mainnet and its fork the wrappers are ordinary
+ * ERC-4626 contracts with a supply; on the testnet they have no code. One wrapper answering `totalSupply()` settles it.
+ * Cached for the process lifetime: a chain does not stop serving a token halfway through a deployment.
  */
 let functional: Promise<boolean> | undefined;
 
 export function equitiesFunctional(): Promise<boolean> {
   functional ??= (async () => {
-    /*
-     * Ask several, not one, and accept any answer.
-     *
-     * Probing a single token looked sufficient and is not: on real Base only four of the eight
-     * answer `totalSupply()` at all — TSLAc, AMZNc, GOOGLc and MSTRc revert — while all eight show
-     * transfer activity in the same window. They are transferable without exposing the full ERC-20
-     * read surface. Probing whichever happened to be first in the registry would have called
-     * mainnet broken on a different ordering.
-     *
-     * The question is whether equities function on THIS CHAIN, and one token answering settles it:
-     * a fork answers none of them, because there is nothing behind the byte for any.
-     */
-    const probes = Object.values(STOCKS).slice(0, 4);
+    const probes = Object.values(STOCKS).slice(0, 3);
     if (probes.length === 0) return false;
     const { publicClient } = await import('../evm/client.js');
     const { erc20Abi } = await import('viem');
-    /*
-     * Each probe past the throttle guard, because a rate limit here answers the wrong question.
-     *
-     * The `.catch(() => 0n)` below is meant to absorb "this token has no code on this chain",
-     * which is the case this function exists to detect. A throttled read fails identically, so a
-     * burst against the free public endpoint could make all four probes look dead and report
-     * live mainnet equities as unavailable.
-     */
     const { pastTheThrottle } = await import('../evm/throttle.js');
     const answers = await Promise.all(
       probes.map((p) =>
         pastTheThrottle(() =>
-          publicClient.readContract({
-            address: p.address,
-            abi: erc20Abi,
-            functionName: 'totalSupply',
-          }),
+          publicClient.readContract({ address: p.address, abi: erc20Abi, functionName: 'totalSupply' }),
         ).catch(() => 0n),
       ),
     );

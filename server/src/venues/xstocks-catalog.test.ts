@@ -1,143 +1,101 @@
 /**
- * The catalog, with the price endpoint stood in for.
+ * The catalog, with the pool price stood in for.
  *
- * What is pinned here is the thing the whole feature turns on: a mint nothing will price produces a
- * ROW with `price: null` and `feed: 'unavailable'`, never a number and never a hole in the list. The
- * shape of the upstream payload is real — taken from a live `lite-api.jup.ag/price/v3` response, with
- * its `stockData` block and its 24h change — because a fixture that invented the shape would prove
- * only that this file agrees with itself.
+ * What is pinned here is the thing the whole feature turns on: a token nothing will price produces a
+ * ROW with `price: null` and `feed: 'unavailable'`, never a number and never a hole in the list. And
+ * the fields X Layer has no source for — the exchange mark, the 24h change, the pool depth — are
+ * null on every row, not a borrowed or invented figure.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ getJson: vi.fn(), staleValue: vi.fn() }));
+const h = vi.hoisted(() => {
+  process.env.XORR_CHAIN = 'xlayer-testnet';
+  return { xStockPriceUsd: vi.fn() };
+});
 
-vi.mock('../http/get.js', () => ({ getJson: h.getJson, staleValue: h.staleValue }));
+vi.mock('./xstocks.js', async (orig) => ({
+  ...(await orig<typeof import('./xstocks.js')>()),
+  xStockPriceUsd: h.xStockPriceUsd,
+}));
+vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
 
-const NVDAX = 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh';
-const TSLAX = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB';
-
-/** Two entries exactly as the endpoint returns them. */
-const LIVE = {
-  [NVDAX]: {
-    usdPrice: 215.9225991175978,
-    blockId: 447735731,
-    decimals: 8,
-    priceChange24h: 1.0786600564316768,
-    liquidity: 1885148.375969128,
-    stockData: { id: 'xstocks', price: 215.68, updatedAt: '2026-09-17T07:16:34.333Z' },
-  },
-  [TSLAX]: {
-    usdPrice: 363.1929098278067,
-    blockId: 447736227,
-    decimals: 8,
-    priceChange24h: 1.49637016682163,
-    liquidity: 1251139.863591303,
-    stockData: { id: 'xstocks', price: 359.9352, updatedAt: '2026-09-17T07:16:51.061Z' },
-  },
-};
+const LIVE: Record<string, number> = { NVDAx: 181.62, TSLAx: 362.9 };
 
 beforeEach(() => {
-  h.getJson.mockReset();
-  h.staleValue.mockReset().mockReturnValue(undefined);
+  h.xStockPriceUsd.mockReset().mockImplementation(async (s: string) => LIVE[s] ?? null);
 });
 
 afterEach(() => vi.resetModules());
 
-describe('a priced mint', () => {
-  it('carries the pool price and the issuer mark as separate numbers', async () => {
-    h.getJson.mockResolvedValue(LIVE);
+describe('a priced token', () => {
+  it('carries the pool price, and no mark X Layer does not publish', async () => {
     const { xStockCatalog } = await import('./xstocks-catalog.js');
+    const nvda = (await xStockCatalog()).find((r) => r.symbol === 'NVDAx')!;
 
-    const rows = await xStockCatalog();
-    const nvda = rows.find((r) => r.symbol === 'NVDAx')!;
-
-    // The two are near each other and are not the same number — which is the spread a buyer pays,
-    // and the reason the row does not collapse them into one "price".
-    expect(nvda.price).toBeCloseTo(215.9226, 4);
-    expect(nvda.underlyingPrice).toBeCloseTo(215.68, 4);
-    expect(nvda.price).not.toBe(nvda.underlyingPrice);
-    expect(nvda.change24hPct).toBeCloseTo(1.0787, 4);
-    expect(nvda.liquidityUsd).toBeCloseTo(1885148.376, 3);
-    expect(nvda.underlyingAt).toBe('2026-09-17T07:16:34.333Z');
+    expect(nvda.price).toBe(181.62);
     expect(nvda.feed).toBe('live');
+    expect(nvda.ticker).toBe('NVDA');
+    expect(nvda.address).toBe('0xa8ddb5cd96b5222afe198316e9a57caa642850d5');
+    // Null, not the pool price copied across: the two would be different claims.
+    expect(nvda.underlyingPrice).toBeNull();
+    expect(nvda.underlyingAt).toBeNull();
+    expect(nvda.change24hPct).toBeNull();
+    expect(nvda.liquidityUsd).toBeNull();
   });
 
-  it('asks for every mint in one request', async () => {
-    h.getJson.mockResolvedValue(LIVE);
+  it('prices every token in the catalog, one quote each', async () => {
     const { xStockCatalog } = await import('./xstocks-catalog.js');
     const { XSTOCKS } = await import('./xstocks.js');
 
     await xStockCatalog();
-
-    // Eleven probes behind a shared rate limit is how a browsable list becomes a spinner.
-    expect(h.getJson).toHaveBeenCalledTimes(1);
-    const url = String(h.getJson.mock.calls[0]![0]);
-    for (const t of Object.values(XSTOCKS)) expect(url).toContain(t.address);
+    const asked = h.xStockPriceUsd.mock.calls.map((c) => c[0]).sort();
+    expect(asked).toEqual(Object.keys(XSTOCKS).sort());
   });
 });
 
-describe('a mint nothing will price', () => {
+describe('a token nothing will price', () => {
   it('is a row saying so, not a missing row and not a number', async () => {
-    h.getJson.mockResolvedValue(LIVE);
     const { xStockCatalog } = await import('./xstocks-catalog.js');
     const { XSTOCKS } = await import('./xstocks.js');
 
     const rows = await xStockCatalog();
-
-    // Every catalogued mint is present whether or not the feed knew it.
     expect(rows).toHaveLength(Object.keys(XSTOCKS).length);
     const aapl = rows.find((r) => r.symbol === 'AAPLx')!;
     expect(aapl.price).toBeNull();
-    expect(aapl.underlyingPrice).toBeNull();
     expect(aapl.feed).toBe('unavailable');
-    // The parts that are facts about the listing, not observations, survive the outage.
-    expect(aapl.name).toBe('Apple Inc. xStock');
+    // The parts that are facts about the listing, not observations, survive.
+    expect(aapl.name).toBe('Apple Inc.');
     expect(aapl.sector).toBe('Technology');
   });
 
-  it('refuses a zero or a non-number the feed may report', async () => {
-    h.getJson.mockResolvedValue({
-      [NVDAX]: { usdPrice: 0, stockData: { price: 215.68 } },
-      [TSLAX]: { usdPrice: 'oops', priceChange24h: null },
+  it('refuses a zero or a non-number', async () => {
+    h.xStockPriceUsd.mockImplementation(async (s: string) => (s === 'NVDAx' ? 0 : s === 'TSLAx' ? Number.NaN : null));
+    const { xStockCatalog } = await import('./xstocks-catalog.js');
+
+    const rows = await xStockCatalog();
+    expect(rows.find((r) => r.symbol === 'NVDAx')!.price).toBeNull();
+    expect(rows.find((r) => r.symbol === 'NVDAx')!.feed).toBe('unavailable');
+    expect(rows.find((r) => r.symbol === 'TSLAx')!.price).toBeNull();
+  });
+
+  it('turns a failed read into that row’s null, not the catalog’s error', async () => {
+    h.xStockPriceUsd.mockImplementation(async (s: string) => {
+      if (s === 'NVDAx') throw new Error('ETIMEDOUT');
+      return LIVE[s] ?? null;
     });
     const { xStockCatalog } = await import('./xstocks-catalog.js');
 
     const rows = await xStockCatalog();
-
-    // A zero price is not a price. Carried through, it would render as "$0.00" — a number a reader
-    // has no way to tell from a real one.
-    expect(rows.find((r) => r.symbol === 'NVDAx')!.price).toBeNull();
     expect(rows.find((r) => r.symbol === 'NVDAx')!.feed).toBe('unavailable');
-    expect(rows.find((r) => r.symbol === 'TSLAx')!.price).toBeNull();
-    expect(rows.find((r) => r.symbol === 'TSLAx')!.change24hPct).toBeNull();
+    expect(rows.find((r) => r.symbol === 'TSLAx')!.price).toBe(362.9);
   });
 
-  it('keeps a zero 24h change, which is a real reading', async () => {
-    h.getJson.mockResolvedValue({ [NVDAX]: { usdPrice: 215.92, priceChange24h: 0 } });
-    const { xStockCatalog } = await import('./xstocks-catalog.js');
-
-    // "did not move" and "not reported" are different facts and the row keeps them apart.
-    expect((await xStockCatalog()).find((r) => r.symbol === 'NVDAx')!.change24hPct).toBe(0);
-  });
-});
-
-describe('when the endpoint is unreachable', () => {
-  it('serves the last good answer while it is recent enough to mean something', async () => {
-    h.getJson.mockRejectedValue(new Error('ETIMEDOUT'));
-    h.staleValue.mockReturnValue(LIVE);
-    const { xStockCatalog } = await import('./xstocks-catalog.js');
-
-    expect((await xStockCatalog()).find((r) => r.symbol === 'NVDAx')!.price).toBeCloseTo(215.9226, 4);
-  });
-
-  it('and shows every row as unpriced once it is not', async () => {
-    h.getJson.mockRejectedValue(new Error('ETIMEDOUT'));
-    h.staleValue.mockReturnValue(undefined);
+  it('shows every row as unpriced when nothing answers', async () => {
+    h.xStockPriceUsd.mockResolvedValue(null);
     const { xStockCatalog } = await import('./xstocks-catalog.js');
 
     const rows = await xStockCatalog();
     expect(rows.every((r) => r.price === null && r.feed === 'unavailable')).toBe(true);
-    // Still a full catalog: the names and sectors are not market data and did not go anywhere.
     expect(rows.length).toBeGreaterThan(0);
   });
 });
@@ -154,9 +112,6 @@ describe('the sector filter', () => {
 
   it('puts the not-a-sector bucket last', async () => {
     const { xStockSectors } = await import('./xstocks-catalog.js');
-
-    // SPYx and QQQx span every sector on the list; filing them under one would be a false claim
-    // about their holdings, so they get a bucket of their own and it reads wrong anywhere but last.
     expect(xStockSectors().at(-1)).toBe('Index funds');
   });
 });

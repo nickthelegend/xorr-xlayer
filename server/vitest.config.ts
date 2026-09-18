@@ -33,12 +33,19 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    exclude: ['**/node_modules/**'],
+    // The live suites need a running executor and database; `LIVE=1` runs them, as in the root config.
+    exclude: process.env.LIVE ? ['**/node_modules/**'] : ['**/node_modules/**', '**/*.live.test.ts'],
     // The same placeholders as the root config, for the same reason — see vitest.config.mts.
     env: process.env.LIVE
       ? {}
       : {
-          ONEINCH_API_KEY: process.env.ONEINCH_API_KEY ?? 'unit-test-placeholder',
+          /*
+           * The chain is pinned, not inherited: a developer's `.env` naming another network (the Base build's
+           * `base-sepolia`, carried over in a copy) made every suite that loads the chain config fail to collect.
+           * The unit tests describe X Layer's testnet; the fork and mainnet runs set their own.
+           */
+          XORR_CHAIN: 'xlayer-testnet',
+          EXPO_PUBLIC_XORR_CHAIN: 'xlayer-testnet',
           PRIVY_APP_ID: process.env.PRIVY_APP_ID ?? 'unit-test-placeholder',
           PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET ?? 'unit-test-placeholder',
         },

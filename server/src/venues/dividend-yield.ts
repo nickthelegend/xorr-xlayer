@@ -1,10 +1,17 @@
 /**
  * What an xStock has paid its holders, derived from the multiplier (PLAN.md §8.4).
  *
- * Backed pays a dividend by auto-reinvesting it: the raw balance never moves, the Scaled UI
- * multiplier does, and every holder's displayed position grows by the same proportion. That makes
- * the multiplier the only dividend record this project has that nobody had to invent — no
- * calendar, no feed, no guess.
+ * Backed pays a dividend by auto-reinvesting it: a holder's shares never move, the multiplier does,
+ * and every holder's position grows by the same proportion. On X Layer that multiplier is the raw
+ * xStock's, which the ERC-4626 wrapper reports as `convertToAssets(1e18)`; `market/observe.ts`
+ * writes it to `multiplier_observations` (keyed on the wrapper address, the `mint` passed here)
+ * whenever it changes (`venues/multiplier.ts`). That makes the multiplier the only dividend record
+ * this project has that nobody had to invent — no calendar, no feed, no guess.
+ *
+ * One thing on X Layer moves it the other way: Backed's token can charge a management fee by
+ * shrinking the multiplier once per period (`feePerPeriod`, 0 on the tokens read 2026-09-19). Such
+ * a step is small and below 1, so it compounds into the figure as a small negative — which is what
+ * a holder actually received net of it, not a mislabelled dividend.
  *
  * ## Why a split cannot be counted as yield
  *

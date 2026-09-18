@@ -1,24 +1,29 @@
 /**
- * The upcoming corporate action for a tokenized equity, read off the mint.
+ * The upcoming corporate action for a tokenized equity, read off the token.
  *
- * Backed's xStocks are Token-2022 mints carrying the Scaled UI Amount extension. A split or a
- * dividend is expressed there as a NEW MULTIPLIER with the timestamp it starts applying, and until
- * that moment arrives the mint carries both numbers at once. So the chain holds the schedule, and
+ * Backed's xStocks on X Layer are rebasing ERC-20s behind an ERC-4626 wrapper. A split or a
+ * dividend is expressed as a NEW MULTIPLIER with the time it starts applying: the raw token holds
+ * `newMultiplier` and `newMultiplierActivationTime` alongside the multiplier in force until that
+ * moment (`venues/multiplier.ts`, source verified on OKLink). So the chain holds the schedule, and
  * there is nothing to look up anywhere else — no vendor calendar, no API key, and no table of dates
  * somebody typed in.
  *
  * That last point is why this module exists. The first version of the agent shipped a literal list
  * of invented dividend dates and a `ca-tsla-split-sample` split, which is precisely the thing this
- * product refuses to do. The extension makes the honest version cheaper than the dishonest one.
+ * product refuses to do. An on-chain schedule makes the honest version cheaper than the dishonest one.
  *
  * ## What it cannot tell you
  *
- * The extension records that the multiplier changes, not why. A forward split and a dividend
- * credited as extra units both raise it, and nothing in the account data distinguishes them. So
- * this reports the change and its size and refuses to name it: calling a dividend a split on an
- * asset screen would be an invention of exactly the kind the on-chain read was chosen to avoid.
+ * The token records that the multiplier changes, not why. A forward split and a dividend credited
+ * as extra units both raise it, and nothing in the contract state distinguishes them. So this
+ * reports the change and its size and refuses to name it: calling a dividend a split on an asset
+ * screen would be an invention of exactly the kind the on-chain read was chosen to avoid.
+ *
+ * Nor can it see further ahead than the issuer has published: the contract accepts an activation
+ * only before its next fee period (a week on the tokens read), so `none` means "the token answered
+ * and has nothing scheduled", not "nothing will happen this quarter".
  */
-import { readMintScale } from '../solana/balances.js';
+import { readMultiplier } from '../venues/multiplier.js';
 import { XSTOCKS, xStockKey } from '../venues/xstocks.js';
 import { underlyingTicker } from './edgar.js';
 
@@ -38,14 +43,14 @@ export type PendingAction = {
 
 export type CorporateActionNotice =
   | {
-      /** The mint answered and has a change queued. */
+      /** The token answered and has a change queued. */
       status: 'scheduled';
       symbol: string;
       multiplier: number;
       pending: PendingAction;
     }
   | {
-      /** The mint answered and has nothing queued. A real answer, not a missing one. */
+      /** The token answered and has nothing queued. A real answer, not a missing one. */
       status: 'none';
       symbol: string;
       multiplier: number;
@@ -53,7 +58,8 @@ export type CorporateActionNotice =
     }
   | {
       /**
-       * Nothing could be read: not a Token-2022 equity, or the cluster did not answer.
+       * Nothing could be read: not an xStock, or the chain did not answer (or the wrapper and the
+       * raw token disagreed, which is not a number to show either).
        *
        * Distinct from `none` on purpose. "No split is coming" and "we could not find out" are
        * different claims, and a screen that shows the first when it means the second is telling
@@ -69,7 +75,7 @@ export type CorporateActionNotice =
 /**
  * The notice for one symbol.
  *
- * Accepts either spelling of a tokenized equity — `NVDAx` as the mint is registered, or `NVDAc` as
+ * Accepts either spelling of a tokenized equity — `NVDAx` as the token is registered, or `NVDAc` as
  * the Base listing is — because the asset screen is opened with whichever the market list gave it,
  * and a corporate action belongs to the company rather than to one of its listings.
  */
@@ -80,7 +86,7 @@ export async function corporateAction(symbol: string): Promise<CorporateActionNo
     return { status: 'unavailable', symbol, multiplier: null, pending: null, reason: 'not_tokenized' };
   }
 
-  const scale = await readMintScale(token.address).catch(() => null);
+  const scale = await readMultiplier(token).catch(() => null);
   if (!scale) {
     return {
       status: 'unavailable',
@@ -99,18 +105,18 @@ export async function corporateAction(symbol: string): Promise<CorporateActionNo
   /*
    * The ratio is against the multiplier in force, not against 1.
    *
-   * A mint that has already split once sits at 2, and a second two-for-one takes it to 4. Reading
+   * A token that has already split once sits at 2, and a second two-for-one takes it to 4. Reading
    * `nextMultiplier` as the ratio would announce that one as a four-for-one.
    */
   const current = scale.multiplier > 0 ? scale.multiplier : 1;
-  const ratio = pending.nextMultiplier / current;
+  const ratio = pending.multiplier / current;
 
   return {
     status: 'scheduled',
     symbol: token.symbol,
     multiplier: scale.multiplier,
     pending: {
-      nextMultiplier: pending.nextMultiplier,
+      nextMultiplier: pending.multiplier,
       effectiveAtMs: pending.effectiveAtMs,
       ratio,
       direction: ratio >= 1 ? 'increase' : 'decrease',

@@ -14,11 +14,13 @@ import { TONE_INSTRUCTIONS, type ToneId } from '../bot/tone.js';
 import { briefing } from '../news/feed.js';
 import { propose } from '../bot/propose.js';
 import { send } from '../notifications/push.js';
-import { quote, canonicalSymbol, TOKENS as VENUE_TOKENS } from '../venues/oneinch.js';
+import { canonicalSymbol, TOKENS as VENUE_TOKENS } from '../venues/tokens.js';
+import { quote } from '../venues/uniswap.js';
 import { ADDRESSES } from '../evm/chains.js';
 import { gasPrice, networkCost } from '../evm/gas-price.js';
 import { estimateOutUnits } from '../executor/fill-measure.js';
-import { compareVenues } from '../venues/compare.js';
+import { OKX_VENUE_NAME, okxConfigured, okxQuoteRaw } from '../venues/okxdex.js';
+import { VENUE_NAME as UNISWAP_VENUE_NAME } from '../venues/uniswap.js';
 import { requireUser } from '../auth/middleware.js';
 import { currentWallet } from './wallet-context.js';
 import { armExits, money, placeOrder } from '../executor/order.js';
@@ -27,14 +29,6 @@ import { screenPatience } from '../http/patience.js';
 import { beforeDeadline, StillFetching } from '../http/deadline.js';
 import { readPolicy } from '../evm/delegation.js';
 import type { Address } from 'viem';
-import { decide } from '../graph/decide.js';
-import {
-  health as graphHealth,
-  dailySpendFor,
-  indexDescription,
-  spendsFor,
-  SubgraphUnavailable,
-} from '../graph/client.js';
 
 export const extra = new Hono();
 
@@ -647,146 +641,46 @@ extra.get('/swap/quote', async (c) => {
 });
 
 /**
- * What every venue would give for the same trade.
- *
- * `settle.ts` picks one and the trail names it. This says what the other two would have done, so
- * "Aqua filled this" can become "Aqua filled this and beat the aggregator by 11 bps" — the second
- * is a claim about the routing, and the first is only a label.
+ * What every X Layer venue would give for the same trade: Uniswap v3's quote and, where this deployment is keyed for it,
+ * OKX DEX's. `settle.ts` picks one and the trail names it; this says what the other would have done. A venue that could
+ * not answer is listed with why — never left out, never given a number.
  *
  * A quote surface: it builds nothing submittable and touches no permission.
  */
 extra.get('/route/compare', async (c) => {
-  // Not `.toUpperCase()`: tokenized equities are `NVDAc`, and uppercasing them names a
-  // symbol the registry has never heard of.
+  // Not `.toUpperCase()`: xStocks are `TSLAx`, and uppercasing them names a symbol the registry has never heard of.
   const inSymbol = canonicalSymbol(c.req.query('in') ?? 'USDC');
-  const outSymbol = canonicalSymbol(c.req.query('out') ?? 'WETH');
+  const outSymbol = canonicalSymbol(c.req.query('out') ?? 'TSLAx');
   const amount = Number(c.req.query('amount') ?? 100);
   const refusal = tradeRefusal(inSymbol, outSymbol, amount);
   if (refusal) return c.json(refusal, 400);
-  const w = await currentWallet(c);
-  if (!w) return c.json({ error: 'no_wallet' }, 400);
-  try {
-    const patience = screenPatience();
-    return c.json(
-      await compareVenues({
-        owner: w.address as Address,
-        inSymbol,
-        outSymbol,
-        amount,
-        // A screen's patience: a venue that has not answered by then is reported late, beside those that did (E165).
-        patience: { withinMs: patience.routeMs, priceMs: patience.priceMs },
-      }),
-    );
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
-  }
+  const inToken = VENUE_TOKENS[inSymbol]!;
+  const outToken = VENUE_TOKENS[outSymbol]!;
+  type VenueAnswer = { venue: string; outAmount: number | null; unavailable: string | null };
+  const answers: VenueAnswer[] = await Promise.all([
+    quote({ inSymbol, outSymbol, amount })
+      .then((q): VenueAnswer => ({ venue: UNISWAP_VENUE_NAME, outAmount: q.outAmount, unavailable: null }))
+      .catch((e: unknown): VenueAnswer => ({ venue: UNISWAP_VENUE_NAME, outAmount: null, unavailable: e instanceof Error ? e.message : String(e) })),
+    okxConfigured()
+      ? okxQuoteRaw(inSymbol, outSymbol, BigInt(Math.round(amount * 10 ** inToken.decimals)))
+          .then((raw): VenueAnswer => ({ venue: OKX_VENUE_NAME, outAmount: Number(raw) / 10 ** outToken.decimals, unavailable: null }))
+          .catch((e: unknown): VenueAnswer => ({ venue: OKX_VENUE_NAME, outAmount: null, unavailable: e instanceof Error ? e.message : String(e) }))
+      : Promise.resolve<VenueAnswer>({ venue: OKX_VENUE_NAME, outAmount: null, unavailable: 'This deployment has no OKX DEX API key.' }),
+  ]);
+  const priced = answers.filter((a): a is VenueAnswer & { outAmount: number } => a.outAmount !== null && a.outAmount > 0);
+  const best = priced.reduce<(VenueAnswer & { outAmount: number }) | null>((b, a) => (!b || a.outAmount > b.outAmount ? a : b), null);
+  const runnerUp = priced.filter((a) => a !== best).reduce<number | null>((m, a) => (m === null || a.outAmount > m ? a.outAmount : m), null);
+  return c.json({
+    inSymbol,
+    outSymbol,
+    amount,
+    venues: answers,
+    best: best?.venue ?? null,
+    // How much more the best venue delivers than the next, in basis points — null with fewer than two answers.
+    edgeBps: best && runnerUp ? Math.round(((best.outAmount - runnerUp) / runnerUp) * 10_000) : null,
+  });
 });
 
-// ── The Graph — the agent's reasoning surface ────────────────────────────────
-
-/**
- * What the bot would decide right now, and why. Read straight from indexed chain data.
- *
- * `/graph/decision`, not `/agent/decision`. The old path made this route unreachable by anyone:
- * the auth middleware treats the `/agent/` prefix as the machine surface and demands an agent key,
- * while the handler needs a signed-in user's wallet. A Privy token got "this surface needs an agent
- * key"; an agent key got "this route belongs to a signed-in user". Both refusals were correct and
- * the route was dead between them.
- *
- * It regressed silently when the prefix guard was introduced — an earlier test plan records it
- * passing — because nothing calls it from the app. It is the surface a judge would use to see the
- * subgraph actually driving a decision, which is exactly the thing worth showing.
- *
- * `/graph/` is where the other subgraph reads already live, and it is a user route in fact as well
- * as in name: the decision is about the caller's own wallet.
- */
-extra.get('/graph/decision', async (c) => {
-  /*
-   * A size that is not dollars is refused, not decided.
-   *
-   * `Number('abc')` reached `decide()` as NaN, where `Math.min(NaN, …)` slipped past the minimum-size guard: one
-   * deployment answered `act: true, sizeUsd: null` — a decision to trade an amount that does not exist.
-   */
-  const wantUsd = Number(c.req.query('usd') ?? 100);
-  if (!(Number.isFinite(wantUsd) && wantUsd > 0)) {
-    return c.json({ error: 'invalid_usd', detail: 'usd is a dollar amount above zero.' }, 400);
-  }
-  // `currentWallet` already carries the address; reading the row a second time was one more wait before anything.
-  const w = await currentWallet(c);
-  if (!w) return c.json({ error: 'no_wallet' }, 400);
-  /*
-   * The question a run asks, asked the same way (PLAN.md 3.5).
-   *
-   * This named mainnet USDC by a literal and no book app, bought token or size, so the Aqua half of the
-   * decision always answered "no index configured" here, whatever a run on the same deployment saw. It now
-   * names what `runStrategy` names: the settlement USDC, our Aqua book, and how much of the bought token the
-   * size would need (`symbol`, WETH unless given).
-   */
-  const symbol = canonicalSymbol(c.req.query('symbol') ?? 'WETH');
-  const outToken = VENUE_TOKENS[symbol];
-  try {
-    return c.json(
-      await decide({
-        owner: w.address,
-        wantUsd,
-        token: ADDRESSES.usdc,
-        aquaApp: process.env.AQUA_BOOK_ADDRESS,
-        tokenOut: outToken?.address,
-        /*
-         * Priced only when the decision reaches the depth check, beside the index reads, and with a screen's patience
-         * (`http/patience.ts`). This priced the size first, with no deadline, and gave no answer inside sixty seconds in the
-         * QA run against the hosted fork executor — whose index is for another contract, so the price was never used.
-         */
-        amountOut: outToken
-          ? () => estimateOutUnits(wantUsd, symbol, outToken.decimals, screenPatience().priceMs)
-          : undefined,
-      }),
-    );
-  } catch (e) {
-    // The index did not answer: said by name, as a 502 the app retries, with the sentence where a sentence belongs.
-    if (e instanceof SubgraphUnavailable) {
-      return c.json({ error: 'subgraph_unavailable', message: e.message }, 502);
-    }
-    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
-  }
-});
-
-extra.get('/graph/health', async (c) => {
-  requireUser(c);
-  try {
-    /*
-     * The index's own state, and whether it is about THIS deployment.
-     *
-     * `_meta` alone says a subgraph is healthy and current, which is true and can still be
-     * useless: a perfectly synced index of a different contract is worse than no index, because
-     * it answers confidently about somebody else's policy. The screen has to be able to say which
-     * of those it is looking at, so the description travels with the health.
-     */
-    const [meta, index] = [await graphHealth(), indexDescription()];
-    return c.json({ ...meta, ...index });
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : String(e) }, 502);
-  }
-});
-
-extra.get('/graph/activity', async (c) => {
-  const id = await walletId(c);
-  if (!id) return c.json({ spends: [], daily: [] });
-  const w = await one<{ address: string }>(`SELECT address FROM wallets WHERE id=$1`, [id]);
-  if (!w) return c.json({ spends: [], daily: [] });
-  try {
-    const [spends, daily] = await Promise.all([spendsFor(w.address), dailySpendFor(w.address)]);
-    return c.json({ spends, daily });
-  } catch (e) {
-    /*
-     * An index that did not answer is named, as `/graph/decision` names it: a 502 the app retries. It fell through to the
-     * error handler as a 500, which says the executor broke, while The Graph was refusing every read with 429 (E080 at
-     * 35556a1).
-     */
-    if (e instanceof SubgraphUnavailable) return c.json({ error: 'subgraph_unavailable', message: e.message }, 502);
-    throw e;
-  }
-});
 
 /**
  * What a strategy WOULD have done, before you commit money to it.

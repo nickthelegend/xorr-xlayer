@@ -53,7 +53,7 @@ export async function priceOf(symbol: string, deadlineMs?: number): Promise<numb
   const feed = feedFor(symbol);
 
   /*
-   * A tokenized equity on Solana, priced by the Jupiter route that would fill it.
+   * A wrapped xStock on X Layer, priced by the Uniswap v3 pools that would fill it.
    *
    * The same read `executor/place.ts` marks a fill against, so an alert on NVDAx watches the number
    * a buy of it would actually pay rather than a second opinion about the same asset. `xStockPriceUsd`

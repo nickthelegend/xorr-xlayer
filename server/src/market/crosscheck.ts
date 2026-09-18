@@ -16,7 +16,7 @@
  */
 import { getJson } from '../http/get.js';
 import { ONEINCH_CHAIN_ID } from '../evm/chains.js';
-import { canonicalSymbol, TOKENS } from '../venues/oneinch.js';
+import { canonicalSymbol, TOKENS } from '../venues/tokens.js';
 import { priceOf } from './prices.js';
 
 const API_KEY = process.env.ONEINCH_API_KEY ?? '';
