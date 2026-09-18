@@ -5,19 +5,17 @@
  * else, got two JSON endpoints and a GIF unless they were willing to clone, create a Postgres and
  * supply three API keys. This produces the thing that was missing.
  *
- * The fork, by default, since PLAN.md 4.2. The hosted build was Base Sepolia because Privy previews
- * and broadcasts through its own RPC for a chain it knows, and a fork of Base is chain 8453 — so on
- * a fork build every user-signed transaction was simulated against mainnet, where the wallet holds
- * nothing. A fork build now has the wallet only sign, and sends the transaction to the fork itself
- * (`src/wallet/userSigning.ts`, proven with a Privy wallet on the Railway fork). And the fork is
- * where fills are real, so it is the one environment where the whole loop completes in one place:
- * sign in, take test funds, grant, watch the bot fill, withdraw. Sepolia fills nothing.
- * `XORR_WEB_API=https://api.xorr.finance` still builds Sepolia.
+ * The fork, by default. Privy previews and broadcasts through its own RPC for a chain it knows, and a fork of X Layer
+ * is chain 196 — so on a fork build a user-signed transaction would be simulated against mainnet, where the wallet
+ * holds nothing. A fork build has the wallet only sign, and sends the transaction to the fork itself
+ * (`src/wallet/userSigning.ts`). And the fork is where fills are real, so it is the one environment where the whole
+ * loop completes in one place: sign in, take test funds, grant, watch the bot fill, withdraw. The X Layer testnet has
+ * no DEX and fills nothing; pointing `XORR_WEB_API` at a testnet executor builds for the testnet.
  *
  * A fork build carries the fork's own RPC (`EXPO_PUBLIC_CHAIN_RPC`), or `src/chain.ts` reads
  * 127.0.0.1:8545 in every visitor's browser. It comes from `XORR_WEB_CHAIN_RPC`, else from
  * `server/.env.fork` — what `npm run rebuild:fork` wrote — and is refused unless it answers, from
- * here, as anvil on chain 8453.
+ * here, as anvil on chain 196.
  *
  * Every build also pins the delegation contract it was built against (`EXPO_PUBLIC_PINNED_DELEGATION`,
  * FEATURES.md #24), names the commit it was built from (`EXPO_PUBLIC_APP_COMMIT`, #53), and installs
@@ -32,7 +30,7 @@
  * `.env` itself: it is swapped for the duration of the build and restored in a `finally`, which
  * runs on a failed export and on a Ctrl-C alike.
  *
- * This is the trap `build-base.mjs` documents, and it caught both attempts. Nothing here is trusted
+ * This trap caught both attempts. Nothing here is trusted
  * without reading the artifact at the end.
  */
 import { execFileSync } from 'node:child_process';
@@ -40,7 +38,11 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { join } from 'node:path';
 
 const OUT = 'dist-web';
-const API = process.env.XORR_WEB_API ?? 'https://executor-fork-production.up.railway.app';
+const API = process.env.XORR_WEB_API;
+if (!API) {
+  console.error('\n  Refusing to build: set XORR_WEB_API to the public executor this bundle talks to.\n');
+  process.exit(1);
+}
 const ENV_FILE = '.env';
 const FORK_ENV_FILE = 'server/.env.fork';
 
@@ -79,14 +81,14 @@ async function rpc(url, method, params = []) {
 }
 
 /* A fork build names the fork's RPC, and the RPC has to be the fork. */
-const FORK = health.chain === 'base-fork' || health.chain === 'localnet';
+const FORK = health.chain === 'xlayer-fork' || health.chain === 'localnet';
 const CHAIN_RPC = FORK ? process.env.XORR_WEB_CHAIN_RPC ?? envValue(FORK_ENV_FILE, 'EXPO_PUBLIC_CHAIN_RPC') : undefined;
 if (FORK) {
   if (!CHAIN_RPC) refuse(`${API} settles on ${health.chain}, and neither XORR_WEB_CHAIN_RPC nor ${FORK_ENV_FILE} names its RPC.`);
   if (local(CHAIN_RPC)) refuse(`${CHAIN_RPC} is not reachable from a visitor's browser.`);
   const [chainId, client] = await Promise.all([rpc(CHAIN_RPC, 'eth_chainId'), rpc(CHAIN_RPC, 'web3_clientVersion')]);
-  if (Number(chainId) !== 8453 || !String(client).startsWith('anvil')) {
-    refuse(`${CHAIN_RPC} answers as ${client} on chain ${Number(chainId)}, not as a fork of Base.`);
+  if (Number(chainId) !== 196 || !String(client).startsWith('anvil')) {
+    refuse(`${CHAIN_RPC} answers as ${client} on chain ${Number(chainId)}, not as a fork of X Layer.`);
   }
   console.log(`  fork RPC ${CHAIN_RPC} answers as ${client} on chain ${Number(chainId)}`);
 }
@@ -100,10 +102,9 @@ if (FORK) {
  *   - the executor this build talks to reports it (`/health` → `delegation`);
  *   - the deployment's own record agrees, where there is one: `XORR_WEB_DELEGATION`, else `server/.env.fork` on a fork;
  *   - and the chain has a contract at that address.
- * The developer's `.env` is not asked. Its `EXPO_PUBLIC_DELEGATION_ADDRESS` named neither the fork's contract nor
- * Sepolia's when this was written (2026-09-14), and a pin taken from it would have refused every grant.
+ * The developer's `.env` is not asked: a pin taken from a stale local value would refuse every grant.
  */
-const PUBLIC_RPC = { base: 'https://mainnet.base.org', 'base-sepolia': 'https://sepolia.base.org' };
+const PUBLIC_RPC = { xlayer: 'https://rpc.xlayer.tech', 'xlayer-testnet': 'https://testrpc.xlayer.tech' };
 const PIN = String(health.delegation ?? '').toLowerCase();
 if (!/^0x[0-9a-f]{40}$/.test(PIN)) refuse(`${API} does not report its delegation contract, so there is nothing to pin.`);
 const RECORD = (

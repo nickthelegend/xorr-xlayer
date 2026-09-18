@@ -16,7 +16,7 @@ export const DATABASE_URL =
  * pool included — and a row cannot be written without its chain or read across one.
  */
 if (!/^[a-z0-9-]+$/.test(CHAIN_KEY)) {
-  throw new Error(`XORR_CHAIN must be a plain chain key such as base-sepolia, not "${CHAIN_KEY}".`);
+  throw new Error(`XORR_CHAIN must be a plain chain key such as xlayer-testnet, not "${CHAIN_KEY}".`);
 }
 
 export const pool = new Pool({

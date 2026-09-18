@@ -7,14 +7,14 @@
  *
  * So the executor sends a fixed amount of the settlement token, and what sending means depends on the chain:
  *
- *   - **A fork of Base** (`base-fork`, `localnet`). Real Base USDC moved from a real holder, Aave's aUSDC reserve, by
- *     impersonating it — the way `fork-bootstrap.ts` and `fork/makers.ts` fund a rebuilt fork. A real `transfer`, a real
- *     `Transfer` event and a receipt; nothing minted, no storage written. The wallet's fork ETH is then raised to a floor
- *     so it can pay for what it signs itself. Only on a node that says it is anvil: impersonation is a cheat a local node
- *     honours, and an executor pointed at a real node by mistake has to learn that from a refusal, not from trying.
- *   - **Base Sepolia.** Circle's USDC from the faucet key, capped, when that key holds any — read live on every request.
- *     When it holds none, nothing is sent and the refusal says so.
- *   - **Base mainnet.** Refused before anything is read. It is real money.
+ *   - **A fork of X Layer** (`xlayer-fork`, `localnet`). Circle's USDC moved from the fork-only reserve
+ *     (`fork/anvil.ts`: its balance is written to the token's storage, the technique of Foundry's `deal`) in a real
+ *     `transfer` with a real `Transfer` event and a receipt. The wallet's fork OKB is then raised to a floor so it can pay
+ *     for what it signs itself. Only on a node that says it is anvil: impersonation is a cheat a local node honours, and
+ *     an executor pointed at a real node by mistake has to learn that from a refusal, not from trying.
+ *   - **X Layer testnet.** The testnet USDC from the faucet key, capped, when that key holds any — read live on every
+ *     request. When it holds none, nothing is sent and the refusal says so.
+ *   - **X Layer mainnet.** Refused before anything is read. It is real money.
  *
  * Whether a wallet may ask again is the route's question (`routes/faucet.ts`), answered from the database; this module
  * only knows what the chain can give and how to give it.

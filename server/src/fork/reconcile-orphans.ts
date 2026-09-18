@@ -6,7 +6,7 @@
  * would leave and why, and the exact change to `daily_spend` and each position — and then rolls all of it back. From
  * server/:
  *
- *   XORR_CHAIN=base-fork FORK_RPC=<the fork's anvil RPC URL> DATABASE_URL=<that executor's Postgres URL> \
+ *   XORR_CHAIN=xlayer-fork FORK_RPC=<the fork's anvil RPC URL> DATABASE_URL=<that executor's Postgres URL> \
  *     npm run reconcile:orphans [-- --wallet <wallet id>]
  *
  * Then the same with `-- --apply`, which does exactly that in one transaction and commits it. A second run finds
@@ -15,7 +15,7 @@
  * All three variables must be on the command line. FORK_RPC must be the node the executor serves and DATABASE_URL that
  * executor's database, because an orphan is a transaction THIS node does not have — so they are read and checked before
  * anything that loads a `.env` is imported (`guard.ts`). It refuses any node that is not anvil, any chain that is not a
- * fork of Base, and any XORR_CHAIN but base-fork.
+ * fork of X Layer, and any XORR_CHAIN but xlayer-fork.
  */
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';

@@ -18,12 +18,10 @@
  * WHAT THIS NUMBER IS NOT, ON A FORK
  *
  * The market price comes from a live feed; a fork is pinned at a block, so its pools have drifted
- * from the market the price describes. On `base-fork` the figure therefore mixes venue quality
- * with however far the fork has moved — and with the pricing of whichever maker happened to ship a
- * book. The first measurements came out at **SwapVM +71 bps** and **Aqua −308 bps**, and neither
- * is a ranking of the venues. `basis` says which situation produced the figure so a reader is never
- * left to guess; on Base mainnet, where price and fill describe the same market, it means what it
- * says.
+ * from the market the price describes. On `xlayer-fork` the figure therefore mixes venue quality
+ * with however far the fork has moved, and is not a ranking of the venues. `basis` says which
+ * situation produced the figure so a reader is never left to guess; on X Layer mainnet, where price
+ * and fill describe the same market, it means what it says.
  */
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';

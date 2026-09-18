@@ -14,7 +14,7 @@
  *   FORK_RPC=http://127.0.0.1:8551 FAUCET_EXECUTOR=http://127.0.0.1:8793 \
  *   npx tsx --env-file=.env server/src/fork/prove-faucet.ts
  *
- * Point it at an executor started with `XORR_CHAIN=base-fork` on the same fork. It refuses any node that is not anvil. A
+ * Point it at an executor started with `XORR_CHAIN=xlayer-fork` on the same fork. It refuses any node that is not anvil. A
  * wallet's claim lasts a day, so a second run inside one proves only the refusal.
  */
 import 'dotenv/config';
@@ -37,7 +37,7 @@ import { base } from 'viem/chains';
 const RPC = process.env.FORK_RPC;
 const EXECUTOR = process.env.FAUCET_EXECUTOR;
 if (!RPC) throw new Error('FORK_RPC is required: the anvil fork the executor settles on');
-if (!EXECUTOR) throw new Error('FAUCET_EXECUTOR is required: an executor started with XORR_CHAIN=base-fork on that fork');
+if (!EXECUTOR) throw new Error('FAUCET_EXECUTOR is required: an executor started with XORR_CHAIN=xlayer-fork on that fork');
 
 const USDC: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 /** Aave v3's aUSDC reserve: the holder the executor's faucet moves USDC from. */

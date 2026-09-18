@@ -1,10 +1,7 @@
-# What can be checked without a chain, a key or a paid API — on every push — and, on demand, what cannot.
-#
-# `checks` and `contracts` are hermetic and run on every push and pull request. The interesting proofs in
-# this repo need a Base mainnet fork and a 1inch key, and a job that skipped them silently would report
-# green for a suite it never ran, which is worse than not having CI. So those run only when asked for
-# (Actions → ci → Run workflow), with the repository's `ONEINCH_API_KEY` and `BASE_RPC` secrets, and they
-# fail loudly when a secret is missing rather than skipping (PLAN.md 3.19).
+# What can be checked on every push: the app and the executor without a chain, the contracts without a fork, and —
+# because X Layer's public RPC needs no key — the contracts and the whole executor loop against a fork of X Layer
+# mainnet. A proof that needs a secret would have to run on demand and skip otherwise; these need none, so they run
+# every time and a red run means the product is broken, not that a secret was missing.
 name: ci
 
 on:
@@ -12,6 +9,9 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
+env:
+  XLAYER_RPC: https://rpc.xlayer.tech
 
 jobs:
   checks:
@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
 
       - name: Install
         run: |
@@ -38,15 +41,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # The client and the executor. The `.live.test.ts` files are excluded here and by name — they
-      # need real credentials and a real chain, and pretending otherwise is how a suite starts lying
-      # about its own coverage. `live-1inch` runs the 1inch ones on demand.
+      # The client and the executor. `.live.test.ts` files are excluded — they need a running executor.
       - name: Unit tests
         run: npm test
 
       # The app bundled for iOS, as a phone loads it. Web never loads a `.native` file, so a dependency only the
-      # native build imports can be missing while every step above passes — Privy's QR code peer was, and the iOS
-      # app could not start (PLAN.md X78).
+      # native build imports can be missing while every step above passes (PLAN.md X78).
       - name: Bundle the app for iOS
         run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/ios-export"
 
@@ -63,52 +63,40 @@ jobs:
         run: forge build
         working-directory: contracts
 
-      # Only the tests that need no fork. The fork suites — Aqua, SwapVM, the tokenized equities — need
-      # a Base mainnet RPC, so they run in `fork-contracts`, on demand.
-      - name: Contract tests (no fork required)
-        run: forge test --match-contract XorrDelegationTest -vv
+      - name: Unit suites
+        run: forge test --no-match-path 'test/*.fork.t.sol' -vv
         working-directory: contracts
 
-  # On demand: the contracts against a fork of real Base, through the BASE_RPC secret.
-  fork-contracts:
-    if: github.event_name == 'workflow_dispatch'
+      # Real X Layer state: wrapped TSLAx bought directly, NVDAx through USDG, the cap, a foreign venue, a close, a revoke.
+      - name: Fork suite (X Layer mainnet)
+        run: forge test --match-path 'test/XorrXLayer.fork.t.sol' -vv
+        working-directory: contracts
+
+  # The executor's own order path against a fork of X Layer: a fresh owner grants, the executor buys and sells through
+  # Uniswap v3 into the owner's wallet, the on-chain cap refuses, revoke stops it (`npm run prove:fork`).
+  fork-e2e:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: xorr
+          POSTGRES_PASSWORD: xorr
+          POSTGRES_DB: xorr_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U xorr" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      BASE_RPC: ${{ secrets.BASE_RPC }}
+      DATABASE_URL: postgres://xorr:xorr@localhost:5432/xorr_ci
+      XORR_CHAIN: xlayer-fork
+      FORK_RPC: http://127.0.0.1:8545
+      # The proof never calls Privy; the auth module needs these names to load.
+      PRIVY_APP_ID: ci-unused
+      PRIVY_APP_SECRET: ci-unused
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Require the secret
-        run: test -n "$BASE_RPC" || { echo "::error::BASE_RPC is not set as a repository secret"; exit 1; }
-
-      - name: Build
-        run: forge build
-        working-directory: contracts
-
-      - name: Fork suites (Aqua book, SwapVM, tokenized equities)
-        run: forge test --match-path 'test/*.fork.t.sol' -vv
-        working-directory: contracts
-
-  # On demand: the real 1inch API, with calldata built against a local anvil fork of real Base.
-  live-1inch:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    env:
-      ONEINCH_API_KEY: ${{ secrets.ONEINCH_API_KEY }}
-      BASE_RPC: ${{ secrets.BASE_RPC }}
-      LIVE: '1'
-      # A fork of Base, where 1inch settles — and, with a local node, a chain the executor may give a
-      # throwaway signing key, which is all a job that signs nothing needs.
-      XORR_CHAIN: base-fork
-      FORK_RPC: http://127.0.0.1:8545
-      # The live suite waits for an executor's market cache before judging anything; the deployed one answers.
-      EXPO_PUBLIC_API_URL: https://api.xorr.finance
-    steps:
-      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -120,22 +108,18 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Require the secrets
-        run: |
-          test -n "$ONEINCH_API_KEY" || { echo "::error::ONEINCH_API_KEY is not set as a repository secret"; exit 1; }
-          test -n "$BASE_RPC" || { echo "::error::BASE_RPC is not set as a repository secret"; exit 1; }
-
-      # Both installs, not just the executor's: its suite loads `tools/wait-for-warm.ts`, which esbuild compiles
-      # against the repo-root tsconfig — and that extends `expo/tsconfig.base`, which only the root install provides.
-      # With the executor's install alone the run died before collecting a file.
       - name: Install
         run: |
           npm ci --ignore-scripts
           (cd server && npm ci --ignore-scripts)
 
-      - name: Fork Base
+      - name: Build contracts
+        run: forge build
+        working-directory: contracts
+
+      - name: Fork X Layer
         run: |
-          nohup anvil --fork-url "$BASE_RPC" --chain-id 8453 --port 8545 --silent > anvil.log 2>&1 &
+          nohup anvil --fork-url "$XLAYER_RPC" --chain-id 196 --port 8545 --silent > anvil.log 2>&1 &
           for i in $(seq 1 90); do
             cast chain-id --rpc-url "$FORK_RPC" >/dev/null 2>&1 && exit 0
             sleep 1
@@ -144,6 +128,14 @@ jobs:
           echo "::error::the fork never answered"
           exit 1
 
-      - name: 1inch — quotes, calldata, the venue comparison, the tokenized equities
-        run: npx vitest run src/venues/oneinch.live.test.ts src/venues/compare.live.test.ts src/venues/stocks.live.test.ts
+      - name: Migrate
+        run: npm run migrate
+        working-directory: server
+
+      - name: Bootstrap the fork (deploy delegation + anchor)
+        run: npm run setup:fork
+        working-directory: server
+
+      - name: Prove the loop
+        run: set -a && . ./.env.fork && set +a && npm run prove:fork
         working-directory: server

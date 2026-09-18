@@ -1,7 +1,7 @@
-# The Base mainnet fork behind the fork executor (PLAN.md 3.3).
+# The X Layer mainnet fork behind the fork executor (PLAN.md 3.3).
 #
-# Deployed to the Railway service `base-fork`, which has a volume mounted at /data (docs/RUNBOOK.md §8):
-#   railway up --project <id> --environment production --service base-fork --ci     # from this directory
+# Deployed to the Railway service `xlayer-fork`, which has a volume mounted at /data (docs/RUNBOOK.md §8):
+#   railway up --project <id> --environment production --service xlayer-fork --ci     # from this directory
 #
 # Pinned, not `latest`: the saved chain is anvil's own state format, and a restart that pulled a newer anvil
 # could refuse the file an older one wrote. This is the anvil the save-and-resume round trip was proven with.

@@ -300,7 +300,8 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       run: async () => {
         const walletId = await privyDemoWalletId();
         if (!walletId) skip('No policy-bound wallet on this deployment.');
-        const chainId = CHAIN_KEY === 'xlayer-testnet' ? 84532 : 8453;
+        // The chain this executor serves: 196 on mainnet and its fork, 1952 on the testnet.
+        const chainId = chain.id;
         // Marked before it is tried: getting through is the failure this check exists to catch, and it would be a real send.
         await markBroadcast();
         try {
