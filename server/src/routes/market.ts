@@ -18,7 +18,7 @@ import { getJson, staleValue } from '../http/get.js';
 import { readChain } from '../http/chain-read.js';
 import { log } from '../http/request-id.js';
 import { COINGECKO_IDS, COINGECKO_PRICE_URL, type CoingeckoPrices } from '../market/ids.js';
-import { CAN_SETTLE, TOKENS, canonicalSymbol } from '../venues/tokens.js';
+import { CAN_SETTLE, TOKENS, canonicalSymbol, isRoutable } from '../venues/tokens.js';
 import { quote } from '../venues/uniswap.js';
 import { STOCKS, equitiesFunctional, isStock, observedHistory } from '../venues/stocks.js';
 import { classificationFor, earningsCalendar } from '../market/edgar.js';
@@ -486,6 +486,8 @@ market.get('/market/watchable', async (c) => c.json(await functioningHere()));
 export async function functioningHere(): Promise<{ symbol: string; address: string; decimals: number }[]> {
   const equitiesOk = await equitiesFunctional();
   return Object.entries(TOKENS)
+    // A token with no pool to a stablecoin (WETH on X Layer) is held and shown, never offered as tradable.
+    .filter(([symbol]) => isRoutable(symbol))
     .filter(([symbol]) => equitiesOk || !isStock(symbol))
     .map(([symbol, t]) => ({
       symbol,

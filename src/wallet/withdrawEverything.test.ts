@@ -19,6 +19,7 @@ const OWNER = account('xorr/withdraw-everything/owner');
 const COLD = account('xorr/withdraw-everything/cold-storage');
 const STRANGER = account('xorr/withdraw-everything/stranger');
 const USDC: Address = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
+const USDT0: Address = '0x779Ded0c9e1022225f8E0630b35a9b54bE713736';
 const POOL_ABI = parseAbi(['function withdraw(address asset, uint256 amount, address to) returns (uint256)']);
 const hash = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex;
 
@@ -41,7 +42,7 @@ const confirmed = (txHash: string, aave: boolean): RecordOutcome => ({
   status: 'confirmed',
   txHash,
   transfers: [],
-  aave: aave ? { amount: '125.5', amountRaw: '125500000' } : null,
+  aave: aave ? { amount: '125.5', amountRaw: '125500000', symbol: 'USDT0' } : null,
   duplicate: false,
 });
 
@@ -76,8 +77,10 @@ function harness(over: (calls: string[]) => Partial<WithdrawEverythingDeps> = ()
       calls.push('aave calldata');
       return aaveCall();
     }),
-    prepareAll: vi.fn(async (to: string, token: string) => {
+    prepareAll: vi.fn(async (to: string, token: string): Promise<PrepareOutcome> => {
       calls.push(`prepare ${token} to ${to}`);
+      // By default the wallet holds USDC only; a test that exits savings into USDT0 says so.
+      if (token === 'USDT0') return { status: 'blocked', reason: 'nothing_to_send', detail: 'This wallet holds no USDT0.' };
       return prepared();
     }),
     sign: vi.fn(async (to: Address) => {
@@ -115,8 +118,9 @@ describe('withdraw everything', () => {
       `prepare USDC to ${COLD}`,
       `sign ${USDC}`,
       `record ${hash(102)}`,
+      `prepare USDT0 to ${COLD}`,
     ]);
-    expect(out.steps[1]!.lines).toEqual([{ tone: 'done', text: 'Withdrew 125.5 USDC from savings', txHash: hash(101) }]);
+    expect(out.steps[1]!.lines).toEqual([{ tone: 'done', text: 'Withdrew 125.5 USDT0 from savings', txHash: hash(101) }]);
     expect(out.steps[2]!.lines).toEqual([{ tone: 'done', text: 'Sent 1420.5 USDC to Cold storage', txHash: hash(102) }]);
   });
 
@@ -191,9 +195,45 @@ describe('withdraw everything', () => {
     expect(out.ok).toBe(true);
     expect(out.steps[0]!.detail).toContain('Nothing to sell.');
     expect(out.steps[0]!.detail).toContain('WOKB stays');
-    expect(calls).toEqual(['preview', 'aave position', `prepare USDC to ${COLD}`, `sign ${USDC}`, `record ${hash(101)}`]);
+    expect(calls).toEqual([
+      'preview',
+      'aave position',
+      `prepare USDC to ${COLD}`,
+      `sign ${USDC}`,
+      `record ${hash(101)}`,
+      `prepare USDT0 to ${COLD}`,
+    ]);
     expect(deps.close).not.toHaveBeenCalled();
     expect(deps.aaveWithdrawCall).not.toHaveBeenCalled();
+  });
+
+  it('sends USDT0 as well — what savings pay back on X Layer', async () => {
+    const usdt0 = (to: Address = COLD): PrepareOutcome => ({
+      status: 'prepared',
+      call: { to: USDT0, data: encodeFunctionData({ abi: erc20Abi, functionName: 'transfer', args: [to, 125_500_000n] }) },
+      token: { symbol: 'USDT0', address: USDT0, decimals: 6 },
+      amount: '125.5',
+      amountRaw: '125500000',
+      destination: { address: COLD, label: 'Cold storage' },
+    });
+    const { deps } = harness((calls) => ({
+      prepareAll: vi.fn(async (to: string, token: string): Promise<PrepareOutcome> => {
+        calls.push(`prepare ${token} to ${to}`);
+        return token === 'USDT0' ? usdt0() : prepared();
+      }),
+    }));
+    const out = await withdrawEverything(deps, quietly);
+    expect(out.ok).toBe(true);
+    expect(out.steps[2]!.lines.map((l) => l.text)).toEqual(['Sent 1420.5 USDC to Cold storage', 'Sent 125.5 USDT0 to Cold storage']);
+  });
+
+  it('fails the send when the wallet holds neither stablecoin', async () => {
+    const { deps } = harness(() => ({
+      prepareAll: vi.fn(async (): Promise<PrepareOutcome> => ({ status: 'blocked', reason: 'nothing_to_send', detail: 'none' })),
+    }));
+    const out = await withdrawEverything(deps, quietly);
+    expect(statuses(out.steps)).toEqual(['sell:done', 'aave:done', 'send:failed']);
+    expect(out.steps[2]!.detail).toContain('no USDC or USDT0');
   });
 
   it('refuses to sign an Aave exit that pays anyone but the owner, goes anywhere but the pool, or leaves some behind', async () => {
@@ -267,7 +307,7 @@ describe('withdraw everything', () => {
     }));
     const out = await withdrawEverything(deps, quietly);
 
-    expect(out.steps.map((s) => s.title)).toEqual(['Sell every position', 'Take your USDC out of savings', 'Send your USDC']);
+    expect(out.steps.map((s) => s.title)).toEqual(['Sell every position', 'Take your money out of savings', 'Send your USDC and USDT0']);
     expect(out.steps[1]!.detail).toBe('Nothing to take out: savings aren’t available here.');
     expect(JSON.stringify(out.steps)).not.toMatch(/Aave/);
   });

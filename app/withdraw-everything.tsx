@@ -222,10 +222,10 @@ export default function WithdrawEverything() {
               </Eyebrow>
               <SheetCard borderRadius={radius.note} padding={space.s16} style={{ marginTop: space.s10, gap: space.s12 }}>
                 <PlanLine n={1} title="Sell every position" detail={sells} figure={sellsFigure} />
-                <PlanLine n={2} title="Take your USDC out of savings" detail={exits} figure={exitsFigure} />
+                <PlanLine n={2} title="Take your money out of savings" detail={exits} figure={exitsFigure} />
                 <PlanLine
                   n={3}
-                  title="Send your USDC"
+                  title="Send your USDC and USDT0"
                   detail={`All of it, to ${destination ? destination.label : 'the address you choose'}. You sign it.`}
                 />
               </SheetCard>

@@ -66,8 +66,8 @@ export type Step = { key: StepKey; title: string; status: StepStatus; detail?: s
 /* The running card's titles are the plan's, word for word: the plan said "savings" while this said "Aave". */
 const TITLES: Readonly<Record<StepKey, string>> = {
   sell: 'Sell every position',
-  aave: 'Take your USDC out of savings',
-  send: 'Send your USDC',
+  aave: 'Take your money out of savings',
+  send: 'Send your USDC and USDT0',
 };
 const ORDER: readonly StepKey[] = ['sell', 'aave', 'send'];
 
@@ -230,28 +230,45 @@ async function exitAave(deps: WithdrawEverythingDeps, note: Note): Promise<Outco
   const failed = unconfirmed(recorded, 'The savings withdrawal');
   if (failed || recorded.status !== 'confirmed') return { ok: false, detail: failed ?? '' };
 
-  const amount = recorded.aave ? `${recorded.aave.amount} USDC` : money(position.suppliedUsd);
+  // Savings on X Layer are USDT0 (the pool pays ~0% on USDC), so the executor names the token it paid back.
+  const amount = recorded.aave ? `${recorded.aave.amount} ${recorded.aave.symbol ?? 'USDT0'}` : money(position.suppliedUsd);
   note({ tone: 'done', text: `Withdrew ${amount} from savings`, txHash: hash });
   return { ok: true, detail: 'Back in your wallet.' };
 }
 
+/**
+ * Send every stablecoin the wallet holds: USDC, and USDT0 — what savings pay back on X Layer, and what a deposit may
+ * have arrived as. A token the wallet holds none of is skipped, not failed; holding neither is a failure, because
+ * the step's whole job is to move money that is not there.
+ */
+const SENT_TOKENS = ['USDC', 'USDT0'] as const;
+
 async function send(deps: WithdrawEverythingDeps, note: Note): Promise<Outcome> {
-  const prepared = await deps.prepareAll(deps.destination.address, 'USDC');
-  if (prepared.status !== 'prepared') return { ok: false, detail: prepared.detail };
-  const problem = transferProblem(prepared, deps.destination.address);
-  if (problem) return { ok: false, detail: problem };
+  const sent: string[] = [];
+  for (const symbol of SENT_TOKENS) {
+    const prepared = await deps.prepareAll(deps.destination.address, symbol);
+    if (prepared.status !== 'prepared') {
+      // Nothing of this token, or a chain that does not list it (USDT0 on the testnet): nothing to send, not a failure.
+      if (prepared.reason === 'nothing_to_send' || prepared.reason === 'unknown_token') continue;
+      return { ok: false, detail: prepared.detail };
+    }
+    const problem = transferProblem(prepared, deps.destination.address);
+    if (problem) return { ok: false, detail: problem };
 
-  const hash = await signed(deps, prepared.call.to as Address, prepared.call.data);
-  const recorded = await deps.record(hash);
-  const failed = unconfirmed(recorded, 'The transfer');
-  if (failed) return { ok: false, detail: failed };
+    const hash = await signed(deps, prepared.call.to as Address, prepared.call.data);
+    const recorded = await deps.record(hash);
+    const failed = unconfirmed(recorded, 'The transfer');
+    if (failed) return { ok: false, detail: failed };
 
-  note({
-    tone: 'done',
-    text: `Sent ${prepared.amount} ${prepared.token.symbol} to ${prepared.destination.label}`,
-    txHash: hash,
-  });
-  return { ok: true, detail: `At ${prepared.destination.label}, ${shortAddress(prepared.destination.address)}.` };
+    note({
+      tone: 'done',
+      text: `Sent ${prepared.amount} ${prepared.token.symbol} to ${prepared.destination.label}`,
+      txHash: hash,
+    });
+    sent.push(prepared.token.symbol);
+  }
+  if (sent.length === 0) return { ok: false, detail: 'This wallet holds no USDC or USDT0, so there is nothing to send.' };
+  return { ok: true, detail: `At ${deps.destination.label}, ${shortAddress(deps.destination.address)}.` };
 }
 
 const RUN: Readonly<Record<StepKey, (deps: WithdrawEverythingDeps, note: Note) => Promise<Outcome>>> = {

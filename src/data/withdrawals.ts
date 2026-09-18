@@ -71,8 +71,8 @@ export type RecordOutcome =
       status: 'confirmed';
       txHash: string;
       transfers: RecordedTransfer[];
-      /** USDC Aave paid back, when the transaction was an exit from it. */
-      aave: { amount: string; amountRaw: string } | null;
+      /** What Aave paid back (USDT0 on X Layer, or USDC), when the transaction was an exit from it. */
+      aave: { amount: string; amountRaw: string; symbol?: string } | null;
       duplicate: boolean;
     }
   | { status: 'reverted'; txHash: string; detail: string }
