@@ -7,14 +7,13 @@
  * `TOKENS[...]` lookups on whatever the caller passed.
  *
  * So this tests the boundaries rather than the registry, and it tests them the way they actually
- * fail: a lowercase `c` normalised away by something upstream.
+ * fail: a lowercase suffix (`c` on the Base build, `x` on X Layer) normalised away by something upstream.
  */
-process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'xlayer-testnet';
+import { describe, expect, it, vi } from 'vitest';
 
-import { describe, expect, it } from 'vitest';
+vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []), one: vi.fn() }));
 
-const { canonicalSymbol, TOKENS } = await import('./oneinch.js');
+const { canonicalSymbol, TOKENS } = await import('./tokens.js');
 const { isStock, stockKey, STOCKS } = await import('./stocks.js');
 
 /** The three ways a symbol arrives: as written, shouted, and whispered. */
@@ -33,8 +32,11 @@ describe('the venue boundary resolves every registered symbol, however it is cas
 
   it('the equities are the ones that break, so they are named explicitly', () => {
     // Every one of these has a lowercase suffix that uppercasing destroys.
+    expect(Object.keys(STOCKS).length).toBeGreaterThan(0);
     for (const key of Object.keys(STOCKS)) {
-      expect(key).toMatch(/c$/);
+      expect(key).toMatch(/x$/);
+      // Every equity is in the registry the routes resolve through.
+      expect(key in TOKENS).toBe(true);
       expect(canonicalSymbol(key.toUpperCase())).toBe(key);
       expect(isStock(key.toUpperCase())).toBe(true);
       expect(stockKey(key.toLowerCase())).toBe(key);
@@ -58,7 +60,7 @@ describe('no boundary may uppercase a caller symbol', () => {
   /**
    * A textual guard, deliberately.
    *
-   * The rule — crypto is uppercase, equities carry a lowercase `c`, and no boundary may uppercase a
+   * The rule — crypto is uppercase, equities carry a lowercase `x`, and no boundary may uppercase a
    * caller's symbol — is only obvious at the moment someone types `.toUpperCase()`. Catching it
    * then is cheaper than catching it in production for the fourth time.
    *
@@ -69,10 +71,14 @@ describe('no boundary may uppercase a caller symbol', () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const files = [
-      'venues/oneinch.ts',
+      'venues/tokens.ts',
+      'venues/uniswap.ts',
+      'venues/okxdex.ts',
+      'venues/stocks.ts',
       'executor/run.ts',
       'market/crosscheck.ts',
       'market/prices.ts',
+      'market/feeds.ts',
     ];
     const offenders: string[] = [];
     for (const f of files) {
@@ -80,7 +86,10 @@ describe('no boundary may uppercase a caller symbol', () => {
       src.split('\n').forEach((line, i) => {
         if (!line.includes('.toUpperCase()')) return;
         // The canonical resolvers legitimately uppercase to build their lookup key.
-        if (/CANONICAL|stockKey|const want|\.map\(\(k\)/.test(line)) return;
+        if (/CANONICAL|stockKey|const want|\.map\(\(k\)|\.find\(\(k\)/.test(line)) return;
+        // `crosscheck` uppercases only to index its all-caps alias map (BTC → XBTC); a miss passes the caller's own
+        // spelling on to `canonicalSymbol`, so the suffix survives.
+        if (/POOL_TOKEN\[symbol\.toUpperCase\(\)\] \?\? symbol/.test(line)) return;
         // `venuesFrom` title-cases PROTOCOL names for display — "BASE_UNISWAP_V3" to "Uniswap V3".
         // Not a symbol, and the one place uppercasing is the point.
         if (/\^V\\d\$/.test(line)) return;

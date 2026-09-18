@@ -1,30 +1,26 @@
 /**
- * Tokenized equities are `NVDAc` and `TSLAc`, and the routes normalised symbols with
- * `.toUpperCase()`.
+ * Tokenized equities carry a lowercase suffix — `NVDAc` on the Base build, `NVDAx` for the wrapped
+ * xStocks on X Layer — and the routes normalised symbols with `.toUpperCase()`.
  *
- * `NVDAc` became `NVDAC`, which is not a key in `TOKENS`. So `/swap/quote?out=NVDAc` answered
- * **`502 No route for USDC -> NVDAC`** and the order ticket for the entire stocks track could not
- * price a single trade. `/orders` and the panic flatten resolved the same way, so an equity
- * position could not be opened, closed, or flattened either.
+ * On Base, `NVDAc` became `NVDAC`, which is not a key in `TOKENS`. So `/swap/quote?out=NVDAc`
+ * answered **`502 No route for USDC -> NVDAC`** and the order ticket for the entire stocks track
+ * could not price a single trade. `/orders` and the panic flatten resolved the same way, so an equity
+ * position could not be opened, closed, or flattened either. `NVDAx` → `NVDAX` is the same bug.
  *
- * It survived because every crypto symbol is already all-caps: uppercasing is correct for BTC,
- * ETH, WETH, USDC and CBBTC, which is everything anyone tested by hand.
+ * It survived because every crypto symbol is already all-caps: uppercasing is correct for USDC,
+ * XBTC, WOKB and USDG, which is everything anyone tests by hand.
  */
 import { describe, expect, it } from 'vitest';
-
-// The venue module refuses to load unconfigured, and ESM hoists imports above assignments — so
-// the registry is pulled in dynamically, after the environment it checks for exists.
-process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'xlayer-testnet';
-const { canonicalSymbol, TOKENS } = await import('./oneinch.js');
+import { canonicalSymbol, TOKENS } from './tokens.js';
 
 describe('a symbol resolves to the registry spelling, whatever the caller sent', () => {
   it('keeps the lowercase suffix that makes an equity an equity', () => {
-    expect(canonicalSymbol('NVDAc')).toBe('NVDAc');
+    expect(canonicalSymbol('NVDAx')).toBe('NVDAx');
     // What the routes actually sent, and the reason every equity quote failed.
-    expect(canonicalSymbol('NVDAC')).toBe('NVDAc');
-    expect(canonicalSymbol('nvdac')).toBe('NVDAc');
-    expect(canonicalSymbol('TSLAC')).toBe('TSLAc');
+    expect(canonicalSymbol('NVDAX')).toBe('NVDAx');
+    expect(canonicalSymbol('nvdax')).toBe('NVDAx');
+    expect(canonicalSymbol('TSLAX')).toBe('TSLAx');
+    expect(canonicalSymbol('googlx')).toBe('GOOGLx');
   });
 
   it('every registered symbol survives the round trip that broke them', () => {
@@ -40,12 +36,18 @@ describe('a symbol resolves to the registry spelling, whatever the caller sent',
   it('crypto still normalises the way it always did', () => {
     expect(canonicalSymbol('weth')).toBe('WETH');
     expect(canonicalSymbol(' usdc ')).toBe('USDC');
-    expect(canonicalSymbol('CBBTC')).toBe('CBBTC');
+    expect(canonicalSymbol('xbtc')).toBe('XBTC');
+    expect(canonicalSymbol('Wokb')).toBe('WOKB');
+    expect(canonicalSymbol('usdt0')).toBe('USDT0');
   });
 
   it('an unknown symbol comes back unchanged, for the caller to reject by name', () => {
     // Not silently mapped to something tradable — the error should name what was asked for.
     expect(canonicalSymbol('DOGE')).toBe('DOGE');
     expect(canonicalSymbol('DOGE') in TOKENS).toBe(false);
+    // The Base build's spellings are not quietly mapped onto X Layer's.
+    expect(canonicalSymbol('NVDAc')).toBe('NVDAc');
+    expect(canonicalSymbol('NVDAc') in TOKENS).toBe(false);
+    expect(canonicalSymbol('CBBTC') in TOKENS).toBe(false);
   });
 });

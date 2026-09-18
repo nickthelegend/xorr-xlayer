@@ -2,8 +2,8 @@
  * A price a screen waits for is held to the screen's patience, and says so when it is late (`http/patience.ts`).
  *
  * `priceOf` raced its deadline against the CoinGecko fetch and rejected with a bare `price deadline for X`, so a balance
- * could not tell a late price from a missing feed and counted it as $0 — and an equity, priced by a 1inch quote, was not
- * held to the deadline at all. These drive the real `priceOf` with the feed and the venue replaced by ones that answer
+ * could not tell a late price from a missing feed and counted it as $0 — and an equity, priced by a venue quote (1inch on
+ * the Base build, Uniswap v3 on X Layer), was not held to the deadline at all. These drive the real `priceOf` with the feed and the venue replaced by ones that answer
  * late or never.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,13 +15,8 @@ vi.mock('../http/get.js', () => ({
   staleValue: h.staleValue,
   UpstreamUnavailable: class extends Error {},
 }));
-// Mocked outright, as `stock-price.test.ts` does: the real module throws at import without an API key.
-vi.mock('../venues/oneinch.js', () => ({
-  quote: h.quote,
-  TOKENS: {},
-  canonicalSymbol: (x: string) => x,
-  DEFAULT_SLIPPAGE_PCT: 0.3,
-}));
+// The venue a wrapped xStock is priced by, mocked as `stock-price.test.ts` does.
+vi.mock('../venues/uniswap.js', () => ({ quote: h.quote }));
 vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
 
 const { priceOf } = await import('./prices.js');
@@ -55,11 +50,11 @@ describe('a price with a deadline', () => {
     expect(await priceOf('WETH', 50)).toBe(2_512.5);
   });
 
-  it('for a tokenized equity is held to the same deadline, where it waited out the 1inch lane', async () => {
+  it('for a tokenized equity is held to the same deadline, where it waited out the venue quote', async () => {
     h.quote.mockImplementation(never);
 
     const started = Date.now();
-    await expect(priceOf('NVDAc', 50)).rejects.toBeInstanceOf(StillFetching);
+    await expect(priceOf('NVDAx', 50)).rejects.toBeInstanceOf(StillFetching);
     expect(Date.now() - started).toBeLessThan(1_000);
   });
 

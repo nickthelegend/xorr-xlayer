@@ -3,15 +3,21 @@
  * pool it is going through.
  *
  * A 0.3% ceiling is generous on WETH/USDC and impossible on a thin pair where a $60 order moves the
- * price 0.8% by itself — and the failure is `ReturnAmountIsNotEnough`, the router refusing at a
- * price its own quote had already predicted.
+ * price 0.8% by itself — and the failure is the router refusing at a price its own quote had already
+ * predicted (`ReturnAmountIsNotEnough` from 1inch on the Base build; Uniswap's SwapRouter02 reverts
+ * `Too little received`).
  */
-process.env.ONEINCH_API_KEY ??= 'test-key';
-process.env.XORR_CHAIN ??= 'xlayer-testnet';
-
 import { describe, expect, it } from 'vitest';
+import { slippageFor, SLIPPAGE, DEFAULT_SLIPPAGE_PCT } from './tokens.js';
 
-const { slippageFor, SLIPPAGE } = await import('./oneinch.js');
+describe('the urgency ceilings', () => {
+  it('rise with how little a trade can wait', () => {
+    expect(SLIPPAGE.scheduled).toBe(DEFAULT_SLIPPAGE_PCT);
+    expect(DEFAULT_SLIPPAGE_PCT).toBe(0.3);
+    expect(SLIPPAGE.scheduled).toBeLessThan(SLIPPAGE.stop);
+    expect(SLIPPAGE.stop).toBeLessThan(SLIPPAGE.panic);
+  });
+});
 
 describe('the ceiling is the floor, not the answer', () => {
   it('leaves a deep pool alone', () => {
@@ -29,9 +35,9 @@ describe('the ceiling is the floor, not the answer', () => {
 
   it('rounds to two decimals, because the venue rejects more', () => {
     /*
-     * `0.35 * 1.5` is `0.5292344803237518` in binary floating point, and 1inch answers a slippage
-     * with sixteen decimals with `400 Bad Request` — so the adaptive tolerance broke every fill it
-     * touched. Rounded UP, since rounding a tolerance down refuses trades the widening was
+     * `0.35 * 1.5` is `0.5292344803237518` in binary floating point, and an aggregator API (1inch
+     * then, OKX DEX now) answers a slippage with sixteen decimals with `400 Bad Request` — so the
+     * adaptive tolerance broke every fill it touched. Rounded UP, since rounding a tolerance down refuses trades the widening was
      * calculated to allow.
      */
     expect(slippageFor(0.3, 0.35)).toBe(0.53);
@@ -52,7 +58,7 @@ describe('the ceiling is the floor, not the answer', () => {
   });
 
   it('falls back to the constant when there is no impact figure', () => {
-    // No quote, an un-measurable pair, or an Aqua fill — the behaviour that existed before.
+    // No quote or an un-measurable pair — the behaviour that existed before.
     expect(slippageFor(SLIPPAGE.scheduled, null)).toBe(SLIPPAGE.scheduled);
     expect(slippageFor(SLIPPAGE.stop, Number.NaN)).toBe(SLIPPAGE.stop);
     // Negative impact means the fill beats the mid. Not a reason to loosen anything.

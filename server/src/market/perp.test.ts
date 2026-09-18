@@ -67,7 +67,8 @@ describe('perpMetrics', () => {
   });
 
   it('answers "no contract" for a stock without asking the venue', async () => {
-    expect(await perpMetrics('NVDAc')).toBeNull();
+    expect(await perpMetrics('NVDAx')).toBeNull();
+    expect(await perpMetrics('tslax')).toBeNull();
     expect(perpMarkets).not.toHaveBeenCalled();
   });
 
@@ -85,7 +86,9 @@ describe('findPerp', () => {
 
   it("finds a wrapped token's contract under its underlying", () => {
     expect(findPerp([BTC, ETH], 'WETH')?.symbol).toBe('ETH');
-    expect(findPerp([BTC, ETH], 'cbBTC')?.symbol).toBe('BTC');
+    // OKX's wrapped BTC on X Layer is BTC's contract.
+    expect(findPerp([BTC, ETH], 'XBTC')?.symbol).toBe('BTC');
+    expect(findPerp([BTC, ETH], 'xbtc')?.symbol).toBe('BTC');
   });
 });
 

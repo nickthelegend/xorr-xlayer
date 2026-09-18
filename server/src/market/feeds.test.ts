@@ -6,7 +6,7 @@
  * beside it already warned why: "a second, looser definition of valid here is how the two drift
  * apart and the check stops meaning anything."
  *
- * They then drifted the other way. The executor grew a Solana price for xStocks and the alert route
+ * They then drifted the other way. The executor grew a price for xStocks and the alert route
  * never heard, so `POST /alerts` refused an alert on NVDAx saying nothing could price it — while
  * `venues/xstocks.ts` was pricing it all day. A refusal that is WRONG is worse than the bug it was
  * written to prevent: the original fault was an alert that never fired, and this was an alert the
@@ -24,33 +24,38 @@ const { STOCKS } = await import('../venues/stocks.js');
 const { XSTOCKS } = await import('../venues/xstocks.js');
 
 describe('which feed answers for a symbol', () => {
-  it('sends a tokenized equity on Solana to the Jupiter route', () => {
+  it('sends a wrapped xStock on X Layer to the Uniswap pools that would fill it', () => {
+    expect(Object.keys(XSTOCKS).length).toBeGreaterThan(0);
     for (const symbol of Object.keys(XSTOCKS)) expect(feedFor(symbol), symbol).toBe('xstock');
   });
 
-  it('sends a tokenized equity on an EVM chain to the venue that would fill it', () => {
-    for (const symbol of Object.keys(STOCKS)) expect(feedFor(symbol), symbol).toBe('equity');
+  it('prices every equity in the trade registry the same way — one registry, one feed', () => {
+    // `STOCKS` (what trades) and `XSTOCKS` (the catalog) are one list on X Layer. An equity that
+    // fell through to the crypto feed would find no id and throw on every sweep.
+    expect(Object.keys(STOCKS).sort()).toEqual(Object.keys(XSTOCKS).sort());
+    for (const symbol of Object.keys(STOCKS)) expect(feedFor(symbol), symbol).toBe('xstock');
   });
 
   it('sends everything with a market-data entry to the crypto feed', () => {
     for (const symbol of Object.keys(COINGECKO_IDS)) expect(feedFor(symbol), symbol).toBe('crypto');
   });
 
-  it('tells the same company on two chains apart', () => {
-    // `NVDAx` and `NVDAc` are NVIDIA under two registries on two chains, priced by two venues.
+  it('does not take another chain\'s spelling of the same company for this one', () => {
+    // `NVDAc` was NVIDIA on the Base build. On X Layer it is `NVDAx`, and the old spelling is priced
+    // by nothing — not silently answered with the xStock's price.
     expect(feedFor('NVDAx')).toBe('xstock');
-    expect(feedFor('NVDAc')).toBe('equity');
+    expect(feedFor('NVDAc')).toBeNull();
   });
 
   it('resolves through canonicalSymbol rather than uppercasing', () => {
     /*
-     * Rule 3 in `oneinch.ts`, which three separate production bugs came from breaking. Uppercasing
-     * turns `NVDAc` into `NVDAC`, a symbol no registry has ever heard of — and it would take
-     * `NVDAx` with it.
+     * Rule 3 in `venues/tokens.ts`, which three separate production bugs came from breaking.
+     * Uppercasing turns `TSLAx` into `TSLAX`, a symbol no registry has ever heard of.
      */
-    expect(feedFor('nvdac')).toBe('equity');
+    expect(feedFor('tslax')).toBe('xstock');
     expect(feedFor('weth')).toBe('crypto');
     expect(feedFor('  WETH  ')).toBe('crypto');
+    expect(feedFor('xbtc')).toBe('crypto');
   });
 
   it('is case-insensitive about an xStock without losing its spelling', () => {

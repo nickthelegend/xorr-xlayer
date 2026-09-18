@@ -11,14 +11,17 @@ import { decodeFunctionData, encodeFunctionData, erc20Abi, type Abi, type Hex } 
 
 const DELEGATION = '0x6c5528Fd8E74a047A85bAb413856A9239E73540e';
 const DELEGATE = '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5';
-const USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
-const WETH = '0x4200000000000000000000000000000000000006';
+// Circle's USDC on X Layer testnet — the only token the testnet's grant approves (`evm/chains.ts`).
+const USDC = '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3';
+// Mainnet WETH: it has no code on the testnet, so the testnet policy must not name it.
+const MAINNET_WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c';
+const UNISWAP_ROUTER = '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA';
 const AAVE = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
 const STRANGER = '0x000000000000000000000000000000000000dEaD';
 
 vi.mock('../evm/delegation.js', () => ({ DELEGATION_ADDRESS: DELEGATION, delegatePublicKey: DELEGATE }));
 vi.mock('../evm/chains.js', () => ({
-  ADDRESSES: { usdc: USDC, weth: WETH, btc: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf' },
+  APPROVABLE_TOKENS: [{ symbol: 'USDC', address: USDC }],
   AAVE_V3_POOL: AAVE,
   CHAIN_KEY: 'xlayer-testnet',
   IS_MAINNET_STATE: false,
@@ -77,14 +80,14 @@ const DELEGATION_ABI = [
 
 describe('what the policy lets the wallet sign', () => {
   it('allows each step of a grant: the approvals, the grant to our delegate, and revoke', () => {
-    for (const token of [USDC, WETH]) {
-      const data = encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [DELEGATION, 10n ** 12n] });
-      expect(allowed({ to: token, data })).toBe(true);
-    }
+    const approve = encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [DELEGATION, 10n ** 12n] });
+    expect(allowed({ to: USDC, data: approve })).toBe(true);
+    // A token the chain does not have is not approvable, even with the right spender.
+    expect(allowed({ to: MAINNET_WETH, data: approve })).toBe(false);
     const grant = encodeFunctionData({
       abi: DELEGATION_ABI,
       functionName: 'grant',
-      args: [DELEGATE, 1_600_000_000n, 1_791_855_009n, ['0x111111125421cA6dc452d289314280a0f8842A65']],
+      args: [DELEGATE, 1_600_000_000n, 1_791_855_009n, [UNISWAP_ROUTER]],
     });
     expect(allowed({ to: DELEGATION.toLowerCase(), data: grant })).toBe(true);
     expect(allowed({ to: DELEGATION, data: encodeFunctionData({ abi: DELEGATION_ABI, functionName: 'revoke' }) })).toBe(true);

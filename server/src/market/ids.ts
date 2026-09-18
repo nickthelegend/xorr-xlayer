@@ -25,12 +25,22 @@ export const COINGECKO_IDS: Record<string, string> = {
    */
   XAUT: 'tether-gold',
   PAXG: 'pax-gold',
-  // Base-native assets the delegation actually trades.
+  /*
+   * The X Layer tokens in `venues/tokens.ts`, each priced as ITSELF. Every id below was confirmed on 2026-09-19 by
+   * CoinGecko's contract lookup (`GET /api/v3/coins/x-layer/contract/{address}`) against the mainnet address in
+   * `evm/chains.ts`, and each answers `/simple/price`. A wrapped or omnichain token gets its own id rather than its
+   * underlying's — XBTC is not `bitcoin`, USD₮0 is not `tether` — which is the stand-in rule above, and keeps one id per
+   * symbol. (Tier 4 holds USD₮0 between its swap and its supply, PLAN.md P2.14.)
+   *
+   * WETH stays on Ethereum's `weth`: it is held and shown, never traded (no pool), and X Layer's bridged WETH has its own
+   * id (`bridged-wrapped-ether-x-layer`) should it ever need one. cbBTC was the Base build's BTC and is not on X Layer.
+   */
   WETH: 'weth',
   USDC: 'usd-coin',
-  // Tether's omnichain USD₮0 is USDT, one for one — tier 4 holds it between its swap and its supply (PLAN.md P2.14).
-  USDT0: 'tether',
-  CBBTC: 'coinbase-wrapped-btc',
+  XBTC: 'okx-wrapped-btc',
+  WOKB: 'wrapped-okb',
+  USDG: 'global-dollar',
+  USDT0: 'usdt0',
 };
 
 export function knownSymbols(): string[] {

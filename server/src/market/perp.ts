@@ -46,8 +46,11 @@ export class PriceTooSlow extends Error {
   }
 }
 
-/** A wrapped token's contract is its underlying's: nobody lists a WETH perpetual, and ETH's is the one. */
-const UNDERLYING: Readonly<Record<string, string>> = { WETH: 'ETH', CBBTC: 'BTC', WBTC: 'BTC' };
+/**
+ * A wrapped token's contract is its underlying's: nobody lists a WETH perpetual, and ETH's is the one. XBTC is OKX's
+ * wrapped BTC on X Layer and WOKB is wrapped OKB, the gas token.
+ */
+const UNDERLYING: Readonly<Record<string, string>> = { WETH: 'ETH', CBBTC: 'BTC', WBTC: 'BTC', XBTC: 'BTC', WOKB: 'OKB' };
 
 /** The contract for a symbol, whatever its case — Hyperliquid names some in mixed case, like `kPEPE`. */
 export function findPerp(markets: readonly PerpMarket[], symbol: string): PerpMarket | undefined {
