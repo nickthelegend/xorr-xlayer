@@ -1,6 +1,5 @@
 /**
- * The backtest, proposal, quote, comparison and decision routes (docs/qa/ENDPOINTS.md E025, E026, E083, E160, E166,
- * E183, E188).
+ * The backtest, proposal, quote and comparison routes (docs/qa/ENDPOINTS.md E025, E026, E083, E160, E166, E183, E188).
  *
  * A request only the caller can fix is a named 400 or 404 given before any venue, feed or index is asked: never a 502
  * that tells the app to retry an impossible request, and never a 200 carrying a result nobody computed. And an id the
@@ -23,14 +22,11 @@ vi.mock('../bot/tone.js', () => ({ TONE_INSTRUCTIONS: {} }));
 vi.mock('../news/feed.js', () => ({ briefing: vi.fn() }));
 vi.mock('../bot/propose.js', () => ({ propose: vi.fn() }));
 vi.mock('../notifications/push.js', () => ({ send: vi.fn() }));
-// The registry and its spelling rule are real; only the venue call is stood in for.
-vi.mock('../venues/oneinch.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../venues/oneinch.js')>()),
-  quote: vi.fn(),
-}));
+// The registry and its spelling rule are real (`venues/tokens.ts`); only the venue calls are stood in for.
+vi.mock('../venues/uniswap.js', () => ({ quote: vi.fn(), VENUE_NAME: 'Uniswap v3' }));
+vi.mock('../venues/okxdex.js', () => ({ OKX_VENUE_NAME: 'OKX DEX', okxConfigured: vi.fn(), okxQuoteRaw: vi.fn() }));
 vi.mock('../evm/gas-price.js', () => ({ gasPrice: vi.fn(), networkCost: vi.fn() }));
 vi.mock('../executor/fill-measure.js', () => ({ estimateOutUnits: vi.fn() }));
-vi.mock('../venues/compare.js', () => ({ compareVenues: vi.fn() }));
 vi.mock('../auth/middleware.js', () => ({
   requireUser: vi.fn(() => ({ userId: 'did:privy:owner' })),
   WrongPrincipalError: class extends Error {},
@@ -42,27 +38,17 @@ vi.mock('./wallet-context.js', () => ({
 }));
 vi.mock('../executor/order.js', () => ({ armExits: vi.fn(), money: (n: number) => `$${n}`, placeOrder: vi.fn() }));
 vi.mock('../evm/delegation.js', () => ({ readPolicy: vi.fn() }));
-vi.mock('../graph/decide.js', () => ({ decide: vi.fn() }));
-vi.mock('../graph/client.js', () => ({
-  health: vi.fn(),
-  dailySpendFor: vi.fn(),
-  indexDescription: vi.fn(),
-  spendsFor: vi.fn(),
-  SubgraphUnavailable: class extends Error {},
-}));
 
 const { one, tx } = await import('../db/index.js');
 const { append } = await import('../audit/log.js');
 const { placeOrder } = await import('../executor/order.js');
 const engine = await import('../backtest/engine.js');
-const { quote } = await import('../venues/oneinch.js');
+const { quote } = await import('../venues/uniswap.js');
+const { okxConfigured, okxQuoteRaw } = await import('../venues/okxdex.js');
 const { gasPrice, networkCost } = await import('../evm/gas-price.js');
 const { setScreenPatienceForTests } = await import('../http/patience.js');
-const { compareVenues } = await import('../venues/compare.js');
 const { currentWallet } = await import('./wallet-context.js');
 const { readPolicy } = await import('../evm/delegation.js');
-const { decide } = await import('../graph/decide.js');
-const { dailySpendFor, spendsFor, SubgraphUnavailable } = await import('../graph/client.js');
 const { extra } = await import('./extra.js');
 const { errorResponse } = await import('../http/errors.js');
 
@@ -216,34 +202,34 @@ describe('POST /proposals/:id/decide (E160)', () => {
 
 describe('GET /swap/quote', () => {
   it('names a slippage outside 0.05–3, an amount that is not one and a token nothing trades — and quotes nothing', async () => {
-    refused(await get('/swap/quote?in=USDC&out=WETH&amount=20&slippage=10'), 400, 'invalid_slippage');
-    refused(await get('/swap/quote?in=USDC&out=WETH&amount=abc'), 400, 'invalid_amount');
-    refused(await get('/swap/quote?in=USDC&out=WETH&amount=0'), 400, 'invalid_amount');
-    const nope = await get('/swap/quote?in=NOPE&out=WETH&amount=20');
+    refused(await get('/swap/quote?in=USDC&out=WOKB&amount=20&slippage=10'), 400, 'invalid_slippage');
+    refused(await get('/swap/quote?in=USDC&out=WOKB&amount=abc'), 400, 'invalid_amount');
+    refused(await get('/swap/quote?in=USDC&out=WOKB&amount=0'), 400, 'invalid_amount');
+    const nope = await get('/swap/quote?in=NOPE&out=WOKB&amount=20');
     refused(nope, 400, 'unknown_token');
     expect(nope.body.detail).toContain('NOPE');
     expect(quote).not.toHaveBeenCalled();
   });
 
   it('quotes a sound request under the registry spelling', async () => {
-    vi.mocked(quote).mockResolvedValue({ inSymbol: 'USDC', outSymbol: 'NVDAc', outAmount: 0.55 } as never);
+    vi.mocked(quote).mockResolvedValue({ inSymbol: 'USDC', outSymbol: 'NVDAx', outAmount: 0.55 } as never);
     vi.mocked(gasPrice).mockResolvedValue({ wei: 2_000_000_000n, source: 'chain' });
     vi.mocked(networkCost).mockRejectedValue(new Error('no gas price'));
-    const r = await get('/swap/quote?in=usdc&out=nvdac&amount=100');
-    expect(r).toMatchObject({ status: 200, body: { outSymbol: 'NVDAc', gas: null } });
-    expect(quote).toHaveBeenCalledWith({ inSymbol: 'USDC', outSymbol: 'NVDAc', amount: 100, slippagePct: undefined });
+    const r = await get('/swap/quote?in=usdc&out=nvdax&amount=100');
+    expect(r).toMatchObject({ status: 200, body: { outSymbol: 'NVDAx', gas: null } });
+    expect(quote).toHaveBeenCalledWith({ inSymbol: 'USDC', outSymbol: 'NVDAx', amount: 100, slippagePct: undefined });
   });
 
   describe("inside a screen's patience (E187)", () => {
-    const QUOTE = { inSymbol: 'USDC', outSymbol: 'WETH', outAmount: 0.008, estimatedGas: 210_000 };
+    const QUOTE = { inSymbol: 'USDC', outSymbol: 'WOKB', outAmount: 0.008, estimatedGas: 210_000 };
     const PRICE = { wei: 2_000_000_000n, source: 'chain' as const };
     afterEach(() => setScreenPatienceForTests());
 
-    it('costs the route at the gas price read alongside it, and prices ETH within a price read’s bound', async () => {
+    it('costs the route at the gas price read alongside it, and prices OKB within a price read’s bound', async () => {
       vi.mocked(quote).mockResolvedValue(QUOTE as never);
       vi.mocked(gasPrice).mockResolvedValue(PRICE);
       vi.mocked(networkCost).mockResolvedValue({ priceGwei: 2, source: 'chain', units: 210_000, feeUsd: 1.05 });
-      const r = await get('/swap/quote?in=USDC&out=WETH&amount=20&slippage=0.5');
+      const r = await get('/swap/quote?in=USDC&out=WOKB&amount=20&slippage=0.5');
       expect(r).toMatchObject({
         status: 200,
         body: { outAmount: 0.008, gas: { priceGwei: 2, units: 210_000, feeUsd: 1.05, paidBy: 'executor' } },
@@ -251,11 +237,11 @@ describe('GET /swap/quote', () => {
       expect(networkCost).toHaveBeenCalledWith(210_000, { price: PRICE, priceMs: 4_000 });
     });
 
-    it('answers a quote the aggregator has not given in time as warming, not a hang', async () => {
+    it('answers a quote the venue has not given in time as warming, not a hang', async () => {
       setScreenPatienceForTests({ routeMs: 30 });
       vi.mocked(quote).mockReturnValue(new Promise(() => {}) as never);
       vi.mocked(gasPrice).mockResolvedValue(PRICE);
-      const res = await app.request('/swap/quote?in=USDC&out=WETH&amount=20&slippage=0.5');
+      const res = await app.request('/swap/quote?in=USDC&out=WOKB&amount=20&slippage=0.5');
       expect(res.status).toBe(503);
       expect(res.headers.get('retry-after')).toBe('5');
       expect(await res.json()).toMatchObject({ error: 'warming', detail: expect.stringContaining('The quote is still') });
@@ -266,7 +252,7 @@ describe('GET /swap/quote', () => {
       setScreenPatienceForTests({ chainReadMs: 30 });
       vi.mocked(quote).mockResolvedValue(QUOTE as never);
       vi.mocked(gasPrice).mockReturnValue(new Promise(() => {}) as never);
-      const r = await get('/swap/quote?in=USDC&out=WETH&amount=20');
+      const r = await get('/swap/quote?in=USDC&out=WOKB&amount=20');
       expect(r).toMatchObject({ status: 200, body: { outAmount: 0.008, gas: null } });
       expect(networkCost).not.toHaveBeenCalled();
     });
@@ -275,36 +261,55 @@ describe('GET /swap/quote', () => {
 
 describe('GET /route/compare', () => {
   it('names a token nothing trades and an amount that is not a number, before any venue is asked', async () => {
-    refused(await get('/route/compare?in=NOPE&out=WETH&amount=500'), 400, 'unknown_token');
-    refused(await get('/route/compare?in=USDC&out=WETH&amount=abc'), 400, 'invalid_amount');
-    refused(await get('/route/compare?in=USDC&out=WETH&amount=Infinity'), 400, 'invalid_amount');
-    expect(compareVenues).not.toHaveBeenCalled();
-  });
-});
-
-describe('GET /graph/activity', () => {
-  it('answers an index that did not answer as a named 502, never as a 500', async () => {
-    vi.mocked(spendsFor).mockRejectedValue(new SubgraphUnavailable('The Graph is unreachable: 429'));
-    vi.mocked(dailySpendFor).mockResolvedValue([]);
-    const r = await get('/graph/activity');
-    expect(r.status).toBe(502);
-    expect(r.body).toMatchObject({ error: 'subgraph_unavailable', message: expect.stringContaining('429') });
+    refused(await get('/route/compare?in=NOPE&out=WOKB&amount=500'), 400, 'unknown_token');
+    refused(await get('/route/compare?in=USDC&out=WOKB&amount=abc'), 400, 'invalid_amount');
+    refused(await get('/route/compare?in=USDC&out=WOKB&amount=Infinity'), 400, 'invalid_amount');
+    expect(quote).not.toHaveBeenCalled();
+    expect(okxQuoteRaw).not.toHaveBeenCalled();
   });
 
-  it("answers this wallet's spends and days when the index answers", async () => {
-    vi.mocked(spendsFor).mockResolvedValue([]);
-    vi.mocked(dailySpendFor).mockResolvedValue([]);
-    expect(await get('/graph/activity')).toEqual({ status: 200, body: { spends: [], daily: [] } });
-    expect(spendsFor).toHaveBeenCalledWith(OWNER);
-  });
-});
+  it('asks Uniswap v3 and OKX DEX for the same trade, and names the better one and by how much', async () => {
+    vi.mocked(quote).mockResolvedValue({ outAmount: 10 } as never);
+    vi.mocked(okxConfigured).mockReturnValue(true);
+    // 10.05 WOKB, in its eighteen decimals.
+    vi.mocked(okxQuoteRaw).mockResolvedValue(10_050_000_000_000_000_000n);
 
-describe('GET /graph/decision', () => {
-  it('refuses a size that is not dollars above zero, and decides nothing', async () => {
-    for (const usd of ['abc', '0', '-5', 'Infinity', '']) {
-      refused(await get(`/graph/decision?usd=${usd}`), 400, 'invalid_usd');
-    }
-    expect(decide).not.toHaveBeenCalled();
+    const r = await get('/route/compare?in=usdc&out=wokb&amount=500');
+
+    expect(r).toEqual({
+      status: 200,
+      body: {
+        inSymbol: 'USDC',
+        outSymbol: 'WOKB',
+        amount: 500,
+        venues: [
+          { venue: 'Uniswap v3', outAmount: 10, unavailable: null },
+          { venue: 'OKX DEX', outAmount: 10.05, unavailable: null },
+        ],
+        best: 'OKX DEX',
+        edgeBps: 50,
+      },
+    });
+    // USDC's six decimals, exactly.
+    expect(okxQuoteRaw).toHaveBeenCalledWith('USDC', 'WOKB', 500_000_000n);
+  });
+
+  it('lists a venue that could not answer with why, never with a number, and names no edge with one answer', async () => {
+    vi.mocked(quote).mockRejectedValue(new Error('No Uniswap v3 route for USDC -> WOKB'));
+    vi.mocked(okxConfigured).mockReturnValue(false);
+
+    const r = await get('/route/compare?in=USDC&out=WOKB&amount=500');
+
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      venues: [
+        { venue: 'Uniswap v3', outAmount: null, unavailable: 'No Uniswap v3 route for USDC -> WOKB' },
+        { venue: 'OKX DEX', outAmount: null, unavailable: expect.stringContaining('no OKX DEX API key') },
+      ],
+      best: null,
+      edgeBps: null,
+    });
+    expect(okxQuoteRaw).not.toHaveBeenCalled();
   });
 });
 
@@ -317,7 +322,7 @@ describe('POST /strategies/backtest', () => {
     refused(
       await post('/strategies/backtest', {
         kind: 'grid',
-        symbol: 'NVDAc',
+        symbol: 'NVDAx',
         params: { lower: 100, upper: 200, steps: 4, usdPerStep: 25 },
       }),
       404,

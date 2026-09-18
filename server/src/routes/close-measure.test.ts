@@ -27,10 +27,14 @@ vi.mock('../evm/delegation.js', () => ({
   waitForTx: vi.fn(async () => true),
   DELEGATION_ADDRESS: '0xc535e991ceca1bdad485425dae5840a39ba8e44e',
 }));
-vi.mock('../venues/oneinch.js', () => ({
-  buildSwap: vi.fn(async () => ({ to: '0x111111125421cA6dc452d289314280a0f8842A65', data: '0xdead', value: '0', minOut: 1n })),
-  SLIPPAGE: { panic: 3, stop: 1 },
-  TOKENS: { WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18 } },
+vi.mock('../venues/uniswap.js', () => ({
+  // Uniswap v3's SwapRouter02 on X Layer: what a close calls.
+  buildSwap: vi.fn(async () => ({ to: '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA', data: '0xdead', value: '0', minOut: 1n })),
+}));
+vi.mock('../venues/tokens.js', () => ({
+  SLIPPAGE: { panic: 2, stop: 1 },
+  // Wrapped OKB on X Layer, routed to USDC through Uniswap v3.
+  TOKENS: { WOKB: { address: '0xe538905cf8410324e03A5A23C1c177a474D59b2b', decimals: 18 } },
   canonicalSymbol: (s: string) => s,
 }));
 vi.mock('../positions/index.js', () => ({ applyFill: vi.fn(async () => undefined) }));
@@ -52,20 +56,20 @@ beforeEach(() => {
   h.statements.length = 0;
   vi.mocked(append).mockClear();
   vi.mocked(applyFill).mockClear();
-  vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 0.5, usd: 1250, raw: 500_000_000_000_000_000n }]);
+  vi.mocked(holdings).mockResolvedValue([{ symbol: 'WOKB', units: 0.5, usd: 1250, raw: 500_000_000_000_000_000n }]);
   vi.mocked(usdcRawOf).mockResolvedValue(1_000_000_000n);
 });
 
 describe('a close', () => {
   it('books the USDC that arrived, and records the sale as a filled run', async () => {
     vi.mocked(proceedsSince).mockResolvedValue(1240.5);
-    const out = await closeHolding({ wallet, symbol: 'WETH', fraction: 1, actor: 'You' });
+    const out = await closeHolding({ wallet, symbol: 'WOKB', fraction: 1, actor: 'You' });
 
     expect(out.status).toBe(200);
-    expect(out.body).toMatchObject({ status: 'closed', symbol: 'WETH', units: 0.5, usd: 1240.5, measured: true });
+    expect(out.body).toMatchObject({ status: 'closed', symbol: 'WOKB', units: 0.5, usd: 1240.5, measured: true });
     expect(vi.mocked(applyFill).mock.calls[0]![1]).toEqual({
       walletId: 'wallet-1',
-      symbol: 'WETH',
+      symbol: 'WOKB',
       units: -0.5,
       usd: -1240.5,
       // A close of one position, not a flatten: the two must not share a label.
@@ -75,35 +79,35 @@ describe('a close', () => {
     const strategy = inserted('strategies')!;
     expect(strategy.text).toMatch(/\$3, 'ended'/);
     expect(strategy.params[2]).toBe('close');
-    expect([strategy.params[1], strategy.params[3], strategy.params[4]]).toEqual(['wallet-1', 'Sold all WETH', 'WETH']);
+    expect([strategy.params[1], strategy.params[3], strategy.params[4]]).toEqual(['wallet-1', 'Sold all WOKB', 'WOKB']);
     const run = inserted('strategy_runs')!;
     expect(run.text).toMatch(/'filled', \$4, \$5, \$6, \$7, \$8, 'sell'/);
-    expect(run.params[7]).toBe('1inch');
+    expect(run.params[7]).toBe('uniswap-v3');
     expect(run.params[1]).toBe(strategy.params[0]);
     // usd, units, price, signature, venue, quoted_usd, asset_class
-    expect(run.params.slice(3)).toEqual([1240.5, 0.5, 2481, `0x${'ab'.repeat(32)}`, '1inch', 1250, 'crypto']);
+    expect(run.params.slice(3)).toEqual([1240.5, 0.5, 2481, `0x${'ab'.repeat(32)}`, 'uniswap-v3', 1250, 'crypto']);
 
     const trail = vi.mocked(append).mock.calls[0]![0] as { detail: string; payload: Record<string, unknown> };
-    expect(trail.detail).toBe('0.500000 WETH for $1,240.50 USDC.');
+    expect(trail.detail).toBe('0.500000 WOKB for $1,240.50 USDC.');
     expect(trail.payload).toMatchObject({ usd: 1240.5, quotedUsd: 1250, measured: true, runId: run.params[0] });
   });
 
   it('when the balance cannot be read back, keeps the estimate, says so, and leaves the sale unmeasured', async () => {
     vi.mocked(proceedsSince).mockResolvedValue(undefined);
-    const out = await closeHolding({ wallet, symbol: 'WETH', fraction: 1, actor: 'You' });
+    const out = await closeHolding({ wallet, symbol: 'WOKB', fraction: 1, actor: 'You' });
 
     expect(out.body).toMatchObject({ usd: 1250, measured: false });
     expect(inserted('strategy_runs')!.params[8]).toBeNull();
     const trail = vi.mocked(append).mock.calls[0]![0] as { detail: string };
-    expect(trail.detail).toBe('0.500000 WETH for about $1,250.00 USDC (the balance could not be read back).');
+    expect(trail.detail).toBe('0.500000 WOKB for about $1,250.00 USDC (the balance could not be read back).');
   });
 
   it('a partial close sells exactly the fraction of the chain balance, not a float of it', async () => {
     vi.mocked(proceedsSince).mockResolvedValue(311);
-    const out = await closeHolding({ wallet, symbol: 'WETH', fraction: 0.25, actor: 'You' });
+    const out = await closeHolding({ wallet, symbol: 'WOKB', fraction: 0.25, actor: 'You' });
 
     expect(out.body).toMatchObject({ units: 0.125, usd: 311 });
-    expect(inserted('strategies')!.params[3]).toBe('Sold 25% of WETH');
+    expect(inserted('strategies')!.params[3]).toBe('Sold 25% of WOKB');
     // The arrival value of a quarter of the holding.
     expect(inserted('strategy_runs')!.params[8]).toBe(312.5);
   });

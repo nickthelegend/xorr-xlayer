@@ -2,21 +2,20 @@
  * GET /history — what settled on chain for this wallet (PLAN.md 3.14).
  *
  * Distinct from Activity, which is the executor's own trail of what it decided. This is what the chain recorded: the
- * delegation contract's `Spent` and `Closed` events for the caller's wallet, on the chain this executor serves — and on
- * Base mainnet, where 1inch indexes a wallet's life outside the app as well, 1inch's History API beside them.
+ * delegation contract's `Spent` and `Closed` events for the caller's wallet, on the chain this executor serves. (The Base
+ * build added 1inch's History API beside them on mainnet; 1inch does not run on X Layer.)
  *
  * The chain is the authority, so the join runs one way. Where one of this wallet's runs recorded the event's
  * transaction, the run says what the executor meant by it — the strategy's kind and symbol, the venue it chose, the
  * side, the units and dollars it measured. An event with no run behind it is still history; a run with no event is not.
  *
- * The screen read The Graph from the client until this route, spends only, and the subgraph indexes the Sepolia
- * contract — so on the fork, where every fill is real, it said nothing had settled. Closes appeared nowhere.
+ * The chain is read directly: there is no indexer between the contract's events and this screen.
  */
 import { Hono } from 'hono';
 import { formatUnits, type Address } from 'viem';
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
-import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, IS_MAINNET_STATE, explorerTx, ONEINCH_ROUTER } from '../evm/chains.js';
+import { AAVE_V3_POOL, ADDRESSES, CHAIN_KEY, IS_MAINNET_STATE, explorerTx } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
 import { DELEGATION_ADDRESS } from '../evm/delegation.js';
 import { getLogsPaged } from '../evm/logs.js';

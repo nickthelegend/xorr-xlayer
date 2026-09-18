@@ -50,7 +50,7 @@ export type ApprovalSpender = {
   unread?: boolean;
 };
 
-/** `spender` and `tokens` are the delegation's, as they always were; `spenders` adds the 1inch router. */
+/** `spender` and `tokens` are the delegation's, as they always were; `spenders` adds each venue contract a fill approves. */
 export type ApprovalsView = { spender: Address; tokens: TokenApproval[]; spenders?: ApprovalSpender[] };
 
 export function useApprovals() {

@@ -11,29 +11,39 @@ import type { WalletRow } from '../routes/wallet-context.js';
 
 const h = vi.hoisted(() => ({
   canSettle: true,
-  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  WETH: '0x4200000000000000000000000000000000000006',
-  CBBTC: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
-  NVDAC: '0x0000000000000000000000000000000000000da1',
+  // X Layer mainnet: Circle's USDC, wrapped OKB, OKX's wrapped BTC, WETH (held, not routed) and the NVDAx xStock.
+  USDC: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+  WOKB: '0xe538905cf8410324e03A5A23C1c177a474D59b2b',
+  XBTC: '0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f',
+  WETH: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c',
+  NVDAX: '0xa8ddb5cd96b5222afe198316e9a57caa642850d5',
   DELEGATION: '0x6c5528Fd8E74a047A85bAb413856A9239E73540e',
-  ROUTER: '0x111111125421cA6dc452d289314280a0f8842A65',
+  /** Uniswap v3 SwapRouter02 on X Layer. */
+  ROUTER: '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA',
+  /** OKX DEX's router and the approval contract it pulls through. */
+  OKX_ROUTER: '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf',
+  OKX_SPENDER: '0x8b773D83bc66Be128c60e07E17C8901f7a64F000',
 }));
 
-vi.mock('../venues/oneinch.js', () => ({
-  get CAN_SETTLE() {
-    return h.canSettle;
-  },
-  SETTLEMENT_SYMBOL: 'USDC',
-  TOKENS: {
-    ETH: { address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', decimals: 18 },
+vi.mock('../venues/tokens.js', () => {
+  const TOKENS: Record<string, { address: string; decimals: number }> = {
     USDC: { address: h.USDC, decimals: 6 },
+    WOKB: { address: h.WOKB, decimals: 18 },
+    XBTC: { address: h.XBTC, decimals: 8 },
     WETH: { address: h.WETH, decimals: 18 },
-    CBBTC: { address: h.CBBTC, decimals: 8 },
-    NVDAc: { address: h.NVDAC, decimals: 18 },
-  },
-  canonicalSymbol: (s: string) => (s.toLowerCase() === 'nvdac' ? 'NVDAc' : s.toUpperCase()),
-}));
-vi.mock('../venues/stocks.js', () => ({ isStock: (s: string) => s === 'NVDAc', equitiesFunctional: vi.fn(async () => false) }));
+    NVDAx: { address: h.NVDAX, decimals: 18 },
+  };
+  const canonical = new Map(Object.keys(TOKENS).map((k) => [k.toUpperCase(), k]));
+  return {
+    get CAN_SETTLE() {
+      return h.canSettle;
+    },
+    SETTLEMENT_SYMBOL: 'USDC',
+    TOKENS,
+    canonicalSymbol: (s: string) => canonical.get(s.trim().toUpperCase()) ?? s.trim(),
+  };
+});
+vi.mock('../venues/stocks.js', () => ({ isStock: (s: string) => s === 'NVDAx', equitiesFunctional: vi.fn(async () => false) }));
 vi.mock('../evm/chains.js', () => ({ CHAIN_KEY: 'xlayer-fork', explorerTx: (hash: string) => `fork:${hash}` }));
 vi.mock('../evm/delegation.js', () => ({
   readPolicy: vi.fn(),
@@ -72,14 +82,14 @@ const { placeSwap } = await import('./swap.js');
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
 const wallet = { id: 'wallet-1', address: OWNER } as unknown as WalletRow;
-const ONE_WETH = 1_000_000_000_000_000_000n;
+const ONE_WOKB = 1_000_000_000_000_000_000n;
 
-/** The aggregator's route for WETH → cbBTC, held to 0.0039 cbBTC. */
-const INTO_CBBTC = {
-  payToken: { address: h.WETH, decimals: 18 },
+/** Uniswap's route for WOKB → XBTC, held to 0.0039 XBTC. */
+const INTO_XBTC = {
+  payToken: { address: h.WOKB, decimals: 18 },
   swap: { to: h.ROUTER, data: '0x1111' },
-  venue: '1inch',
-  floor: { tokenOut: h.CBBTC, minOut: 390_000n },
+  venue: 'uniswap-v3',
+  floor: { tokenOut: h.XBTC, minOut: 390_000n },
 };
 
 const nothingSent = () => {
@@ -93,9 +103,9 @@ beforeEach(() => {
   h.canSettle = true;
   vi.clearAllMocks();
   vi.mocked(readPolicy).mockResolvedValue({ revoked: false, expiresAt: Date.now() + 86_400_000 } as never);
-  vi.mocked(priceOf).mockImplementation(async (s: string) => ({ WETH: 2_500, CBBTC: 100_000 })[s as 'WETH']);
-  vi.mocked(rawBalanceOf).mockImplementation(async (_owner, symbol) => (symbol === 'WETH' ? ONE_WETH : 0n));
-  vi.mocked(chooseSettlement).mockResolvedValue(INTO_CBBTC as never);
+  vi.mocked(priceOf).mockImplementation(async (s: string) => ({ WOKB: 2_500, XBTC: 100_000 })[s as 'WOKB']);
+  vi.mocked(rawBalanceOf).mockImplementation(async (_owner, symbol) => (symbol === 'WOKB' ? ONE_WOKB : 0n));
+  vi.mocked(chooseSettlement).mockResolvedValue(INTO_XBTC as never);
   vi.mocked(closeAsDelegate).mockResolvedValue('0xsig');
   vi.mocked(waitForTx).mockResolvedValue(true);
   vi.mocked(measuredDelta).mockResolvedValue(0.004);
@@ -106,7 +116,7 @@ beforeEach(() => {
 describe('refused before anything is read', () => {
   it('where nothing settles, places nothing', async () => {
     h.canSettle = false;
-    const r = await placeSwap(wallet, { from: 'USDC', to: 'WETH', amount: '20' });
+    const r = await placeSwap(wallet, { from: 'USDC', to: 'WOKB', amount: '20' });
     expect(r).toMatchObject({ status: 409, body: { status: 'blocked', reason: 'not_settleable_here' } });
     expect(readPolicy).not.toHaveBeenCalled();
     nothingSent();
@@ -125,7 +135,7 @@ describe('refused before anything is read', () => {
   });
 
   it('an equity where equities do not function', async () => {
-    const r = await placeSwap(wallet, { from: 'USDC', to: 'nvdac', amount: '20' });
+    const r = await placeSwap(wallet, { from: 'USDC', to: 'nvdax', amount: '20' });
     expect(r).toMatchObject({ status: 409, body: { reason: 'not_settleable_here' } });
     expect(equitiesFunctional).toHaveBeenCalled();
     nothingSent();
@@ -139,15 +149,15 @@ describe('paying USDC is a one-shot buy', () => {
       orderId: 'strategy-1',
       outcome: { status: 'filled', runId: 'run-1', signature: '0xabc', units: 0.008, price: 2_500 },
     });
-    vi.mocked(one).mockResolvedValue({ venue: 'swapvm' });
+    vi.mocked(one).mockResolvedValue({ venue: 'okx-dex' });
 
-    const r = await placeSwap(wallet, { from: 'usdc', to: 'WETH', amount: '20', slippagePct: 0.5 });
+    const r = await placeSwap(wallet, { from: 'usdc', to: 'WOKB', amount: '20', slippagePct: 0.5 });
 
-    expect(placeOrder).toHaveBeenCalledWith(wallet, 'WETH', 20, 'Swap 20 USDC for WETH', { slippagePct: 0.5 });
+    expect(placeOrder).toHaveBeenCalledWith(wallet, 'WOKB', 20, 'Swap 20 USDC for WOKB', { slippagePct: 0.5 });
     expect(one).toHaveBeenCalledWith(expect.stringContaining('FROM strategy_runs'), ['run-1']);
     expect(r).toEqual({
       status: 200,
-      body: { status: 'filled', from: 'USDC', to: 'WETH', sold: 20, received: 0.008, usd: 20, venue: 'swapvm', txHash: '0xabc' },
+      body: { status: 'filled', from: 'USDC', to: 'WOKB', sold: 20, received: 0.008, usd: 20, venue: 'okx-dex', txHash: '0xabc' },
     });
     expect(closeAsDelegate).not.toHaveBeenCalled();
   });
@@ -158,31 +168,31 @@ describe('paying USDC is a one-shot buy', () => {
       orderId: 'strategy-1',
       outcome: { status: 'filled', runId: 'run-1', signature: '0xabc', units: 0.008, price: 2_500 },
     });
-    vi.mocked(one).mockResolvedValue({ venue: '1inch' });
+    vi.mocked(one).mockResolvedValue({ venue: 'uniswap-v3' });
 
-    await placeSwap(wallet, { from: 'USDC', to: 'WETH', amount: '20' });
+    await placeSwap(wallet, { from: 'USDC', to: 'WOKB', amount: '20' });
     expect(vi.mocked(placeOrder).mock.calls[0]![4]).toEqual({});
   });
 
   it('answers a refusal before the run with its reason, and a run the rules block the same way', async () => {
     const refusal = { status: 'blocked' as const, reason: 'no_delegation', detail: 'No active trading permission on-chain.' };
     vi.mocked(placeOrder).mockResolvedValueOnce({ placed: false, refusal });
-    expect(await placeSwap(wallet, { from: 'USDC', to: 'WETH', amount: '20' })).toEqual({ status: 409, body: refusal });
+    expect(await placeSwap(wallet, { from: 'USDC', to: 'WOKB', amount: '20' })).toEqual({ status: 409, body: refusal });
 
     const outcome = { status: 'blocked' as const, runId: 'run-2', reason: 'daily_cap', detail: 'The daily cap is spent.' };
     vi.mocked(placeOrder).mockResolvedValueOnce({ placed: true, orderId: 'strategy-2', outcome });
-    expect(await placeSwap(wallet, { from: 'USDC', to: 'WETH', amount: '20' })).toEqual({ status: 409, body: outcome });
+    expect(await placeSwap(wallet, { from: 'USDC', to: 'WOKB', amount: '20' })).toEqual({ status: 409, body: outcome });
   });
 });
 
 describe('paying anything else converts the holding through closePosition()', () => {
   it('sells exactly the units typed into the token asked for, measures what arrived, and records both sides', async () => {
-    const r = await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2', slippagePct: 0.5 });
+    const r = await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2', slippagePct: 0.5 });
 
     expect(chooseSettlement).toHaveBeenCalledWith({
       intent: {
-        inSymbol: 'WETH',
-        outSymbol: 'CBBTC',
+        inSymbol: 'WOKB',
+        outSymbol: 'XBTC',
         amountIn: 0.2,
         amountInRaw: 200_000_000_000_000_000n,
         usd: 500,
@@ -190,73 +200,91 @@ describe('paying anything else converts the holding through closePosition()', ()
         slippagePct: 0.5,
       },
       owner: OWNER,
-      preferred: undefined,
       isClose: true,
       delegationFrom: h.DELEGATION,
-      // The same call and raw amount as the close below, so a fork measures the route it will run (PLAN.md X77).
+      // The same call and raw amount as the close below, so every venue is routed for exactly what it will pull.
       send: { via: 'closePosition', amount: 200_000_000_000_000_000n },
     });
     expect(closeAsDelegate).toHaveBeenCalledWith({
       owner: OWNER,
-      token: h.WETH,
+      token: h.WOKB,
       venue: h.ROUTER,
       amount: 200_000_000_000_000_000n,
       data: '0x1111',
-      tokenOut: h.CBBTC,
+      tokenOut: h.XBTC,
       minOut: 390_000n,
     });
-    // cbBTC read before the transaction, so the delta afterwards is the fill and nothing else.
-    expect(measuredDelta).toHaveBeenCalledWith({ owner: OWNER, symbol: 'CBBTC', before: 0n });
+    // XBTC read before the transaction, so the delta afterwards is the fill and nothing else.
+    expect(measuredDelta).toHaveBeenCalledWith({ owner: OWNER, symbol: 'XBTC', before: 0n });
     expect(vi.mocked(applyFill).mock.calls.map((c) => c[1])).toEqual([
       // Both legs attributed to the swap, so neither lands in the book as nobody's.
-      { walletId: 'wallet-1', symbol: 'WETH', units: -0.2, usd: -400, attribution: SWAP },
-      { walletId: 'wallet-1', symbol: 'CBBTC', units: 0.004, usd: 400, attribution: SWAP },
+      { walletId: 'wallet-1', symbol: 'WOKB', units: -0.2, usd: -400, attribution: SWAP },
+      { walletId: 'wallet-1', symbol: 'XBTC', units: 0.004, usd: 400, attribution: SWAP },
     ]);
     expect(recordSale).toHaveBeenCalledWith(
       { client: true },
       {
         walletId: 'wallet-1',
-        symbol: 'WETH',
-        label: 'Swapped 0.2 WETH for 0.004 CBBTC',
+        symbol: 'WOKB',
+        label: 'Swapped 0.2 WOKB for 0.004 XBTC',
         units: 0.2,
         proceedsUsd: 400,
         quotedUsd: 500,
         signature: '0xsig',
         kind: 'swap',
-        venue: '1inch',
+        venue: 'uniswap-v3',
       },
     );
     expect(vi.mocked(append).mock.calls[0]![0]).toMatchObject({
       walletId: 'wallet-1',
       agent: 'You',
-      action: 'Swapped 0.2 WETH for 0.004 CBBTC',
+      action: 'Swapped 0.2 WOKB for 0.004 XBTC',
       kind: 'trade',
       signature: '0xsig',
-      payload: { runId: 'run-9', venue: '1inch', measured: true, explorer: 'fork:0xsig' },
+      payload: { runId: 'run-9', venue: 'uniswap-v3', measured: true, explorer: 'fork:0xsig' },
     });
     expect(r).toEqual({
       status: 200,
-      body: { status: 'filled', from: 'WETH', to: 'CBBTC', sold: 0.2, received: 0.004, usd: 400, venue: '1inch', measured: true, txHash: '0xsig' },
+      body: { status: 'filled', from: 'WOKB', to: 'XBTC', sold: 0.2, received: 0.004, usd: 400, venue: 'uniswap-v3', measured: true, txHash: '0xsig' },
     });
   });
 
-  it('parses the typed decimal exactly — 0.1 WETH is 10^17 wei, not the float of it', async () => {
-    await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.1' });
+  it('through OKX DEX, names its approval contract so the close is sent as closePositionVia', async () => {
+    vi.mocked(chooseSettlement).mockResolvedValue({
+      ...INTO_XBTC,
+      swap: { to: h.OKX_ROUTER, data: '0x2222' },
+      spender: h.OKX_SPENDER,
+      venue: 'okx-dex',
+    } as never);
+
+    await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' });
+
+    expect(closeAsDelegate).toHaveBeenCalledWith(
+      expect.objectContaining({ venue: h.OKX_ROUTER, spender: h.OKX_SPENDER, data: '0x2222' }),
+    );
+    // Uniswap's router pulls for itself: no spender, and the plain closePosition.
+    vi.mocked(chooseSettlement).mockResolvedValue(INTO_XBTC as never);
+    await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' });
+    expect(vi.mocked(closeAsDelegate).mock.calls[1]![0]).not.toHaveProperty('spender');
+  });
+
+  it('parses the typed decimal exactly — 0.1 WOKB is 10^17 wei, not the float of it', async () => {
+    await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.1' });
     expect(vi.mocked(closeAsDelegate).mock.calls[0]![0].amount).toBe(100_000_000_000_000_000n);
   });
 
   it('into USDC, measures the proceeds and records a close', async () => {
     vi.mocked(chooseSettlement).mockResolvedValue({
-      ...INTO_CBBTC,
+      ...INTO_XBTC,
       floor: { tokenOut: h.USDC, minOut: 495_000_000n },
     } as never);
 
-    const r = await placeSwap(wallet, { from: 'WETH', to: 'USDC', amount: '0.2' });
+    const r = await placeSwap(wallet, { from: 'WOKB', to: 'USDC', amount: '0.2' });
 
     expect(proceedsSince).toHaveBeenCalledWith(OWNER, 7n);
     expect(measuredDelta).not.toHaveBeenCalled();
     expect(vi.mocked(applyFill).mock.calls.map((c) => c[1])).toEqual([
-      { walletId: 'wallet-1', symbol: 'WETH', units: -0.2, usd: -499.2, attribution: SWAP },
+      { walletId: 'wallet-1', symbol: 'WOKB', units: -0.2, usd: -499.2, attribution: SWAP },
     ]);
     expect(vi.mocked(recordSale).mock.calls[0]![1]).toMatchObject({ kind: 'close', proceedsUsd: 499.2, quotedUsd: 500 });
     expect(r.body).toMatchObject({ status: 'filled', to: 'USDC', received: 499.2, usd: 499.2 });
@@ -264,29 +292,29 @@ describe('paying anything else converts the holding through closePosition()', ()
 
   it('refuses without an active permission, and sends nothing', async () => {
     vi.mocked(readPolicy).mockResolvedValue({ revoked: true, expiresAt: Date.now() + 86_400_000 } as never);
-    const r = await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' });
+    const r = await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' });
     expect(r).toMatchObject({ status: 409, body: { reason: 'delegation_inactive' } });
     nothingSent();
   });
 
   it('refuses what is not held, and more than is held', async () => {
     vi.mocked(rawBalanceOf).mockResolvedValueOnce(0n);
-    expect(await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' })).toMatchObject({
+    expect(await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' })).toMatchObject({
       status: 409,
       body: { reason: 'not_held' },
     });
 
     vi.mocked(rawBalanceOf).mockResolvedValueOnce(100_000_000_000_000_000n);
-    expect(await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' })).toMatchObject({
+    expect(await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' })).toMatchObject({
       status: 409,
-      body: { reason: 'insufficient', detail: 'You hold 0.1 WETH, less than 0.2.' },
+      body: { reason: 'insufficient', detail: 'You hold 0.1 WOKB, less than 0.2.' },
     });
     nothingSent();
   });
 
   it('says so when the balance cannot be read, and places nothing', async () => {
     vi.mocked(rawBalanceOf).mockResolvedValueOnce(undefined);
-    expect(await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' })).toMatchObject({
+    expect(await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' })).toMatchObject({
       status: 502,
       body: { status: 'failed' },
     });
@@ -295,11 +323,11 @@ describe('paying anything else converts the holding through closePosition()', ()
 
   it('refuses a holding it cannot price, and one worth less than the gas', async () => {
     // No price at all: the feed throws, and nothing is valued or placed.
-    vi.mocked(priceOf).mockRejectedValueOnce(new Error('no price for WETH'));
-    expect(await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' })).toMatchObject({ status: 503 });
+    vi.mocked(priceOf).mockRejectedValueOnce(new Error('no price for WOKB'));
+    expect(await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' })).toMatchObject({ status: 503 });
 
     vi.mocked(priceOf).mockResolvedValueOnce(2);
-    expect(await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' })).toMatchObject({
+    expect(await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' })).toMatchObject({
       status: 409,
       body: { reason: 'dust' },
     });
@@ -309,11 +337,11 @@ describe('paying anything else converts the holding through closePosition()', ()
   it('records nothing for a swap that did not confirm', async () => {
     vi.mocked(waitForTx).mockResolvedValue(false);
 
-    const r = await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' });
+    const r = await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' });
 
     expect(r).toEqual({
       status: 502,
-      body: { status: 'failed', from: 'WETH', to: 'CBBTC', error: 'In words: swap 0xsig did not confirm' },
+      body: { status: 'failed', from: 'WOKB', to: 'XBTC', error: 'In words: swap 0xsig did not confirm' },
     });
     expect(applyFill).not.toHaveBeenCalled();
     expect(recordSale).not.toHaveBeenCalled();
@@ -323,10 +351,10 @@ describe('paying anything else converts the holding through closePosition()', ()
   it('when what arrived cannot be read back, records the floor the contract enforced as the least it was', async () => {
     vi.mocked(measuredDelta).mockResolvedValue(undefined);
 
-    const r = await placeSwap(wallet, { from: 'WETH', to: 'CBBTC', amount: '0.2' });
+    const r = await placeSwap(wallet, { from: 'WOKB', to: 'XBTC', amount: '0.2' });
 
     expect(r.body).toMatchObject({ received: 0.0039, measured: false });
     expect(vi.mocked(recordSale).mock.calls[0]![1]).toMatchObject({ quotedUsd: null });
-    expect(vi.mocked(append).mock.calls[0]![0].detail).toMatch(/^At least 0\.0039 CBBTC/);
+    expect(vi.mocked(append).mock.calls[0]![0].detail).toMatch(/^At least 0\.0039 XBTC/);
   });
 });

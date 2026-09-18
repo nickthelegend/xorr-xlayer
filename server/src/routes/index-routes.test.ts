@@ -138,7 +138,7 @@ describe('GET /price/:symbol', () => {
     vi.mocked(priceOf).mockResolvedValueOnce(64_000);
     expect(await call('/price/BTC')).toMatchObject({ status: 200, body: { symbol: 'BTC', price: 64_000, source: 'coingecko' } });
     vi.mocked(priceOf).mockResolvedValueOnce(181.5);
-    expect(await call('/price/nvdac')).toMatchObject({ status: 200, body: { symbol: 'NVDAc', price: 181.5, source: '1inch' } });
+    expect(await call('/price/nvdax')).toMatchObject({ status: 200, body: { symbol: 'NVDAx', price: 181.5, source: 'uniswap-v3' } });
   });
 
   it('keeps a feed that failed a 502, worth retrying, with a code rather than the upstream’s own words', async () => {

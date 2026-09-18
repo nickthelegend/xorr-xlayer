@@ -5,11 +5,14 @@
  * round. Both are now one multicall each — and a failed read must still throw, never come back as
  * "no permission" or "no venues".
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => {
   process.env.DELEGATION_ADDRESS = '0x6c5528Fd8E74a047A85bAb413856A9239E73540e';
-  return { multicall: vi.fn() };
+  // A fork of X Layer mainnet, where the grant names venues: the testnet the suite pins has none to read.
+  const chainBefore = process.env.XORR_CHAIN;
+  process.env.XORR_CHAIN = 'xlayer-fork';
+  return { multicall: vi.fn(), chainBefore };
 });
 
 vi.mock('./client.js', () => ({
@@ -20,6 +23,10 @@ vi.mock('./client.js', () => ({
 
 const { readPolicy, readPolicyAndVenues } = await import('./delegation.js');
 const { SETTLEMENT_VENUES } = await import('./chains.js');
+// Read at import: put the suite's chain back for whatever this worker runs next.
+afterAll(() => {
+  process.env.XORR_CHAIN = h.chainBefore;
+});
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
 const DELEGATE = '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5';
@@ -62,6 +69,7 @@ describe('the permission', () => {
 
 describe('the permission and its venues', () => {
   it('come back from the same single read', async () => {
+    expect(SETTLEMENT_VENUES.length).toBeGreaterThan(0);
     const allowed = SETTLEMENT_VENUES.map((_, i) => i === 0);
     h.multicall.mockResolvedValue([[DELEGATE, usd(2_810), 1_791_000_000n, false], usd(2_810), 0n, ...allowed]);
     const { policy, venues } = await readPolicyAndVenues(OWNER);

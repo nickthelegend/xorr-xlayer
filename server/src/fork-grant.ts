@@ -10,12 +10,13 @@
  */
 import 'dotenv/config';
 import { createPublicClient, createWalletClient, http, parseUnits, erc20Abi, type Address } from 'viem';
-import { base } from 'viem/chains';
+import { xLayer } from 'viem/chains';
 
 const RPC = process.env.FORK_RPC ?? 'http://127.0.0.1:8545';
-const USDC: Address = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+/** Circle's native USDC on X Layer — the settlement token. */
+const USDC: Address = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
 
-const chain = { ...base, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
+const chain = { ...xLayer, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
 const pub = createPublicClient({ chain, transport: http(RPC) });
 
 const ABI = [
@@ -33,7 +34,7 @@ const rpc = (m: string, p: unknown[]) =>
 async function main() {
   // From the arguments, or the environment `npm run rebuild:fork` runs it in (PLAN.md 3.2).
   const owner = (process.argv[2] ?? process.env.OWNER_ADDRESS) as Address;
-  const capUsd = Number(process.argv[3] ?? process.env.FORK_GRANT_CAP_USD ?? 2_000);
+  const capUsd = Number(process.argv[3] ?? process.env.FORK_GRANT_CAP_USD ?? 100);
   const delegation = process.env.DELEGATION_ADDRESS as Address;
   const delegate = process.env.XORR_DELEGATE_ADDRESS as Address | undefined;
   if (!owner || !delegation) throw new Error('usage: fork-grant.ts <owner> [capUsd]; DELEGATION_ADDRESS must be set');
@@ -50,7 +51,7 @@ async function main() {
   /*
    * The venues come from the shared list, not a literal.
    *
-   * This granted only the 1inch router, so a tier-4 run reached the chain and died inside `spend()`
+   * A literal list once granted a single router, so a run reached the chain and died inside `spend()`
    * as VenueNotAllowed — for a permission the app's own grant screen says it asks for. One list,
    * read here and by `/delegation/params`, is what keeps the fork honest about what a real user
    * would have signed.
@@ -78,12 +79,14 @@ async function main() {
    * The blast radius is unchanged: the delegation can still only move funds to an allowlisted
    * venue and still cannot send anywhere it chooses.
    *
-   * Every token on the list `/delegation/params` hands the app's grant. This approved WETH alone, so
-   * once a swap had bought the demo wallet cbBTC it could not be sold out of it: the panic flatten's
-   * cbBTC leg reverted with SafeTransferFromFailed (2026-09-15). Equities are not on the list; they do
-   * not function on a fork.
+   * Every token on the list `/delegation/params` hands the app's grant, and every wrapped xStock: on a fork of X Layer
+   * the wrappers are ordinary contracts with their real state, so a position bought in one can be sold out of it.
+   * Approving one asset alone once left a bought position unsellable: the panic flatten's leg reverted with
+   * SafeTransferFromFailed (2026-09-15).
    */
-  for (const { address } of APPROVABLE_TOKENS.filter((t) => t.address.toLowerCase() !== USDC.toLowerCase())) {
+  const { STOCKS } = await import('./venues/stocks.js');
+  const sellable = [...APPROVABLE_TOKENS.map((t) => t.address), ...Object.values(STOCKS).map((s) => s.address)];
+  for (const address of sellable.filter((a) => a.toLowerCase() !== USDC.toLowerCase())) {
     const h = await w.writeContract({
       address, abi: erc20Abi, functionName: 'approve', args: [delegation, 2n ** 255n],
     });

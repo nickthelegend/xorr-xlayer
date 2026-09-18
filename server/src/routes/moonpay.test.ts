@@ -8,7 +8,8 @@ import {
 } from './moonpay.js';
 
 describe('MoonPay integration', () => {
-  const testWallet = '7v91N7iZEdMoQg6zJ5pA9oG3eF1n3hXyZ1W2v3u4t5s6';
+  // An X Layer (EVM) wallet: the only kind of address the executor's validator accepts now.
+  const testWallet = '0x95A0b368588713011a15f4b1041423f31B08e615';
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -75,6 +76,19 @@ describe('MoonPay integration', () => {
     expect(body.walletAddress).toBe(testWallet);
     expect(body.url).toContain('https://buy-sandbox.moonpay.com');
     expect(body.url).toContain('currencyCode=usdc_sol');
+  });
+
+  it('POST /deposit/moonpay/url rejects a Solana address, which no X Layer wallet has', async () => {
+    const app = new Hono();
+    app.route('/', moonpayRoutes);
+
+    const res = await app.request('/deposit/moonpay/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletAddress: '7v91N7iZEdMoQg6zJ5pA9oG3eF1n3hXyZ1W2v3u4t5s6' }),
+    });
+
+    expect(res.status).toBe(400);
   });
 
   it('POST /deposit/moonpay/url rejects invalid address', async () => {

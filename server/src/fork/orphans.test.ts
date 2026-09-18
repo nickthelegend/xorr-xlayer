@@ -86,14 +86,14 @@ describe('the chain it will touch', () => {
   const env = { XORR_CHAIN: 'xlayer-fork', FORK_RPC: 'http://127.0.0.1:8555', DATABASE_URL: 'postgres://localhost/xorr_fork' };
   const node = (client: string, chainId: string) => async (method: string) => (method === 'web3_clientVersion' ? client : chainId);
 
-  it('is an anvil fork of Base, with the node and the database named on purpose — and nothing else', async () => {
-    await expect(assertBaseFork(env, node('anvil/v1.3.1', '0x2105'))).resolves.toBeUndefined();
-    await expect(assertBaseFork({ ...env, XORR_CHAIN: 'xlayer-testnet' }, node('anvil', '0x2105'))).rejects.toThrow('xlayer-fork');
-    await expect(assertBaseFork({ ...env, XORR_CHAIN: 'xlayer' }, node('anvil', '0x2105'))).rejects.toThrow('xlayer-fork');
-    await expect(assertBaseFork({ ...env, FORK_RPC: '' }, node('anvil', '0x2105'))).rejects.toThrow('FORK_RPC');
-    await expect(assertBaseFork({ ...env, DATABASE_URL: '' }, node('anvil', '0x2105'))).rejects.toThrow('DATABASE_URL');
-    await expect(assertBaseFork(env, node('Geth/v1.14.0', '0x2105'))).rejects.toThrow('not anvil');
-    await expect(assertBaseFork(env, node('anvil/v1.3.1', '0x14a34'))).rejects.toThrow('84532');
+  it('is an anvil fork of X Layer mainnet, with the node and the database named on purpose — and nothing else', async () => {
+    await expect(assertBaseFork(env, node('anvil/v1.3.1', '0xc4'))).resolves.toBeUndefined();
+    await expect(assertBaseFork({ ...env, XORR_CHAIN: 'xlayer-testnet' }, node('anvil', '0xc4'))).rejects.toThrow('xlayer-fork');
+    await expect(assertBaseFork({ ...env, XORR_CHAIN: 'xlayer' }, node('anvil', '0xc4'))).rejects.toThrow('xlayer-fork');
+    await expect(assertBaseFork({ ...env, FORK_RPC: '' }, node('anvil', '0xc4'))).rejects.toThrow('FORK_RPC');
+    await expect(assertBaseFork({ ...env, DATABASE_URL: '' }, node('anvil', '0xc4'))).rejects.toThrow('DATABASE_URL');
+    await expect(assertBaseFork(env, node('Geth/v1.14.0', '0xc4'))).rejects.toThrow('not anvil');
+    await expect(assertBaseFork(env, node('anvil/v1.3.1', '0x7a0'))).rejects.toThrow('chain 1952, not a fork of X Layer (196)');
   });
 
   it('is checked against the command line before anything that reads a .env is loaded', () => {

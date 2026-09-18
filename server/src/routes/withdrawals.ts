@@ -176,8 +176,9 @@ export async function prepareWithdrawAll(w: WalletRow, input: { to: string; toke
   if (!token) {
     return blocked('unknown_token', `${input.token} is not a token this chain lists, so no transfer of it was prepared.`, 400);
   }
-  if (token.symbol === 'ETH') {
-    return blocked('native_token', 'Native ETH pays the network fee for the transfer itself, so it is not withdrawn this way.', 400);
+  // Known by its address, not a symbol: the chain's own gas token (OKB on X Layer) is not an ERC-20 to transfer.
+  if (isAddressEqual(token.address as Address, ADDRESSES.nativeToken)) {
+    return blocked('native_token', 'Native OKB pays the network fee for the transfer itself, so it is not withdrawn this way.', 400);
   }
 
   const owner = getAddress(w.address);

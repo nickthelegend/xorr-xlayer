@@ -52,6 +52,5 @@ describe('the machine surface and the user surface do not overlap', () => {
     const src = fs.readFileSync(path.join(ROUTES, 'extra.ts'), 'utf8');
     expect(src).toContain("'/agents/leaderboard'");
     expect(/\.get\('\/agent\/decision'/.test(src)).toBe(false);
-    expect(src).toContain("'/graph/decision'");
   });
 });

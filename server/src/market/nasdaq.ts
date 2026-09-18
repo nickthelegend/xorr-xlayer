@@ -1,7 +1,7 @@
 /**
  * Nasdaq market hours and the off-hours decoupling guard — PLAN.md §8.4.
  *
- * xStocks trade 24/7 on Solana, but the underlying US equities only trade during Nasdaq regular
+ * xStocks trade 24/7 on X Layer, but the underlying US equities only trade during Nasdaq regular
  * and extended sessions.
  *
  * Sessions (America/New_York):
@@ -10,7 +10,7 @@
  * - After-hours:   16:00 - 20:00 ET (Mon-Fri)
  * - Closed:        20:00 - 04:00 ET overnight, and Friday 20:00 - Monday 04:00 ET
  *
- * While the underlying exchange is closed, a Jupiter pool price can drift away from what the share
+ * While the underlying exchange is closed, a Uniswap pool price can drift away from what the share
  * is actually worth, because nothing is arbitraging it back. This module measures that drift and
  * says whether to widen slippage or stand down.
  *
@@ -21,16 +21,41 @@
  * that goes stale the day it is written — the earlier version of this file carried one, and every
  * verdict it produced was measured against numbers nobody had checked since.
  *
- * So the reference comes from a real venue: the same company's tokenized share on Base, priced from
- * a live 1inch route by `venues/stocks.ts`. Different chain, different pools, same underlying — if
- * the two disagree, one of them has decoupled. It is not the Nasdaq print and does not claim to be.
+ * So the reference comes from a real, separate market: the same xStock on Solana, where Jupiter's public price API
+ * (keyless) reports xStocks' own reference price for the underlying share (`stockData.price`). Different chain,
+ * different pools, same underlying — if the two disagree, one of them has decoupled. It is not the Nasdaq print and
+ * does not claim to be. The wrapper on X Layer carries the issuer's multiplier (splits, reinvested dividends), so the
+ * reference is the share price times the wrapper's own `convertToAssets(1e18)`: measured 2026-09-19, SPYx $761.34 ×
+ * 1.00571 = $765.69 against the pool's $765.62, NVDAx $219.49 × 1.00170 = $219.86 against $220.17.
  *
  * When no reference is available, this module does not guess. It reports `spreadBps: null` and,
  * outside regular hours, holds: the guard exists to detect decoupling, and "I could not measure it"
  * is not the same answer as "there is none".
  */
 import { underlyingTicker } from './edgar.js';
-import { stockPriceUsd } from '../venues/stocks.js';
+import { getJson } from '../http/get.js';
+import { stockKey } from '../venues/stocks.js';
+import { readMultiplierOrNull } from '../venues/multiplier.js';
+
+/**
+ * The same xStocks on Solana — reference data, the mints Backed issued there. Used only to ask Jupiter's price API for
+ * xStocks' reference price of the underlying share; nothing here touches Solana.
+ */
+const SOLANA_XSTOCK_MINTS: Record<string, string> = {
+  NVDAx: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh',
+  TSLAx: 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
+  AAPLx: 'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp',
+  MSFTx: 'XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX',
+  AMZNx: 'Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg',
+  GOOGLx: 'XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN',
+  METAx: 'Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu',
+  MSTRx: 'XsP7xzNPvEHS1m6qfanPUGjNmdnmsLKEoNAnHjdxxyZ',
+  COINx: 'Xs7ZdzSHLU9ftNJsii5fCeJhoRWSC32SQGzGQtePxNu',
+  SPYx: 'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W',
+  QQQx: 'Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ',
+};
+
+const JUPITER_PRICE_API = 'https://lite-api.jup.ag/price/v3';
 
 export { underlyingTicker };
 
@@ -62,16 +87,30 @@ const EXTENDED_HOLD_PCT = 0.012;
 const CLOSED_HOLD_PCT = 0.015;
 
 /**
- * A second opinion on what the underlying share is worth, or null when there is not one.
+ * A second opinion on what one wrapped xStock is worth, or null when there is not one.
  *
- * The same company's tokenized share on Base, priced from a live 1inch route. Returns null for an
- * xStock with no Base counterpart (the index products, for instance) and for any symbol the Base
- * venue cannot route right now — both of which are real answers, and neither of which this module
- * papers over.
+ * xStocks' reference price for the underlying share, as Jupiter reports it for the same xStock on Solana, times the X
+ * Layer wrapper's multiplier. Null when the symbol has no Solana counterpart, when Jupiter does not answer or answers
+ * without a share price, or when the wrapper's multiplier cannot be read — each a real answer, none papered over.
  */
 export async function referencePriceUsd(symbol: string): Promise<number | null> {
-  const ticker = underlyingTicker(symbol);
-  return await stockPriceUsd(`${ticker}c`).catch(() => null);
+  const key = stockKey(symbol);
+  const mint = key ? SOLANA_XSTOCK_MINTS[key] : undefined;
+  if (!key || !mint) return null;
+  const [share, reading] = await Promise.all([
+    getJson<Record<string, { stockData?: { price?: number } } | undefined>>(
+      `${JUPITER_PRICE_API}?ids=${mint}`,
+      60_000,
+      6_000,
+      {},
+      { attempts: 1 },
+    )
+      .then((r) => r[mint]?.stockData?.price)
+      .catch(() => undefined),
+    readMultiplierOrNull(key),
+  ]);
+  if (typeof share !== 'number' || !Number.isFinite(share) || share <= 0 || !reading) return null;
+  return share * reading.multiplier;
 }
 
 /**
@@ -157,7 +196,7 @@ export function evaluateOffHoursGuard(params: {
     ? Math.abs(onChainPrice - referencePrice) / referencePrice
     : null;
   const spreadBps = spreadPct === null ? null : Math.round(spreadPct * 10_000);
-  const drift = spreadPct === null ? '' : ` Drift against the Base listing is ${(spreadPct * 100).toFixed(2)}%.`;
+  const drift = spreadPct === null ? '' : ` Drift against the Solana reference is ${(spreadPct * 100).toFixed(2)}%.`;
 
   if (session.session === 'regular') {
     return {
@@ -189,7 +228,7 @@ export function evaluateOffHoursGuard(params: {
         spreadPct,
         action: 'hold',
         suggestedSlippageBps: 100,
-        reason: `Nasdaq ${session.phase} and the pool has drifted ${(spreadPct * 100).toFixed(2)}% from the Base listing, past 1.2%. Holding until the regular session.`,
+        reason: `Nasdaq ${session.phase} and the pool has drifted ${(spreadPct * 100).toFixed(2)}% from the Solana reference, past 1.2%. Holding until the regular session.`,
       };
     }
     return {
@@ -209,7 +248,7 @@ export function evaluateOffHoursGuard(params: {
       spreadPct,
       action: 'hold',
       suggestedSlippageBps: 150,
-      reason: `Nasdaq is closed (${session.phase}) and the pool has drifted ${(spreadPct * 100).toFixed(2)}% from the Base listing, past 1.5%. Holding to protect against off-hours slippage.`,
+      reason: `Nasdaq is closed (${session.phase}) and the pool has drifted ${(spreadPct * 100).toFixed(2)}% from the Solana reference, past 1.5%. Holding to protect against off-hours slippage.`,
     };
   }
 
@@ -219,6 +258,6 @@ export function evaluateOffHoursGuard(params: {
     spreadPct,
     action: 'widen_slippage',
     suggestedSlippageBps: 120,
-    reason: `Nasdaq is closed (${session.phase}), and the pool is still tracking the Base listing to within ${(spreadPct * 100).toFixed(2)}%. Trading 24/7 with a 120 bps slippage guard.`,
+    reason: `Nasdaq is closed (${session.phase}), and the pool is still tracking the Solana reference to within ${(spreadPct * 100).toFixed(2)}%. Trading 24/7 with a 120 bps slippage guard.`,
   };
 }

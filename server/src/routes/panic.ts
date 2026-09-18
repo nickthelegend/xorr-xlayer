@@ -79,7 +79,7 @@ export async function recordSale(
     signature: string;
     /** A sale into the settlement token is a `close`; one into any other token is a `swap` (PLAN.md 3.9). */
     kind?: 'close' | 'swap';
-    /** Where it settled. A close goes to the aggregator; a swap names the venue its settlement chose. */
+    /** Where it settled. A close goes through Uniswap v3 (`venues/uniswap.ts`); a swap names the venue its settlement chose. */
     venue?: string;
   },
 ): Promise<string> {
@@ -102,7 +102,7 @@ export async function recordSale(
       sale.units,
       sale.units > 0 ? sale.proceedsUsd / sale.units : null,
       sale.signature,
-      sale.venue ?? '1inch',
+      sale.venue ?? 'uniswap-v3',
       sale.quotedUsd,
       isStock(sale.symbol) ? 'equity' : 'crypto',
     ],

@@ -8,14 +8,12 @@
  *
  * Two real sources, chosen because each is authoritative for what it covers:
  *
- *   - **1inch Token API** (`/token/v1.2/8453/custom/:address`) for anything with a Base address —
- *     WETH, USDC, cbBTC and all eight equities. It answers with the token's own `logoURI`, which
- *     for NVDAc is an SVG 1inch serves and a `name` of "NVIDIA Corporation". This is the token
- *     registry the aggregator itself routes against, so it is the right authority for a token's
- *     identity, and it is the only source that knows the equities at all.
- *   - **CoinGecko** for everything priced by a feed rather than held on Base — BTC, SOL, XRP,
- *     DOGE, HYPE, AAVE, LINK, TON, and the gold pair. One request for all of them, for the reason
- *     spelled out over `COINGECKO_IMAGE_URL`.
+ *   - **Backed's xStocks asset API** (`api.xstocks.fi/api/v2/public/assets/:symbol`, public, no key) for the
+ *     wrapped xStocks. The issuer's own registry answers with the token's `logo` (e.g.
+ *     `xstocks-metadata.backed.fi/logos/tokens/TSLAx.png`), so the mark on screen is the one the issuer publishes for
+ *     the token that trades — the right authority for its identity, and the only source that knows every xStock.
+ *   - **CoinGecko** for everything else — USDC, OKB, BTC and the feed-priced markets. One request for all of them,
+ *     for the reason spelled out over `COINGECKO_IMAGE_URL`.
  *
  * A symbol neither source knows — the commodities, the indices, the pre-IPO names — gets no logo,
  * and the client keeps the gradient mark for it. That is the honest outcome: an invented logo for
@@ -30,10 +28,9 @@
  */
 import { getJson } from '../http/get.js';
 import { COINGECKO_IDS, COINGECKO_IMAGE_URL, type CoingeckoMarket } from './ids.js';
-import { TOKENS } from '../venues/tokens.js';
-import { ONEINCH_CHAIN_ID } from '../evm/chains.js';
+import { STOCKS, stockKey } from '../venues/stocks.js';
 
-const ONEINCH_TOKEN_API = 'https://api.1inch.dev/token/v1.2';
+const XSTOCKS_ASSET_API = 'https://api.xstocks.fi/api/v2/public/assets';
 
 /**
  * Long, because a logo that resolved once is not going to change under us.
@@ -59,7 +56,7 @@ export type Logo = {
   /** Absolute URL to a PNG or SVG, or null where neither source knows this symbol. */
   url: string | null;
   /** Which upstream answered. Rendered nowhere; it is here so `/verify` can say. */
-  source: '1inch' | 'coingecko' | null;
+  source: 'xstocks' | 'coingecko' | null;
 };
 
 /**
@@ -78,21 +75,19 @@ const NONE: Logo = { url: null, source: null };
 /** Resolved and it has none, as distinct from `undefined`, which means we could not ask. */
 type Answer = Logo | undefined;
 
-/** The token registry the aggregator routes against — and the only source that knows the equities. */
-async function fromOneInch(symbol: string): Promise<Answer> {
-  const token = TOKENS[symbol];
-  if (!token) return NONE;
-  const key = process.env.ONEINCH_API_KEY;
-  if (!key) return undefined;
+/** The issuer's own registry — the only source that knows every wrapped xStock. Not a stock: `NONE`, settled. */
+async function fromXStocks(symbol: string): Promise<Answer> {
+  const key = stockKey(symbol);
+  if (!key || !STOCKS[key]) return NONE;
   try {
-    const res = await getJson<{ logoURI?: string }>(
-      `${ONEINCH_TOKEN_API}/${ONEINCH_CHAIN_ID}/custom/${token.address}`,
+    const res = await getJson<{ logo?: string }>(
+      `${XSTOCKS_ASSET_API}/${encodeURIComponent(key)}`,
       TTL_MS,
       TIMEOUT_MS,
-      { Authorization: `Bearer ${key}` },
+      {},
       NO_RETRY,
     );
-    return res.logoURI ? { url: res.logoURI, source: '1inch' } : NONE;
+    return typeof res.logo === 'string' && /^https:\/\//.test(res.logo) ? { url: res.logo, source: 'xstocks' } : NONE;
   } catch {
     // An upstream that will not answer is not evidence the token has no logo.
     return undefined;
@@ -142,8 +137,7 @@ async function coingeckoImages(): Promise<Map<string, string> | undefined> {
 /**
  * The logo for one symbol, or `undefined` when no source could be reached.
  *
- * 1inch first: where a symbol has a Base address, the token that trades IS the thing on screen,
- * and the equities exist nowhere else.
+ * The issuer first: for a wrapped xStock the token that trades IS the thing on screen, and its logo is the issuer's.
  */
 export async function logoFor(symbol: string): Promise<Answer> {
   const hit = cache.get(symbol);
@@ -154,10 +148,10 @@ export async function logoFor(symbol: string): Promise<Answer> {
 
   const run = (async (): Promise<Answer> => {
     try {
-      const viaOneInch = await fromOneInch(symbol);
-      if (viaOneInch?.url) {
-        cache.set(symbol, viaOneInch);
-        return viaOneInch;
+      const viaIssuer = await fromXStocks(symbol);
+      if (viaIssuer?.url) {
+        cache.set(symbol, viaIssuer);
+        return viaIssuer;
       }
 
       const id = COINGECKO_IDS[symbol];
@@ -165,9 +159,9 @@ export async function logoFor(symbol: string): Promise<Answer> {
         /*
          * Neither registry has a row for this symbol at all — the commodities, the indices, the
          * pre-IPO names. Nothing was asked of any upstream, so this is a settled answer and worth
-         * caching, but only when 1inch had actually been consulted and had nothing.
+         * caching, but only when the issuer's registry had actually been consulted and had nothing.
          */
-        if (viaOneInch === undefined) return undefined;
+        if (viaIssuer === undefined) return undefined;
         cache.set(symbol, NONE);
         return NONE;
       }

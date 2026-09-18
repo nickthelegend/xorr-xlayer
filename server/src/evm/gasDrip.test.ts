@@ -20,7 +20,7 @@ vi.mock('./chains.js', () => ({
   get CHAIN_KEY() {
     return h.chain;
   },
-  chain: { id: 84532, name: 'Base Sepolia' },
+  chain: { id: 1952, name: 'X Layer Testnet' },
   rpcUrl: 'http://127.0.0.1:1',
 }));
 vi.mock('viem', async (importOriginal) => ({
@@ -83,7 +83,7 @@ describe('dripGasIfNeeded', () => {
     process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
     balances(0n, parseEther('0.001'));
     const out = await dripGasIfNeeded(NEW_WALLET);
-    expect(out.sent === false && out.reason).toMatch(/the faucet holds 0.001 ETH/);
+    expect(out.sent === false && out.reason).toMatch(/the faucet holds 0.001 OKB/);
     expect(sendTransaction).not.toHaveBeenCalled();
   });
 
@@ -116,11 +116,22 @@ describe('dripGasIfNeeded', () => {
     expect(order).toEqual(['recorded', 'send']);
   });
 
-  it('sends nothing on a chain whose money is real, though it is not Base and the faucet could pay', async () => {
+  it("sends nothing on X Layer mainnet's state — a fork of it included — though the faucet could pay", async () => {
     process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
     balances(0n, parseEther('0.05'));
-    h.chain = 'arbitrum';
-    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({ sent: false, reason: 'refusing to send real ETH on arbitrum' });
+    h.chain = 'xlayer-fork';
+    h.baseState = true;
+    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({ sent: false, reason: 'refusing to send real OKB on xlayer-fork' });
+    expect(getBalance).not.toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing on a chain whose money is real, even were the mainnet-state flag to miss it', async () => {
+    process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
+    balances(0n, parseEther('0.05'));
+    h.chain = 'xlayer';
+    h.baseState = false;
+    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({ sent: false, reason: 'refusing to send real OKB on xlayer' });
     expect(getBalance).not.toHaveBeenCalled();
     expect(sendTransaction).not.toHaveBeenCalled();
   });

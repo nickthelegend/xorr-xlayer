@@ -3,11 +3,11 @@
  *
  * What a node and a database would answer — the client version, balances, receipts, the last claim, the lock — is supplied
  * per case; the decisions are the executor's own, and the receipts carry real ABI-encoded `Transfer` logs that the route
- * decodes itself. Mainnet refuses without reading anything. A fork refuses a node that is not anvil, sends from the real
- * holder by impersonation, waits for the receipt and its Transfer, raises the wallet's ETH by exactly what it lacks and
- * never lowers it, and records the claim with its trail entry — and refuses a second request inside a day with when it
- * may ask again. Base Sepolia sends from the faucet key only when that key holds USDC, capped, and otherwise says there is
- * none. A balance read that fails is a 502, never a zero.
+ * decodes itself. Mainnet refuses without reading anything. A fork refuses a node that is not anvil, sends from the
+ * fork-only reserve by impersonation (dealing it more when it runs short), waits for the receipt and its Transfer, raises
+ * the wallet's OKB by exactly what it lacks and never lowers it, and records the claim with its trail entry — and refuses
+ * a second request inside a day with when it may ask again. X Layer testnet sends from the faucet key only when that key
+ * holds USDC, capped, and otherwise says there is none. A balance read that fails is a 502, never a zero.
  */
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,8 +27,11 @@ const h = vi.hoisted(() => ({
   getGasPrice: vi.fn(),
   writeContract: vi.fn(),
   anvil: vi.fn(),
-  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  HOLDER: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB',
+  dealErc20: vi.fn(),
+  /** X Layer mainnet's USDC (Circle's native token), which a fork of it carries. */
+  USDC: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+  /** Set from `FORK_USDC_RESERVE` once the module is loaded. */
+  HOLDER: '' as string,
 }));
 
 vi.mock('../auth/privy.js', () => ({
@@ -56,11 +59,15 @@ vi.mock('../evm/chains.js', () => ({
     return h.chainKey === 'xlayer' || h.chainKey === 'xlayer-fork';
   },
   ADDRESSES: { usdc: h.USDC },
-  chain: { id: 8453 },
+  chain: { id: 196 },
   rpcUrl: 'http://127.0.0.1:1',
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
-vi.mock('../fork/makers.js', () => ({ WHALE: h.HOLDER, anvil: h.anvil }));
+vi.mock('../fork/anvil.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../fork/anvil.js')>()),
+  anvil: h.anvil,
+  dealErc20: h.dealErc20,
+}));
 vi.mock('viem', async (importOriginal) => ({
   ...(await importOriginal<typeof import('viem')>()),
   createWalletClient: vi.fn((opts: { account: unknown }) => {
@@ -91,6 +98,8 @@ const { currentWallet, requireWallet } = await import('./wallet-context.js');
 const { faucetRoutes } = await import('./faucet.js');
 const { errorResponse } = await import('../http/errors.js');
 const { withRequestScope } = await import('../http/request-id.js');
+const { FORK_USDC_RESERVE } = await import('../fork/anvil.js');
+h.HOLDER = FORK_USDC_RESERVE;
 
 const app = new Hono();
 // Signed in, as the auth middleware would have decided it.
@@ -160,7 +169,7 @@ function fork(opts: { node?: string; holderUsdc?: bigint; holderEth?: bigint; wa
   receiptsFrom(h.HOLDER);
 }
 
-/** Base Sepolia, with a faucet key holding `usdc` and `eth`. */
+/** X Layer testnet, with a faucet key holding `usdc` and `okb`. */
 function sepolia(usdc: bigint, eth = parseEther('0.018')) {
   h.chainKey = 'xlayer-testnet';
   process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
@@ -174,7 +183,7 @@ function sepolia(usdc: bigint, eth = parseEther('0.018')) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  for (const fn of [h.getBalance, h.readContract, h.getCode, h.waitForTransactionReceipt, h.estimateContractGas, h.getGasPrice, h.writeContract, h.anvil]) {
+  for (const fn of [h.getBalance, h.readContract, h.getCode, h.waitForTransactionReceipt, h.estimateContractGas, h.getGasPrice, h.writeContract, h.anvil, h.dealErc20]) {
     fn.mockReset();
   }
   vi.mocked(one).mockReset();
@@ -192,8 +201,8 @@ afterEach(() => {
   delete process.env.FAUCET_PRIVATE_KEY;
 });
 
-describe('POST /faucet on a fork of Base', () => {
-  it('moves 1,000 USDC from the real holder, waits for its Transfer, raises ETH by exactly the shortfall, and records it', async () => {
+describe('POST /faucet on a fork of X Layer', () => {
+  it('moves 1,000 USDC from the fork-only reserve, waits for its Transfer, raises OKB by exactly the shortfall, and records it', async () => {
     fork({ walletUsdc: [0n, USDC_1000], walletEth: [parseEther('0.01'), parseEther('0.05')] });
     vi.setSystemTime(new Date('2026-09-13T12:00:00Z'));
 
@@ -247,7 +256,7 @@ describe('POST /faucet on a fork of Base', () => {
     expect(locks).toEqual([expect.stringContaining('pg_try_advisory_lock'), expect.stringContaining('pg_advisory_unlock')]);
   });
 
-  it('never lowers a balance: a wallet already above the floor, and a holder with gas of its own, get no ETH', async () => {
+  it('never lowers a balance: a wallet already above the floor, and a holder with gas of its own, get no OKB', async () => {
     fork({ holderEth: parseEther('1'), walletEth: [parseEther('3'), parseEther('3')] });
 
     const body = (await (await post()).json()) as Record<string, unknown>;
@@ -298,10 +307,20 @@ describe('POST /faucet on a fork of Base', () => {
     expect(append).not.toHaveBeenCalled();
   });
 
-  it('refuses when the holder holds less than one request sends', async () => {
+  it('deals the reserve more when it holds less than one request sends, then sends', async () => {
     fork({ holderUsdc: parseUnits('999', 6) });
-    expect(await (await post()).json()).toMatchObject({ status: 'blocked', reason: 'holder_short' });
-    expect(h.writeContract).not.toHaveBeenCalled();
+
+    expect(await (await post()).json()).toMatchObject({ status: 'sent', usdc: { amount: 1000 } });
+    expect(h.dealErc20).toHaveBeenCalledWith(
+      expect.objectContaining({ token: h.USDC, holder: h.HOLDER, amount: parseUnits('10000000', 6) }),
+    );
+    expect(h.writeContract).toHaveBeenCalledTimes(1);
+  });
+
+  it('deals nothing to a reserve that holds enough', async () => {
+    fork();
+    expect((await post()).status).toBe(200);
+    expect(h.dealErc20).not.toHaveBeenCalled();
   });
 
   it('records nothing for a transfer that reverted, names its hash, and still stops impersonating', async () => {
@@ -359,7 +378,7 @@ describe('POST /faucet on a fork of Base', () => {
     expect(claimInsert()).toBeUndefined();
   });
 
-  it('reports a failed ETH top-up beside the USDC that arrived, and still records the claim', async () => {
+  it('reports a failed OKB top-up beside the USDC that arrived, and still records the claim', async () => {
     fork();
     h.anvil.mockImplementation(async (_rpc: string, method: string, params: unknown[]) => {
       if (method === 'web3_clientVersion') return 'anvil/v1.7.1';
@@ -420,7 +439,7 @@ describe('POST /faucet on a fork of Base', () => {
   });
 });
 
-describe('POST /faucet on Base Sepolia and Base', () => {
+describe('POST /faucet on X Layer testnet and mainnet', () => {
   it('sends nothing when the faucet key holds no USDC, and says there is none', async () => {
     sepolia(0n);
 
@@ -430,7 +449,7 @@ describe('POST /faucet on Base Sepolia and Base', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toMatchObject({ status: 'blocked', reason: 'no_testnet_usdc' });
     expect(body.detail).toContain(FAUCET);
-    expect(body.detail).toMatch(/holds no Base Sepolia USDC, so there is none to send/);
+    expect(body.detail).toMatch(/holds no X Layer testnet USDC, so there is none to send/);
     expect(h.readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'balanceOf', args: [FAUCET] }));
     expect(h.writeContract).not.toHaveBeenCalled();
     expect(h.anvil).not.toHaveBeenCalled();
@@ -474,7 +493,7 @@ describe('POST /faucet on Base Sepolia and Base', () => {
     expect(h.writeContract).not.toHaveBeenCalled();
   });
 
-  it('refuses on Base mainnet before reading the chain or the database', async () => {
+  it('refuses on X Layer mainnet before reading the chain or the database', async () => {
     h.chainKey = 'xlayer';
 
     const res = await post();
@@ -486,7 +505,7 @@ describe('POST /faucet on Base Sepolia and Base', () => {
     expect(h.statements).toEqual([]);
   });
 
-  it('refuses on a chain whose money is real that is not Base, before reading the chain or the database', async () => {
+  it('refuses on a chain whose money is real that is not X Layer, before reading the chain or the database', async () => {
     h.chainKey = 'arbitrum';
 
     const res = await post();
@@ -512,7 +531,7 @@ describe('GET /faucet', () => {
       chain: 'xlayer-fork',
       available: true,
       reason: null,
-      detail: expect.stringMatching(/^1,000 USDC moved from Aave’s USDC reserve on this fork of Base/),
+      detail: expect.stringMatching(/^1,000 USDC sent from a fork-only reserve on this fork of X Layer/),
       source: 'fork-holder',
       from: h.HOLDER,
       usdc: 1000,
@@ -530,7 +549,7 @@ describe('GET /faucet', () => {
     expect(h.writeContract).not.toHaveBeenCalled();
   });
 
-  it('on Base Sepolia with an empty faucet key, is unavailable and says why', async () => {
+  it('on X Layer testnet with an empty faucet key, is unavailable and says why', async () => {
     sepolia(0n);
     expect(await (await get()).json()).toMatchObject({
       available: false,
@@ -540,14 +559,14 @@ describe('GET /faucet', () => {
     });
   });
 
-  it('on Base mainnet, reads nothing on chain', async () => {
+  it('on X Layer mainnet, reads nothing on chain', async () => {
     h.chainKey = 'xlayer';
     expect(await (await get()).json()).toMatchObject({ available: false, reason: 'real_money', wallet: { canAsk: false } });
     expect(h.readContract).not.toHaveBeenCalled();
     expect(h.anvil).not.toHaveBeenCalled();
   });
 
-  it('on a chain whose money is real that is not Base, reads nothing on chain either', async () => {
+  it('on a chain whose money is real that is not X Layer, reads nothing on chain either', async () => {
     h.chainKey = 'arbitrum';
     expect(await (await get()).json()).toMatchObject({
       available: false,
@@ -561,7 +580,7 @@ describe('GET /faucet', () => {
 });
 
 describe('GET /wallet/funds', () => {
-  it("reads the wallet's USDC and ETH from the chain", async () => {
+  it("reads the wallet's USDC and OKB from the chain", async () => {
     h.readContract.mockResolvedValue(USDC_1000);
     h.getBalance.mockResolvedValue(parseEther('0.05'));
 

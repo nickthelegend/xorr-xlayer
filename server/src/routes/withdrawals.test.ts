@@ -27,8 +27,10 @@ import { privateKeyToAccount } from 'viem/accounts';
 const h = vi.hoisted(() => ({
   /** Whether the trail already carries the hash being recorded. */
   seen: false,
-  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  WETH: '0x4200000000000000000000000000000000000006',
+  /** X Layer mainnet's USDC and WETH. */
+  USDC: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+  WETH: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c',
+  NATIVE: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
   POOL: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
 }));
 
@@ -64,18 +66,18 @@ vi.mock('../audit/log.js', () => ({ append: vi.fn(async () => undefined) }));
 vi.mock('../evm/client.js', () => ({ publicClient: { readContract: vi.fn(), getTransactionReceipt: vi.fn() } }));
 vi.mock('../evm/chains.js', () => ({
   AAVE_V3_POOL: h.POOL,
-  ADDRESSES: { usdc: h.USDC, weth: h.WETH },
+  ADDRESSES: { usdc: h.USDC, weth: h.WETH, nativeToken: h.NATIVE },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
 vi.mock('../evm/delegation.js', () => ({ waitForTx: vi.fn() }));
-vi.mock('../venues/oneinch.js', () => ({
+vi.mock('../venues/tokens.js', () => ({
   canonicalSymbol: (raw: string) =>
-    ({ USDC: 'USDC', WETH: 'WETH', ETH: 'ETH' } as Record<string, string>)[raw.trim().toUpperCase()] ?? raw.trim(),
+    ({ USDC: 'USDC', WETH: 'WETH', OKB: 'OKB' } as Record<string, string>)[raw.trim().toUpperCase()] ?? raw.trim(),
 }));
 vi.mock('../portfolio/snapshots.js', () => ({ snapshotWallet: vi.fn(async () => true) }));
 vi.mock('./market.js', () => ({
   functioningHere: vi.fn(async () => [
-    { symbol: 'ETH', address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', decimals: 18 },
+    { symbol: 'OKB', address: h.NATIVE, decimals: 18 },
     { symbol: 'WETH', address: h.WETH, decimals: 18 },
     { symbol: 'USDC', address: h.USDC, decimals: 6 },
   ]),
@@ -103,7 +105,8 @@ const account = (seed: string) => privateKeyToAccount(keccak256(toHex(seed))).ad
 const OWNER = account('xorr/withdrawals/owner');
 const DEST = account('xorr/withdrawals/cold-storage');
 const STRANGER = account('xorr/withdrawals/stranger');
-const A_USDC = getAddress('0x4e65fe4dba92790696d040ac24aa414708f5c0ab');
+/** A stand-in for Aave's receipt token: only its burn and its payout are read, never its code. */
+const A_USDC = getAddress('0x000000000000000000000000000000000000a05d');
 const HASH = `0x${'ab'.repeat(32)}` as Hex;
 const USABLE_AT = Date.UTC(2026, 8, 14, 9, 30);
 
@@ -281,7 +284,7 @@ describe('preparing a withdrawal of everything', () => {
 
   it('refuses what it cannot or should not move', async () => {
     vi.mocked(book.destinationStatus).mockResolvedValue(USABLE);
-    expect(await call('/withdrawals/prepare-all', { to: DEST, token: 'ETH' })).toMatchObject({
+    expect(await call('/withdrawals/prepare-all', { to: DEST, token: 'OKB' })).toMatchObject({
       status: 400,
       body: { reason: 'native_token' },
     });

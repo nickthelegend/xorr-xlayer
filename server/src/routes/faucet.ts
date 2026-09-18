@@ -246,8 +246,8 @@ async function record(w: WalletRow, offer: Offer, sent: FaucetSent, claimedAt: n
   const amount = usdc(sent.usdcRaw).toLocaleString('en-US', { maximumFractionDigits: USDC_DECIMALS });
   const detail =
     offer.source === 'fork-holder'
-      ? `Moved from Aave’s USDC reserve (${sent.from}) on this fork of Base${ethClause(sent.eth)}. Fork funds exist only on this node.`
-      : `From the faucet key (${sent.from}) on Base Sepolia. Testnet USDC has no value.`;
+      ? `Moved from the fork-only USDC reserve (${sent.from}) on this fork of X Layer${ethClause(sent.eth)}. Fork funds exist only on this node.`
+      : `From the faucet key (${sent.from}) on X Layer testnet. Testnet USDC has no value.`;
   await tx(async (client) => {
     await client.query(
       `INSERT INTO faucet_claims (id, wallet_id, address, paid_by, usdc_raw, usdc_tx, eth_added_wei, claimed_at)
@@ -286,12 +286,12 @@ async function record(w: WalletRow, offer: Offer, sent: FaucetSent, claimedAt: n
   });
 }
 
-/** How the fork's ETH top-up went, as the end of a sentence. */
+/** How the fork's OKB top-up went, as the end of a sentence. */
 function ethClause(topUp: EthTopUp | null): string {
   if (topUp === null) return '';
-  if (!topUp.done) return `; raising its ETH for gas failed (${topUp.failed})`;
-  if (topUp.addedWei === 0n) return `; its ETH was already at least ${ether(topUp.floorWei)}, so it was left as it was`;
-  return `, with its ETH raised from ${ether(topUp.beforeWei)} to ${ether(topUp.beforeWei + topUp.addedWei)} for gas`;
+  if (!topUp.done) return `; raising its OKB for gas failed (${topUp.failed})`;
+  if (topUp.addedWei === 0n) return `; its OKB was already at least ${ether(topUp.floorWei)}, so it was left as it was`;
+  return `, with its OKB raised from ${ether(topUp.beforeWei)} to ${ether(topUp.beforeWei + topUp.addedWei)} for gas`;
 }
 
 function ethView(topUp: EthTopUp | null) {

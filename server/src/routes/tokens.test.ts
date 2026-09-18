@@ -1,9 +1,9 @@
 /**
- * GET /wallet/tokens (PLAN.md 3.10), with the wallet, the chain, 1inch and the price feeds stood in for.
+ * GET /wallet/tokens (PLAN.md 3.10), with the wallet, the chain and the price feeds stood in for.
  *
- * On Base the balances are 1inch's; on a fork or a testnet they are the chain's, read the way `/wallet/balance` reads
- * them. Either way the list is priced where a feed answers and null where it does not, largest value first. A read
- * that fails is a 502, never an empty list, which would say the wallet is empty.
+ * On every X Layer network the balances are the chain's, read the way `/wallet/balance` reads them, beside native OKB and
+ * USDC at this chain's own addresses. The list is priced where a feed answers and null where it does not, largest value
+ * first. A read that fails is a 502, never an empty list, which would say the wallet is empty.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
@@ -13,12 +13,12 @@ const h = vi.hoisted(() => ({
   chain: 'xlayer',
   getBalance: vi.fn(),
   MAINNET: {
-    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+    usdc: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
+    nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
   },
-  SEPOLIA: {
-    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-    nativeEth: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+  TESTNET: {
+    usdc: '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3',
+    nativeToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
   },
   NoWalletError: class extends Error {
     readonly status = 409;
@@ -37,26 +37,24 @@ vi.mock('../evm/chains.js', () => ({
     return h.chain;
   },
   get ADDRESSES() {
-    return h.chain === 'xlayer-testnet' ? h.SEPOLIA : h.MAINNET;
+    return h.chain === 'xlayer-testnet' || h.chain === 'localnet' ? h.TESTNET : h.MAINNET;
   },
 }));
 vi.mock('../evm/client.js', () => ({ publicClient: { getBalance: h.getBalance } }));
 vi.mock('../evm/balances.js', () => ({ holdings: vi.fn(), cashUsd: vi.fn() }));
-vi.mock('../venues/oneinch.js', () => ({
+vi.mock('../venues/tokens.js', () => ({
+  // The registry, at X Layer mainnet's addresses.
   TOKENS: {
-    ETH: { address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', decimals: 18 },
-    WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18 },
-    USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 },
-    CBBTC: { address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', decimals: 8 },
+    USDC: { address: '0xB6CEceAB302E2E4948951eE7843FC24E92933061', decimals: 6 },
+    WETH: { address: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c', decimals: 18 },
+    WOKB: { address: '0xe538905cf8410324e03A5A23C1c177a474D59b2b', decimals: 18 },
   },
 }));
-vi.mock('../venues/balance.js', () => ({ holdingsOnBase: vi.fn() }));
 vi.mock('../market/logos.js', () => ({ logosFor: vi.fn() }));
 vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
 
 const { requireWallet } = await import('./wallet-context.js');
 const { cashUsd, holdings } = await import('../evm/balances.js');
-const { holdingsOnBase } = await import('../venues/balance.js');
 const { logosFor } = await import('../market/logos.js');
 const { priceOf } = await import('../market/prices.js');
 const { errorResponse } = await import('../http/errors.js');
@@ -70,11 +68,9 @@ app.onError(errorResponse);
 /** Stored lowercase, answered checksummed. */
 const WALLET = { id: 'wallet-1', address: '0x95a0b368588713011a15f4b1041423f31b08e615' };
 const OWNER = getAddress(WALLET.address);
-const NATIVE = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-const WETH = '0x4200000000000000000000000000000000000006';
-const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const DEGEN = '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed';
-const AERO = '0x940181a94A35A4569E4529A3CDfB74e38FD98631';
+const WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c';
+/** A stand-in: whatever URL the logo registry answered with. */
+const OKB_LOGO = 'https://logos.example/okb.png';
 
 /** Feeds by symbol; a symbol not in the table has none. */
 function prices(table: Record<string, number>) {
@@ -97,53 +93,52 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
-describe("on Base, 1inch's word", () => {
-  it('lists what 1inch reads, priced where a feed answers, largest value first and the unpriced after', async () => {
-    vi.mocked(holdingsOnBase).mockResolvedValue({
-      tokens: [
-        { symbol: 'DEGEN', name: 'Degen', address: DEGEN, decimals: 18, units: 1140, logo: 'https://tokens.1inch.io/degen.png', feed: null },
-        { symbol: 'USDC', name: 'USD Coin', address: USDC, decimals: 6, units: 167.5, logo: 'https://tokens.1inch.io/usdc.png', feed: 'USDC' },
-        { symbol: 'AERO', name: 'Aerodrome', address: AERO, decimals: 18, units: 3, logo: null, feed: null },
-        { symbol: 'ETH', name: 'Ether', address: NATIVE, decimals: 18, units: 0.5, logo: 'https://tokens.1inch.io/eth.png', native: true, feed: 'ETH' },
-      ],
-      undescribed: ['0x000000000000000000000000000000000000dEaD'],
-    });
-    prices({ USDC: 1, ETH: 4_000 });
+describe("on every X Layer network, the chain's word", () => {
+  it.each(['xlayer', 'xlayer-fork', 'xlayer-testnet', 'localnet'])(
+    "on %s, reads the registry, USDC and native OKB at this chain's addresses",
+    async (chain) => {
+      h.chain = chain;
+      const addresses = chain === 'xlayer-testnet' || chain === 'localnet' ? h.TESTNET : h.MAINNET;
+      vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 0.25, usd: 1_000, raw: 250_000_000_000_000_000n }]);
+      vi.mocked(cashUsd).mockResolvedValue(42.5);
+      h.getBalance.mockResolvedValue(2_000_000_000_000_000n);
+      // OKB's logo resolved, no registry has one for WETH, and USDC's did not come back inside the deadline.
+      vi.mocked(logosFor).mockResolvedValue({
+        OKB: { url: OKB_LOGO, source: 'okx' },
+        WETH: { url: null, source: null },
+      } as never);
+      // Native OKB is priced as its wrapped twin, WOKB.
+      prices({ WOKB: 50, WETH: 4_000, USDC: 1 });
 
-    const { status, body } = await get();
+      const { status, body } = await get();
 
-    expect(status).toBe(200);
-    expect(body).toEqual({
-      owner: OWNER,
-      chain: 'xlayer',
-      source: '1inch',
-      tokens: [
-        { symbol: 'ETH', name: 'Ether', address: NATIVE, decimals: 18, units: 0.5, logo: 'https://tokens.1inch.io/eth.png', native: true, usd: 2_000 },
-        { symbol: 'USDC', name: 'USD Coin', address: USDC, decimals: 6, units: 167.5, logo: 'https://tokens.1inch.io/usdc.png', usd: 167.5 },
-        { symbol: 'AERO', name: 'Aerodrome', address: AERO, decimals: 18, units: 3, logo: null, usd: null },
-        { symbol: 'DEGEN', name: 'Degen', address: DEGEN, decimals: 18, units: 1140, logo: 'https://tokens.1inch.io/degen.png', usd: null },
-      ],
-      undescribed: ['0x000000000000000000000000000000000000dEaD'],
-    });
-    expect(holdingsOnBase).toHaveBeenCalledWith(OWNER);
-    // A token no feed can be trusted to mean is not priced at all.
-    expect(vi.mocked(priceOf).mock.calls.map(([symbol]) => symbol).sort()).toEqual(['ETH', 'USDC']);
-    // On Base, nothing is read from the executor's own RPC.
-    for (const chainRead of [holdings, cashUsd, h.getBalance, logosFor]) expect(chainRead).not.toHaveBeenCalled();
-  });
+      expect(status).toBe(200);
+      expect(body).toEqual({
+        owner: OWNER,
+        chain,
+        source: 'chain',
+        tokens: [
+          { symbol: 'WETH', address: WETH, decimals: 18, units: 0.25, logo: null, usd: 1_000 },
+          { symbol: 'USDC', address: addresses.usdc, decimals: 6, units: 42.5, logo: null, usd: 42.5 },
+          { symbol: 'OKB', address: addresses.nativeToken, decimals: 18, units: 0.002, logo: OKB_LOGO, native: true, usd: 0.1 },
+        ],
+        undescribed: [],
+      });
+      expect(holdings).toHaveBeenCalledWith(OWNER);
+      expect(cashUsd).toHaveBeenCalledWith(OWNER);
+      expect(h.getBalance).toHaveBeenCalledWith({ address: OWNER });
+      expect([...vi.mocked(logosFor).mock.calls[0]![0]].sort()).toEqual(['OKB', 'USDC', 'WETH']);
+    },
+  );
 
   it('a feed that fails, answers something that is not a price, or does not answer in time leaves that token unpriced, never $0', async () => {
-    vi.mocked(holdingsOnBase).mockResolvedValue({
-      tokens: [
-        { symbol: 'WETH', address: WETH, decimals: 18, units: 1, logo: null, feed: 'WETH' },
-        { symbol: 'USDC', address: USDC, decimals: 6, units: 5, logo: null, feed: 'USDC' },
-        { symbol: 'ETH', address: NATIVE, decimals: 18, units: 2, logo: null, native: true, feed: 'ETH' },
-      ],
-      undescribed: [],
-    });
+    vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 1, usd: 0, raw: 10n ** 18n }]);
+    vi.mocked(cashUsd).mockResolvedValue(5);
+    h.getBalance.mockResolvedValue(2n * 10n ** 18n);
+    vi.mocked(logosFor).mockResolvedValue({});
     vi.mocked(priceOf).mockImplementation((symbol: string) =>
-      symbol === 'ETH'
-        ? Promise.reject(new Error('price deadline for ETH'))
+      symbol === 'WOKB'
+        ? Promise.reject(new Error('price deadline for WOKB'))
         : symbol === 'USDC'
           ? Promise.resolve(0)
           : new Promise<number>(() => {}),
@@ -158,7 +153,7 @@ describe("on Base, 1inch's word", () => {
       expect(res.status).toBe(200);
       const { tokens } = (await res.json()) as { tokens: { symbol: string; usd: number | null }[] };
       expect(tokens.map((t) => [t.symbol, t.usd])).toEqual([
-        ['ETH', null],
+        ['OKB', null],
         ['USDC', null],
         ['WETH', null],
       ]);
@@ -166,62 +161,6 @@ describe("on Base, 1inch's word", () => {
       vi.useRealTimers();
     }
   });
-
-  it('a read 1inch cannot answer is a 502 that says so, never an empty list', async () => {
-    vi.mocked(holdingsOnBase).mockRejectedValue(
-      new Error('api.1inch.dev has failed 4 times in a row; not retrying for another 30s.'),
-    );
-
-    const { status, body } = await get();
-
-    expect(status).toBe(502);
-    expect(body).toMatchObject({
-      error: 'balance_read_failed',
-      source: '1inch',
-      message: 'Could not read your tokens from 1inch just now.',
-    });
-    expect(body).not.toHaveProperty('tokens');
-    expect(priceOf).not.toHaveBeenCalled();
-  });
-});
-
-describe("on a fork or a testnet, the chain's word", () => {
-  it.each(['xlayer-fork', 'xlayer-testnet', 'localnet'])(
-    "on %s, reads the registry, USDC and native ETH at this chain's addresses",
-    async (chain) => {
-      h.chain = chain;
-      const addresses = chain === 'xlayer-testnet' ? h.SEPOLIA : h.MAINNET;
-      vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 0.25, usd: 1_000, raw: 250_000_000_000_000_000n }]);
-      vi.mocked(cashUsd).mockResolvedValue(42.5);
-      h.getBalance.mockResolvedValue(2_000_000_000_000_000n);
-      // ETH's logo resolved, no registry has one for WETH, and USDC's did not come back inside the deadline.
-      vi.mocked(logosFor).mockResolvedValue({
-        ETH: { url: 'https://tokens.1inch.io/eth.png', source: '1inch' },
-        WETH: { url: null, source: null },
-      });
-      prices({ ETH: 4_000, WETH: 4_000, USDC: 1 });
-
-      const { status, body } = await get();
-
-      expect(status).toBe(200);
-      expect(body).toEqual({
-        owner: OWNER,
-        chain,
-        source: 'chain',
-        tokens: [
-          { symbol: 'WETH', address: WETH, decimals: 18, units: 0.25, logo: null, usd: 1_000 },
-          { symbol: 'USDC', address: addresses.usdc, decimals: 6, units: 42.5, logo: null, usd: 42.5 },
-          { symbol: 'ETH', address: addresses.nativeEth, decimals: 18, units: 0.002, logo: 'https://tokens.1inch.io/eth.png', native: true, usd: 8 },
-        ],
-        undescribed: [],
-      });
-      expect(holdings).toHaveBeenCalledWith(OWNER);
-      expect(cashUsd).toHaveBeenCalledWith(OWNER);
-      expect(h.getBalance).toHaveBeenCalledWith({ address: OWNER });
-      expect([...vi.mocked(logosFor).mock.calls[0]![0]].sort()).toEqual(['ETH', 'USDC', 'WETH']);
-      expect(holdingsOnBase).not.toHaveBeenCalled();
-    },
-  );
 
   it('nothing held is an empty list: an answer, not an error', async () => {
     h.chain = 'xlayer-fork';
@@ -239,7 +178,7 @@ describe("on a fork or a testnet, the chain's word", () => {
   it.each([
     ['the registry multicall', () => vi.mocked(holdings).mockRejectedValue(new Error('fetch failed'))],
     ['USDC', () => vi.mocked(cashUsd).mockRejectedValue(new Error('The request took too long to respond.'))],
-    ['native ETH', () => h.getBalance.mockRejectedValue(new Error('HTTP request failed.'))],
+    ['native OKB', () => h.getBalance.mockRejectedValue(new Error('HTTP request failed.'))],
   ])('a failed read of %s is a 502 saying what could not be read, never an empty list', async (_read, fail) => {
     h.chain = 'xlayer-fork';
     vi.mocked(holdings).mockResolvedValue([]);
@@ -268,7 +207,6 @@ describe('whose wallet', () => {
 
     expect(status).toBe(409);
     expect(body).toMatchObject({ error: 'no_wallet' });
-    expect(holdingsOnBase).not.toHaveBeenCalled();
     expect(holdings).not.toHaveBeenCalled();
   });
 });

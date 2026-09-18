@@ -1,13 +1,14 @@
 /**
- * GET /history (PLAN.md 3.14) — with the chain, the database and 1inch stood in for.
+ * GET /history (PLAN.md 3.14) — with the chain and the database stood in for.
  *
  * The delegation contract's `Spent` and `Closed` events for this owner alone, over a bounded window, newest first; each
  * joined to the run that recorded its transaction when there is one, and listed when there is not; the token and the
- * dollars from the registry, never guessed; each block's time read once; a failed log read a 502 with the provider's
- * reason; and on Base, 1inch's history beside the chain's — never in place of it, and never twice.
+ * dollars from the registry, never guessed; the venue named as `strategy_runs.venue` names it (uniswap-v3, okx-dex,
+ * aave); each block's time read once; and a failed log read a 502 with the provider's reason. The chain is the only
+ * source, on every X Layer network.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAddress, keccak256, toEventSelector, toHex } from 'viem';
+import { keccak256, toEventSelector, toHex } from 'viem';
 import type { WalletRow } from './wallet-context.js';
 
 const h = vi.hoisted(() => ({
@@ -30,10 +31,12 @@ vi.mock('../evm/chains.js', () => ({
     return h.chain === 'xlayer' || h.chain === 'xlayer-fork';
   },
   AAVE_V3_POOL: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
-  // This chain's settlement USDC is Base Sepolia's: Circle's other deployment, absent from the all-mainnet registry.
-  ADDRESSES: {
-    oneInchRouter: '0x111111125421cA6dc452d289314280a0f8842A65',
-    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  // Mainnet and its fork settle in mainnet USDC through Uniswap v3; the testnet's USDC is Circle's other deployment,
+  // absent from the all-mainnet registry, and it has no Uniswap router.
+  get ADDRESSES() {
+    return h.chain === 'xlayer-testnet'
+      ? { uniswapRouter: null, usdc: '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3' }
+      : { uniswapRouter: '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA', usdc: '0xB6CEceAB302E2E4948951eE7843FC24E92933061' };
   },
   explorerTx: (hash: string) => `fork:${hash}`,
 }));
@@ -42,17 +45,16 @@ vi.mock('../evm/delegation.js', () => ({
     return h.delegation;
   },
 }));
-vi.mock('../venues/oneinch.js', () => ({
+vi.mock('../venues/tokens.js', () => ({
   SETTLEMENT_SYMBOL: 'USDC',
+  // The registry, at X Layer mainnet's addresses.
   TOKENS: {
-    USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 },
-    WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18 },
+    USDC: { address: '0xB6CEceAB302E2E4948951eE7843FC24E92933061', decimals: 6 },
+    WETH: { address: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c', decimals: 18 },
   },
 }));
-// Our Aqua book, configured lowercase as the deployment has it; no SwapVM book on this chain.
-vi.mock('../venues/aqua.js', () => ({ bookAddress: () => '0x74e1283711106a5844eb20760c7cb6405933c54f' }));
-vi.mock('../venues/swapvm.js', () => ({ swapVmBookAddress: () => undefined }));
-vi.mock('../venues/history.js', () => ({ oneinchHistory: vi.fn() }));
+// OKX DEX's router on X Layer, as `venues/okxdex.ts` checksums it.
+vi.mock('../venues/okxdex.js', () => ({ OKX_ROUTER: '0x7c5bEE2a8091C3ef39072f64F18Fac913060AEaF' }));
 vi.mock('../db/index.js', () => ({ query: vi.fn() }));
 vi.mock('./wallet-context.js', () => ({ requireWallet: vi.fn() }));
 vi.mock('../http/request-id.js', () => ({
@@ -65,17 +67,18 @@ vi.stubEnv('HISTORY_LOOKBACK_BLOCKS', undefined);
 vi.stubEnv('LOG_WINDOW_BLOCKS', undefined);
 const { query } = await import('../db/index.js');
 const { requireWallet } = await import('./wallet-context.js');
-const { oneinchHistory } = await import('../venues/history.js');
 const { CLOSED_EVENT, SPENT_EVENT, historyRoutes } = await import('./history.js');
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
 const DELEGATE = '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5';
-const ROUTER = '0x111111125421cA6dc452d289314280a0f8842A65';
-/** The Aqua book as a log carries it: checksummed, where the deployment configures it lowercase. */
-const BOOK = getAddress('0x74e1283711106a5844eb20760c7cb6405933c54f');
-const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const SEPOLIA_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
-const WETH = '0x4200000000000000000000000000000000000006';
+/** Uniswap v3's SwapRouter02 on X Layer. */
+const ROUTER = '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA';
+/** OKX DEX's router, as a log carries it: lowercase, where the executor checksums it. */
+const OKX = '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf';
+const AAVE = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
+const USDC = '0xB6CEceAB302E2E4948951eE7843FC24E92933061';
+const TESTNET_USDC = '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3';
+const WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c';
 const HEAD = 30_000_000n;
 const wallet = { id: 'wallet-1', address: OWNER } as unknown as WalletRow;
 
@@ -126,7 +129,7 @@ function chainHas(logs: Decoded[]) {
   );
 }
 
-/** Two seconds a block, as on Base. */
+/** Two seconds a block. */
 const timeOf = (block: bigint) => 1_789_000_000n + (block - (HEAD - 9_000n)) * 2n;
 const iso = (block: bigint) => new Date(Number(timeOf(block)) * 1000).toISOString();
 const ascending = (xs: bigint[]) => [...xs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -142,7 +145,6 @@ type Item = {
   amount: string | null;
   usd: number | null;
   run?: Record<string, unknown>;
-  oneinch?: Record<string, unknown>;
   explorer: string;
 };
 type Body = {
@@ -174,7 +176,6 @@ beforeEach(() => {
   chainHas([]);
   vi.mocked(query).mockReset().mockResolvedValue([]);
   vi.mocked(requireWallet).mockReset().mockResolvedValue(wallet);
-  vi.mocked(oneinchHistory).mockReset();
 });
 
 describe('what it reads', () => {
@@ -185,7 +186,7 @@ describe('what it reads', () => {
     expect(CLOSED_EVENT.inputs.map((i) => i.indexed)).toEqual([true, true, true, false, false]);
   });
 
-  it("asks the delegation contract for this owner's events alone, over the last 9,000 blocks with no gaps, and not 1inch off Base", async () => {
+  it("asks the delegation contract for this owner's events alone, over the last 9,000 blocks with no gaps", async () => {
     const { status, body } = await get();
 
     expect(status).toBe(200);
@@ -201,7 +202,6 @@ describe('what it reads', () => {
         if (i > 0) expect(q.fromBlock, event.name).toBe(windows[i - 1]!.toBlock + 1n);
       }
     }
-    expect(oneinchHistory).not.toHaveBeenCalled();
     // An empty history says which window it is empty in, and since when.
     expect(body).toEqual({
       owner: OWNER,
@@ -219,8 +219,8 @@ describe('each settlement', () => {
   it('is listed newest first, with the token the registry gives its address, and dollars only where the amount is dollars', async () => {
     chainHas([
       spent(tx(1), HEAD - 300n, USDC, 25_000_000n),
-      closed(tx(2), HEAD - 100n, WETH, 10_000_000_000_000_000n, { venue: BOOK }),
-      spent(tx(3), HEAD - 200n, SEPOLIA_USDC, 1_500_000n),
+      closed(tx(2), HEAD - 100n, WETH, 10_000_000_000_000_000n, { venue: OKX }),
+      spent(tx(3), HEAD - 200n, USDC, 1_500_000n, { venue: AAVE }),
     ]);
 
     const { body } = await get();
@@ -231,7 +231,7 @@ describe('each settlement', () => {
         txHash: tx(2),
         block: Number(HEAD - 100n),
         at: iso(HEAD - 100n),
-        venue: 'aqua',
+        venue: 'okx-dex',
         token: { symbol: 'WETH', decimals: 18, address: WETH },
         amount: '10000000000000000',
         // What a sold asset was worth is not on chain, and today's price would date it wrong.
@@ -243,9 +243,8 @@ describe('each settlement', () => {
         txHash: tx(3),
         block: Number(HEAD - 200n),
         at: iso(HEAD - 200n),
-        venue: '1inch',
-        // Sepolia's USDC is not in the registry, and it is still USDC.
-        token: { symbol: 'USDC', decimals: 6, address: SEPOLIA_USDC },
+        venue: 'aave',
+        token: { symbol: 'USDC', decimals: 6, address: USDC },
         amount: '1500000',
         usd: 1.5,
         explorer: `fork:${tx(3)}`,
@@ -255,12 +254,30 @@ describe('each settlement', () => {
         txHash: tx(1),
         block: Number(HEAD - 300n),
         at: iso(HEAD - 300n),
-        venue: '1inch',
+        venue: 'uniswap-v3',
         token: { symbol: 'USDC', decimals: 6, address: USDC },
         amount: '25000000',
         usd: 25,
         explorer: `fork:${tx(1)}`,
       },
+    ]);
+  });
+
+  it("on the testnet, reads this chain's own USDC as USDC, and names Aave only where its pool exists", async () => {
+    h.chain = 'xlayer-testnet';
+    chainHas([spent(tx(3), HEAD - 200n, TESTNET_USDC, 1_500_000n, { venue: AAVE })]);
+
+    const { body } = await get();
+
+    expect(body.chain).toBe('xlayer-testnet');
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        // The testnet's USDC is not in the registry, and it is still USDC.
+        token: { symbol: 'USDC', decimals: 6, address: TESTNET_USDC },
+        usd: 1.5,
+        // No Aave pool on the testnet: the address stays an address.
+        venue: AAVE,
+      }),
     ]);
   });
 
@@ -296,10 +313,10 @@ describe('the run behind a settlement', () => {
   it("is joined by transaction from this wallet's runs on this chain, and an event with no run is listed all the same", async () => {
     chainHas([
       spent(tx(1), HEAD - 300n, USDC, 25_000_000n),
-      closed(tx(2), HEAD - 100n, WETH, 10_000_000_000_000_000n, { venue: BOOK }),
+      closed(tx(2), HEAD - 100n, WETH, 10_000_000_000_000_000n, { venue: OKX }),
     ]);
     vi.mocked(query).mockResolvedValue([
-      { signature: tx(2), kind: 'exit-rules', symbol: 'WETH', venue: 'aqua', side: 'sell', units: '0.010000000', usd: '24.93' },
+      { signature: tx(2), kind: 'exit-rules', symbol: 'WETH', venue: 'okx-dex', side: 'sell', units: '0.010000000', usd: '24.93' },
     ] as never);
 
     const { body } = await get();
@@ -313,7 +330,7 @@ describe('the run behind a settlement', () => {
     expect(sql).toContain('lower(r.signature) = ANY($2::text[])');
     expect(params).toEqual(['wallet-1', [tx(2), tx(1)]]);
 
-    expect(body.items[0]!.run).toEqual({ kind: 'exit-rules', symbol: 'WETH', venue: 'aqua', side: 'sell', units: 0.01, usd: 24.93 });
+    expect(body.items[0]!.run).toEqual({ kind: 'exit-rules', symbol: 'WETH', venue: 'okx-dex', side: 'sell', units: 0.01, usd: 24.93 });
     // No run recorded this transaction. The chain says it happened, so it is history.
     expect(body.items[1]).toMatchObject({ kind: 'spent', txHash: tx(1) });
     expect(body.items[1]).not.toHaveProperty('run');
@@ -326,8 +343,8 @@ describe('the run behind a settlement', () => {
       spent(tx(3), HEAD - 300n, USDC, 3_000_000n),
     ]);
     vi.mocked(query).mockResolvedValue([
-      { signature: tx(99), kind: 'dca', symbol: 'WETH', venue: '1inch', side: 'buy', units: '0.004', usd: '10' },
-      { signature: tx(2), kind: 'dca', symbol: 'WETH', venue: '1inch', side: 'buy', units: '0.0008', usd: '2' },
+      { signature: tx(99), kind: 'dca', symbol: 'WETH', venue: 'uniswap-v3', side: 'buy', units: '0.004', usd: '10' },
+      { signature: tx(2), kind: 'dca', symbol: 'WETH', venue: 'uniswap-v3', side: 'buy', units: '0.0008', usd: '2' },
     ] as never);
 
     const { body } = await get('/history?limit=2');
@@ -393,7 +410,7 @@ describe('the request', () => {
   it("answers a failed log read with 502 and the provider's reason, never an empty history", async () => {
     h.getLogs.mockRejectedValue(
       Object.assign(
-        new Error('HTTP request failed.\n\nStatus: 429\nURL: https://base-sepolia.example.com/v2/SECRET-KEY\nRequest body: {}'),
+        new Error('HTTP request failed.\n\nStatus: 429\nURL: https://xlayer-testnet.example.com/v2/SECRET-KEY\nRequest body: {}'),
         { shortMessage: 'HTTP request failed.', details: 'Too Many Requests' },
       ),
     );
@@ -412,7 +429,7 @@ describe('the request', () => {
   });
 
   it('cuts a URL out of a reason that carries one, since an RPC URL can carry its key', async () => {
-    h.getBlockNumber.mockRejectedValue(new Error('fetch failed for https://base-sepolia.example.com/v2/SECRET-KEY'));
+    h.getBlockNumber.mockRejectedValue(new Error('fetch failed for https://xlayer-testnet.example.com/v2/SECRET-KEY'));
 
     const { status, body } = await get();
 
@@ -422,116 +439,18 @@ describe('the request', () => {
   });
 });
 
-/** A 1inch History API event, in the shape `venues/history.ts` reads. */
-function oneinchEvent(
-  hash: string,
-  block: bigint,
-  over: { status?: string; type?: string; actions?: object[] } = {},
-) {
-  return {
-    id: `event-${hash.slice(-4)}`,
-    timeMs: Number(timeOf(block)) * 1000 + 250,
-    address: OWNER.toLowerCase(),
-    type: 0,
-    rating: 'reliable',
-    direction: 'out',
-    eventOrderInTransaction: 0,
-    details: {
-      txHash: hash,
-      chainId: 8453,
-      blockNumber: Number(block),
-      blockTimeSec: Number(timeOf(block)),
-      status: over.status ?? 'completed',
-      type: over.type ?? 'Transfer',
-      tokenActions: over.actions ?? [],
-      fromAddress: OWNER.toLowerCase(),
-      toAddress: ROUTER.toLowerCase(),
-      nonce: 7,
-      orderInBlock: 0,
-      feeInSmallestNative: '21000000000',
-    },
-  };
-}
-
-const movement = (token: string, from: string, to: string, amount: string) => ({
-  chainId: '8453',
-  address: token.toLowerCase(),
-  standard: 'ERC20',
-  fromAddress: from.toLowerCase(),
-  toAddress: to.toLowerCase(),
-  amount,
-  direction: from.toLowerCase() === OWNER.toLowerCase() ? 'Out' : 'In',
-});
-
-describe('on Base mainnet', () => {
-  beforeEach(() => {
+describe('on X Layer mainnet', () => {
+  it('reads the chain alone, and lists each settlement once', async () => {
     h.chain = 'xlayer';
-  });
-
-  it("adds 1inch's history beside the chain's: its own rows, no second copy of a settlement, nothing that did not go through", async () => {
     chainHas([spent(tx(1), HEAD - 300n, USDC, 25_000_000n)]);
-    vi.mocked(oneinchHistory).mockResolvedValue([
-      // A swap signed outside the app: USDC paid, WETH received.
-      oneinchEvent(tx(10), HEAD - 50n, {
-        type: 'SwapExactInput',
-        actions: [movement(USDC, OWNER, ROUTER, '40000000'), movement(WETH, ROUTER, OWNER, '16000000000000000')],
-      }),
-      // Only received: the row stands for what arrived.
-      oneinchEvent(tx(12), HEAD - 60n, {
-        actions: [movement(WETH, '0x00000000000000000000000000000000000000c3', OWNER, '5000000000000000')],
-      }),
-      // Reverted: it settled nothing.
-      oneinchEvent(tx(11), HEAD - 40n, { status: 'failed' }),
-      // The contract's own settlement, which 1inch indexed too.
-      oneinchEvent(tx(1), HEAD - 300n, { type: 'SwapExactInput', actions: [movement(USDC, OWNER, h.delegation, '25000000')] }),
-    ] as never);
 
     const { status, body } = await get('/history?limit=5000');
 
     expect(status).toBe(200);
-    // The limit is held to its ceiling before anyone is asked.
-    expect(oneinchHistory).toHaveBeenCalledWith(OWNER, 200);
-    expect(body.source).toBe('chain+1inch');
+    expect(body.source).toBe('chain');
     expect(body.unavailable).toBeNull();
-    expect(body.items.map((i) => [i.kind, i.txHash])).toEqual([
-      ['1inch', tx(10)],
-      ['1inch', tx(12)],
-      ['spent', tx(1)],
-    ]);
-    expect(body.items[0]).toEqual({
-      kind: '1inch',
-      txHash: tx(10),
-      block: Number(HEAD - 50n),
-      at: iso(HEAD - 50n),
-      venue: '1inch',
-      token: { symbol: 'USDC', decimals: 6, address: USDC },
-      amount: '40000000',
-      usd: 40,
-      oneinch: { type: 'SwapExactInput', direction: 'out' },
-      explorer: `fork:${tx(10)}`,
-    });
-    expect(body.items[1]).toMatchObject({
-      token: { symbol: 'WETH', decimals: 18, address: WETH },
-      amount: '5000000000000000',
-      usd: null,
-      oneinch: { type: 'Transfer', direction: 'in' },
-    });
-    // 1inch's rows carry their own time: only the chain's blocks are read, and only its transactions looked up.
+    expect(body.items.map((i) => [i.kind, i.txHash, i.venue])).toEqual([['spent', tx(1), 'uniswap-v3']]);
     expect(blocksRead()).toEqual([HEAD - 9_000n, HEAD - 300n]);
     expect(vi.mocked(query).mock.calls[0]![1]).toEqual(['wallet-1', [tx(1)]]);
-  });
-
-  it("keeps the chain's history when 1inch cannot be read, and says what is missing and why", async () => {
-    chainHas([spent(tx(1), HEAD - 300n, USDC, 25_000_000n)]);
-    vi.mocked(oneinchHistory).mockRejectedValue(
-      new Error('422 Unprocessable Entity for https://api.1inch.dev/history/v2.0/history/0x95a0/events?chainId=8453&limit=50'),
-    );
-
-    const { status, body } = await get();
-
-    expect(status).toBe(200);
-    expect(body.source).toBe('chain');
-    expect(body.unavailable).toEqual({ source: '1inch', reason: '422 Unprocessable Entity' });
-    expect(body.items.map((i) => i.txHash)).toEqual([tx(1)]);
   });
 });

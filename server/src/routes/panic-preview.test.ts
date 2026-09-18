@@ -53,7 +53,8 @@ app.onError(errorResponse);
 app.route('/', panic);
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
-const WETH = '0x4200000000000000000000000000000000000006';
+/** X Layer mainnet's WETH: the registry reads mainnet addresses on every chain. */
+const WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c'.toLowerCase();
 const never = () => new Promise<never>(() => {});
 
 /** A node that answers at once: 1 WETH held, and no other token with code on this chain. */

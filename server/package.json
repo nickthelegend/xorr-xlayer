@@ -14,7 +14,7 @@
     "rebuild:fork": "tsx src/fork-bootstrap.ts && set -a && . \"./${FORK_ENV_FILE:-.env.fork}\" && set +a && tsx src/fork-grant.ts",
     "reconcile:orphans": "tsx src/fork/reconcile-orphans.ts",
     "mirror:mongo": "tsx src/db/mirror-to-mongo.ts",
-    "readiness:base": "XORR_CHAIN=base ALLOW_MAINNET=yes tsx src/base-readiness.ts"
+    "prove:fork": "tsx src/prove-xlayer.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",

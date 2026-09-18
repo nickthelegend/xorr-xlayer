@@ -65,17 +65,6 @@ export const chain = CHAINS[CHAIN_KEY];
 export const rpcUrl = RPCS[CHAIN_KEY];
 
 /**
- * The chain id the 1inch modules still ask about (limit orders, Fusion+, cross-checks, logos, history).
- *
- * 1inch does not run on X Layer. Those modules are replaced by the X Layer venues (OKX DEX, Uniswap v3); until then they
- * keep asking about Base, and nothing they answer reaches a trade — no 1inch contract is on any X Layer grant.
- */
-export const ONEINCH_CHAIN_ID = 8453;
-
-/** 1inch Aggregation Router v6. Only the 1inch modules above use it; it is never a venue on X Layer. */
-export const ONEINCH_ROUTER: Address = '0x111111125421cA6dc452d289314280a0f8842A65';
-
-/**
  * Canonical addresses, per chain. A token address is a property of a chain, not of a product: where a chain does not
  * have one, it is `null` here rather than another chain's address with no code behind it.
  */

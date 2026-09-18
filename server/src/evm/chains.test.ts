@@ -1,15 +1,19 @@
 /**
  * The venues a grant names (PLAN.md 3.1).
  *
- * `SETTLEMENT_VENUES` is what the app asks the user to sign and what the safety screen shows. The SwapVM book
- * was missing from it, so no grant made through the app could ever reach the venue settlement tries second.
+ * `SETTLEMENT_VENUES` is what the app asks the user to sign and what the safety screen shows: every contract the
+ * delegation may call on this chain, and nothing without code behind it. On X Layer that is Uniswap v3's router and, where
+ * mainnet state is, OKX DEX's router and the approval contract it pulls through (`spendVia`).
  *
  * And the chain it starts on: one it knows, and real money only by a deliberate decision.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const BOOK = '0x74e1283711106a5844eb20760c7cb6405933c54f';
-const PROGRAMS = '0x2fbae90b836545d6a0cb947ff701c27d7b627bd1';
+/** Uniswap v3's SwapRouter02 on X Layer (developers.uniswap.org/deployments), where the wrapped xStocks pool. */
+const UNISWAP_ROUTER = '0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca';
+/** OKX DEX's router on X Layer, and its approval contract. */
+const OKX_ROUTER = '0x7c5bee2a8091c3ef39072f64f18fac913060aeaf';
+const OKX_SPENDER = '0x8b773d83bc66be128c60e07e17c8901f7a64f000';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -19,23 +23,24 @@ afterEach(() => {
 const venues = async () => (await import('./chains.js')).SETTLEMENT_VENUES.map((v) => v.toLowerCase());
 
 describe('the venues a grant names', () => {
-  it('include both books when this deployment has them, after the DEX router', async () => {
+  it("on mainnet's state, are the Uniswap router first, then OKX DEX's router and approval contract", async () => {
     vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
-    vi.stubEnv('AQUA_BOOK_ADDRESS', BOOK);
-    vi.stubEnv('SWAPVM_BOOK_ADDRESS', PROGRAMS);
-    const list = await venues();
-    expect(list).toContain(BOOK);
-    expect(list).toContain(PROGRAMS);
-    // Uniswap v3's SwapRouter02 on X Layer (developers.uniswap.org/deployments), where the wrapped xStocks pool.
-    expect(list[0]).toBe('0x4f0c28f5926afda16bf2506d5d9e57ea190f9bca');
+    vi.stubEnv('OKX_DEX_ROUTER', '');
+    vi.stubEnv('OKX_APPROVE_SPENDER', '');
+    expect(await venues()).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER]);
   });
 
-  it('leave out a book that is not configured, or not an address', async () => {
+  it('on the testnet, which has no DEX, are none — never an address with no code there', async () => {
+    vi.stubEnv('XORR_CHAIN', 'xlayer-testnet');
+    expect(await venues()).toEqual([]);
+  });
+
+  it('ignore an OKX override that is not an address, keeping the checked default', async () => {
     vi.stubEnv('XORR_CHAIN', 'xlayer-fork');
-    vi.stubEnv('AQUA_BOOK_ADDRESS', '');
-    vi.stubEnv('SWAPVM_BOOK_ADDRESS', 'not-an-address');
+    vi.stubEnv('OKX_DEX_ROUTER', 'not-an-address');
+    vi.stubEnv('OKX_APPROVE_SPENDER', '0x1234');
     const list = await venues();
-    expect(list).not.toContain(BOOK);
+    expect(list).toEqual([UNISWAP_ROUTER, OKX_ROUTER, OKX_SPENDER]);
     expect(list.some((v) => v === 'not-an-address')).toBe(false);
   });
 });

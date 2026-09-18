@@ -35,7 +35,7 @@ import { backingFor, backingSeries } from '../venues/proof-of-reserves.js';
 import { backingDetail } from '../venues/backing-detail.js';
 import { dividendYield } from '../venues/dividend-yield.js';
 import { XSTOCKS, xStockKey } from '../venues/xstocks.js';
-import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
+import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE, OKX_DEX_APPROVE_SPENDER, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
 import { allowanceView, chainAllowance, routerAllowance, routerSpender } from '../evm/allowances.js';
 import { delegateAccount } from '../evm/client.js';
 import { dripGasIfNeeded } from '../evm/gasDrip.js';
@@ -520,11 +520,10 @@ async function approvableTokens(): Promise<{ symbol: string; address: Address }[
   /*
    * SETTLEMENT addresses, not quote addresses.
    *
-   * `TOKENS` is the routing registry and it is always Base MAINNET — 1inch is only ever asked
-   * about mainnet, which is why `QUOTE_ADDRESSES` exists. Approving from it on Sepolia asked the
-   * user to approve mainnet USDC, which has no code there, so the filter below removed it and the
-   * list came back as WETH alone: the one token that happens to share an address across both.
-   * The user would then have granted a permission that could never pull the token it spends.
+   * `TOKENS` is the routing registry and it is always X Layer MAINNET — the pools are only ever asked
+   * about mainnet, which is why `QUOTE_ADDRESSES` exists. Approving from it on the testnet would ask the
+   * user to approve mainnet USDC, which has no code there. The user would then have granted a
+   * permission that could never pull the token it spends.
    *
    * `ADDRESSES` follows `XORR_CHAIN`, so this is what the delegation will actually be asked to
    * move. The equities are added only where they function. `IS_MAINNET_STATE` is true on a
@@ -577,17 +576,19 @@ routes.get('/approvals', async (c) => {
   const owner = w.address as Address;
   const tokens = (await approvableTokens()).map((t) => ({ ...t, decimals: decimalsFor(t.symbol) }));
   /*
-   * Two spenders (PLAN.md 3.12): the delegation, which the app asks for, and the 1inch router, which the app never
-   * needs — the delegation approves it for one trade and resets it — so an allowance to it came from somewhere else
-   * and is worth taking back. A read that fails is `unread`, never shown as "None": it had been `.catch(() => 0n)`,
-   * which told a wallet it had approved nothing when nobody had been able to look.
+   * The delegation, which the app asks for, and each venue contract a fill approves for one trade and resets (PLAN.md
+   * 3.12): Uniswap v3's router, and — where mainnet state is — OKX DEX's approval contract. The app never needs a
+   * standing allowance to either, so one that exists came from somewhere else and is worth taking back. A read that
+   * fails is `unread`, never shown as "None": that told a wallet it had approved nothing when nobody had been able to look.
    */
   const router = await routerSpender().catch(() => undefined);
-  const [toDelegation, toRouter] = await Promise.all([
+  const venues: { name: string; address: Address }[] = [
+    ...(router ? [{ name: 'Uniswap v3 router', address: router.address }] : []),
+    ...(IS_MAINNET_STATE ? [{ name: 'OKX DEX approval contract', address: OKX_DEX_APPROVE_SPENDER as Address }] : []),
+  ];
+  const [toDelegation, toVenues] = await Promise.all([
     Promise.all(tokens.map((t) => chainAllowance(t.address, owner, DELEGATION_ADDRESS))),
-    router
-      ? Promise.all(tokens.map((t) => routerAllowance(t.address, owner, router.source, router.address)))
-      : Promise.resolve(undefined),
+    Promise.all(venues.map((v) => Promise.all(tokens.map((t) => routerAllowance(t.address, owner, 'chain', v.address))))),
   ]);
   const delegationTokens = tokens.map((t, i) => allowanceView(t, toDelegation[i]));
   return c.json({
@@ -596,15 +597,15 @@ routes.get('/approvals', async (c) => {
     tokens: delegationTokens,
     spenders: [
       { role: 'delegation', name: 'xorr delegation', address: DELEGATION_ADDRESS, source: 'chain', tokens: delegationTokens },
-      router && toRouter
-        ? {
-            role: 'router',
-            name: '1inch router',
-            address: router.address,
-            source: router.source,
-            tokens: tokens.map((t, i) => allowanceView(t, toRouter[i])),
-          }
-        : { role: 'router', name: '1inch router', address: null, source: null, tokens: null, unread: true },
+      ...(venues.length
+        ? venues.map((v, vi) => ({
+            role: 'router' as const,
+            name: v.name,
+            address: v.address,
+            source: 'chain' as const,
+            tokens: tokens.map((t, i) => allowanceView(t, toVenues[vi]?.[i])),
+          }))
+        : [{ role: 'router' as const, name: 'Swap router', address: null, source: null, tokens: null, unread: true }]),
     ],
   });
 });
@@ -1257,8 +1258,8 @@ routes.get('/price/:symbol', async (c) => {
    *
    * Uppercasing turned `NVDAc` into `NVDAC`, which is not a token anyone lists, so every equity
    * price answered "No price feed for NVDAC" for an asset on the app's own markets screen. And the
-   * source was hardcoded: equities are priced from a live 1inch route, so naming CoinGecko was
-   * simply false for eight of the symbols this route serves.
+   * source was hardcoded: equities are priced from a live Uniswap v3 route on X Layer
+   * (`venues/stocks.ts`), so naming CoinGecko was simply false for the symbols this route serves.
    */
   const symbol = canonicalSymbol(c.req.param('symbol'));
   /*
@@ -1281,7 +1282,7 @@ routes.get('/price/:symbol', async (c) => {
      * next caller.
      */
     const price = await priceOf(symbol, screenPatience().priceMs);
-    return c.json({ symbol, price, source: isStock(symbol) ? '1inch' : 'coingecko' });
+    return c.json({ symbol, price, source: isStock(symbol) ? 'uniswap-v3' : 'coingecko' });
   } catch (e) {
     // Late is not failed: the error handler answers it as `warming`, which the app and the endpoint QA wait out.
     if (e instanceof StillFetching) throw e;

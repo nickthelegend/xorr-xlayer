@@ -62,7 +62,8 @@ app.route('/', routes);
 
 const OWNER = '0x95A0b368588713011a15f4b1041423f31B08e615';
 const DELEGATE = '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5';
-const WETH = '0x4200000000000000000000000000000000000006';
+/** X Layer mainnet's WETH: the registry reads mainnet addresses on every chain. */
+const WETH = '0x5A77f1443D16ee5761d310e38b62f77f726bC71c'.toLowerCase();
 const usdc = (n: number) => BigInt(Math.round(n * 1e6));
 const never = () => new Promise<never>(() => {});
 /** What the feed says WETH is worth. */

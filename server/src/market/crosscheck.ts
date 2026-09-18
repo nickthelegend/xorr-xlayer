@@ -6,20 +6,25 @@
  * standard is that no number on screen is invented, and "we asked one API and believed it" is a
  * weaker version of that than it sounds.
  *
- * So the same asset is priced a second way: 1inch's spot API, which derives its number from the
- * on-chain liquidity the executor would actually trade against. That second property is what makes
- * it worth having rather than just being another API — if the two disagree, the one that matters
- * for a fill is the one built from the pools the fill will touch.
+ * So the same asset is priced a second way: the X Layer Uniswap v3 pools the executor would actually trade against,
+ * quoted at a real $1,000 size. That second property is what makes it worth having rather than just being another API —
+ * if the two disagree, the one that matters for a fill is the one built from the pools the fill will touch.
+ *
+ * A wrapped xStock has no second source: its market price IS its pool price (`venues/stocks.ts`), and comparing a number
+ * with itself would report an agreement that never happened. It says so instead.
  *
  * When they agree, this says so quietly. When they do not, the app says THAT rather than picking a
  * winner, because picking one silently is how a wrong price becomes an executed trade.
  */
-import { getJson } from '../http/get.js';
-import { ONEINCH_CHAIN_ID } from '../evm/chains.js';
-import { canonicalSymbol, TOKENS } from '../venues/tokens.js';
+import { SETTLEMENT_SYMBOL, canonicalSymbol, isRoutable, TOKENS } from '../venues/tokens.js';
+import { isStock } from '../venues/stocks.js';
 import { priceOf } from './prices.js';
 
-const API_KEY = process.env.ONEINCH_API_KEY ?? '';
+/** The size the pool is asked about: large enough to be a real trade, small enough not to be all price impact. */
+const PROBE_USD = 1_000;
+
+/** A feed symbol and the X Layer token that carries it in the pools. */
+const POOL_TOKEN: Record<string, string> = { BTC: 'XBTC', OKB: 'WOKB' };
 
 /**
  * Above this the two sources are telling different stories and the app must say so.
@@ -34,8 +39,8 @@ export type CrossCheck = {
   symbol: string;
   /** The feed the screens use. */
   coingecko: number | null;
-  /** Derived from the pools a fill would actually touch. */
-  oneinch: number | null;
+  /** Derived from the X Layer pools a fill would actually touch. */
+  pool: number | null;
   spreadPct: number | null;
   /**
    * Were there actually two numbers to compare?
@@ -45,7 +50,7 @@ export type CrossCheck = {
    * down would make an outage look like a data-integrity problem and train people to ignore the
    * warning that matters.
    *
-   * But `agree: true` alongside `oneinch: null` is, read on its own, a claim that two sources
+   * But `agree: true` alongside `pool: null` is, read on its own, a claim that two sources
    * concurred when only one was ever asked. The note said so and the boolean did not, and a
    * caller reading the field rather than the prose was misled. So the two questions get two
    * fields: `compared` is whether a second opinion exists, `agree` is whether to say anything.
@@ -55,18 +60,13 @@ export type CrossCheck = {
   note: string;
 };
 
-async function oneinchSpot(address: string): Promise<number | null> {
-  if (!API_KEY) return null;
+/** What $1,000 of USDC buys in the pools, as a USD price per unit. Null when the pools will not quote it. */
+async function poolPrice(symbol: string): Promise<number | null> {
+  if (symbol === SETTLEMENT_SYMBOL) return 1;
   try {
-    const res = await getJson<Record<string, string>>(
-      `https://api.1inch.dev/price/v1.1/${ONEINCH_CHAIN_ID}/${address}?currency=USD`,
-      8_000,
-      8_000,
-      { Authorization: `Bearer ${API_KEY}` },
-    );
-    const raw = res[address.toLowerCase()] ?? res[address];
-    const n = raw === undefined ? NaN : Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    const { quote } = await import('../venues/uniswap.js');
+    const q = await quote({ inSymbol: SETTLEMENT_SYMBOL, outSymbol: symbol, amount: PROBE_USD, skipPriceImpact: true });
+    return q.outAmount > 0 ? PROBE_USD / q.outAmount : null;
   } catch {
     return null;
   }
@@ -84,23 +84,33 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
    * precisely what loses the lowercase `c` on a tokenized equity, so it could never resolve one and
    * every equity silently reported "not routable on Base" — for assets that route on Base daily.
    */
-  const token = TOKENS[canonicalSymbol(symbol === 'ETH' ? 'WETH' : symbol)];
-  if (!token) {
+  const key = canonicalSymbol(POOL_TOKEN[symbol.toUpperCase()] ?? symbol);
+  const token = TOKENS[key];
+  if (!token || !isRoutable(key)) {
     return {
       symbol,
       coingecko: await priceOf(symbol, 8_000).catch(() => null),
-      oneinch: null,
+      pool: null,
       spreadPct: null,
       compared: false,
       agree: true,
-      note: `${symbol} is not routable on Base, so there is no on-chain price to compare against.`,
+      note: `${symbol} has no pool on X Layer, so there is no on-chain price to compare against.`,
+    };
+  }
+  if (isStock(key)) {
+    const own = await priceOf(key, 8_000).catch(() => null);
+    return {
+      symbol,
+      coingecko: null,
+      pool: own,
+      spreadPct: null,
+      compared: false,
+      agree: true,
+      note: `${key} is priced by its own X Layer pool; there is no independent feed to compare it with.`,
     };
   }
 
-  const [coingecko, oneinch] = await Promise.all([
-    priceOf(symbol, 8_000).catch(() => null),
-    oneinchSpot(token.address),
-  ]);
+  const [coingecko, pool] = await Promise.all([priceOf(symbol, 8_000).catch(() => null), poolPrice(key)]);
 
   /*
    * One source missing is not a disagreement.
@@ -108,32 +118,32 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
    * Reporting "they disagree" when only one answered would make an outage look like a data
    * integrity problem, and would train people to ignore the warning that matters.
    */
-  if (coingecko === null || oneinch === null) {
+  if (coingecko === null || pool === null) {
     return {
       symbol,
       coingecko,
-      oneinch,
+      pool,
       spreadPct: null,
       compared: false,
       agree: true,
       note:
-        coingecko === null && oneinch === null
+        coingecko === null && pool === null
           ? 'Neither price source answered.'
           : `Only one source answered, so there is nothing to compare.`,
     };
   }
 
-  const spreadPct = (Math.abs(coingecko - oneinch) / ((coingecko + oneinch) / 2)) * 100;
+  const spreadPct = (Math.abs(coingecko - pool) / ((coingecko + pool) / 2)) * 100;
   const agree = spreadPct <= DISAGREEMENT_PCT;
   return {
     symbol,
     coingecko,
-    oneinch,
+    pool,
     spreadPct,
     compared: true,
     agree,
     note: agree
       ? `Two independent sources within ${spreadPct.toFixed(2)}%.`
-      : `The two price sources disagree by ${spreadPct.toFixed(2)}%. The number shown is the market feed; a fill would happen nearer ${oneinch.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}.`,
+      : `The two price sources disagree by ${spreadPct.toFixed(2)}%. The number shown is the market feed; a fill would happen nearer ${pool.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}.`,
   };
 }

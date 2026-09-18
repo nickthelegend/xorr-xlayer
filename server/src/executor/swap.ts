@@ -56,7 +56,7 @@ export async function placeSwap(w: WalletRow, req: SwapRequest): Promise<SwapRes
   if (!CAN_SETTLE) {
     return blocked(
       'not_settleable_here',
-      `Nothing settles on ${CHAIN_KEY} — 1inch has no deployment here — so there is no swap to place.`,
+      `Nothing settles on ${CHAIN_KEY} — there are no Uniswap pools here — so there is no swap to place.`,
     );
   }
   if (!TOKENS[from] || !TOKENS[to]) {
@@ -163,6 +163,8 @@ async function convert(w: WalletRow, from: string, to: string, req: SwapRequest)
       owner,
       token: pay.address,
       venue: settlement.swap.to,
+      // OKX DEX pulls through its approval contract: the close becomes `closePositionVia`, as `run.ts` sends it.
+      ...(settlement.spender ? { spender: settlement.spender } : {}),
       amount: raw,
       data: settlement.swap.data,
       ...settlement.floor,

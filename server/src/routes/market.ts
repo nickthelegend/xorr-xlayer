@@ -306,7 +306,7 @@ function equityAsked(
 ): { symbol: string } | { status: 400 | 404; body: { error: string; detail: string } } {
   const asked = raw?.trim();
   if (!asked) {
-    return { status: 400, body: { error: 'missing_symbol', detail: 'Pass ?symbol=, for example ?symbol=NVDAc.' } };
+    return { status: 400, body: { error: 'missing_symbol', detail: 'Pass ?symbol=, for example ?symbol=NVDAx.' } };
   }
   const symbol = canonicalSymbol(asked);
   if (!isStock(symbol)) {
@@ -316,7 +316,7 @@ function equityAsked(
 }
 
 /**
- * GET /market/stocks/history?symbol=NVDAc — the series we have actually observed.
+ * GET /market/stocks/history?symbol=NVDAx — the series we have actually observed.
  *
  * These assets have no feed and no free candle source, so the only honest history is our own
  * timestamped readings from the route that prices them. It starts when we started watching and the

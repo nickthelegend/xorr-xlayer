@@ -68,13 +68,13 @@ describe('a price alert needs a symbol something can price', () => {
     check({ kind: 'price', symbol, config });
 
   it('accepts the symbols the feed table knows', () => {
-    for (const s of ['WETH', 'CBBTC', 'BTC']) expect(price(s)).toBeUndefined();
+    for (const s of ['WETH', 'BTC', 'ETH']) expect(price(s)).toBeUndefined();
   });
 
   it('accepts a tokenized equity', () => {
-    expect(price('NVDAc')).toBeUndefined();
-    // And keeps the suffix: uppercasing works for every crypto symbol and breaks all eight equities.
-    expect(price('nvdac')).toBeUndefined();
+    expect(price('NVDAx')).toBeUndefined();
+    // And keeps the suffix: uppercasing works for every crypto symbol and breaks every equity.
+    expect(price('nvdax')).toBeUndefined();
   });
 
   it('refuses a symbol nothing prices, naming it as the caller spelled it', () => {

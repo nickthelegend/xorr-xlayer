@@ -40,7 +40,6 @@ vi.mock('../market/yield.js', () => ({
 }));
 vi.mock('../market/edgar.js', () => ({ earningsCalendar: vi.fn() }));
 vi.mock('../market/crosscheck.js', () => ({ crossCheck: vi.fn() }));
-vi.mock('../evm/basename.js', () => ({ addressOfBasename: vi.fn(), basenameOf: vi.fn() }));
 vi.mock('../evm/balances.js', () => ({ suppliedUsd: vi.fn() }));
 
 const { getJson } = await import('../http/get.js');
@@ -49,7 +48,6 @@ const { currentWallet } = await import('./wallet-context.js');
 const pool = await import('../market/yield.js');
 const { earningsCalendar } = await import('../market/edgar.js');
 const { crossCheck } = await import('../market/crosscheck.js');
-const { addressOfBasename, basenameOf } = await import('../evm/basename.js');
 const { market } = await import('./market.js');
 const { errorResponse } = await import('../http/errors.js');
 
@@ -66,8 +64,10 @@ const OWNER = getAddress('0x95a0b368588713011a15f4b1041423f31b08e615');
 const RESERVE = {
   apy: 0.04,
   pool: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
-  aToken: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB',
-  asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  // A stand-in: the aToken is never read by the withdraw calldata, only the pool and the asset.
+  aToken: '0x000000000000000000000000000000000000a70c',
+  // X Layer's USDC, the reserve's asset.
+  asset: '0xB6CEceAB302E2E4948951eE7843FC24E92933061',
 };
 const WITHDRAW = parseAbi(['function withdraw(address asset, uint256 amount, address to) returns (uint256)']);
 
@@ -118,15 +118,15 @@ describe('GET /market/earnings', () => {
 
   it('tells a record with no entry (404) from one that could not be read (502), and names no source in either', async () => {
     vi.mocked(earningsCalendar).mockResolvedValueOnce(null);
-    const none = await call('/market/earnings?symbol=nvdac');
+    const none = await call('/market/earnings?symbol=nvdax');
     refused(none, 404, 'no_filings');
     // Asked under the registry's spelling, whatever the caller sent.
-    expect(earningsCalendar).toHaveBeenCalledWith('NVDAc');
+    expect(earningsCalendar).toHaveBeenCalledWith('NVDAx');
 
     vi.mocked(earningsCalendar).mockRejectedValueOnce(
       new Error('503 Service Unavailable for https://data.sec.gov/submissions/CIK0001045810.json'),
     );
-    const down = await call('/market/earnings?symbol=NVDAc');
+    const down = await call('/market/earnings?symbol=NVDAx');
     refused(down, 502, 'filings_unavailable');
 
     for (const r of [none, down]) expect(JSON.stringify(r.body)).not.toMatch(/edgar|sec\.gov/i);
@@ -137,34 +137,27 @@ describe('GET /market/stocks/history', () => {
   it('names a missing symbol and an hours that is not a number, and reads nothing', async () => {
     refused(await call('/market/stocks/history'), 400, 'missing_symbol');
     refused(await call('/market/stocks/history?symbol=WETH'), 404, 'not_an_equity');
-    refused(await call('/market/stocks/history?symbol=NVDAc&hours=abc'), 400, 'invalid_hours');
+    refused(await call('/market/stocks/history?symbol=NVDAx&hours=abc'), 400, 'invalid_hours');
     expect(query).not.toHaveBeenCalled();
   });
 
   it('answers a read that failed as a failure, never as "No readings yet"', async () => {
     vi.mocked(query).mockRejectedValueOnce(new Error('invalid input syntax for type interval: "NaN hours"'));
-    const r = await call('/market/stocks/history?symbol=NVDAc&hours=24');
+    const r = await call('/market/stocks/history?symbol=NVDAx&hours=24');
     expect(r.status).toBe(500);
     expect(JSON.stringify(r.body)).not.toContain('No readings yet');
   });
 
   it('reads the hours asked for, held to a year', async () => {
     vi.mocked(query).mockResolvedValueOnce([{ at: new Date('2026-09-13T10:00:00Z'), usd: '181.5' }] as never);
-    const r = await call('/market/stocks/history?symbol=NVDAc&hours=99999');
+    const r = await call('/market/stocks/history?symbol=NVDAx&hours=99999');
     expect(r.status).toBe(200);
-    expect(vi.mocked(query).mock.calls[0]![1]).toEqual(['NVDAc', String(24 * 365)]);
+    expect(vi.mocked(query).mock.calls[0]![1]).toEqual(['NVDAx', String(24 * 365)]);
     expect(r.body.points).toEqual([{ at: Date.parse('2026-09-13T10:00:00Z'), usd: 181.5 }]);
   });
 });
 
-describe('GET /basename and GET /market/crosscheck', () => {
-  it('names a query with neither a name nor an address, and resolves nothing', async () => {
-    refused(await call('/basename'), 400, 'invalid_query');
-    refused(await call('/basename?address=0x123'), 400, 'invalid_query');
-    expect(addressOfBasename).not.toHaveBeenCalled();
-    expect(basenameOf).not.toHaveBeenCalled();
-  });
-
+describe('GET /market/crosscheck', () => {
   it('names a missing symbol, and asks neither price source', async () => {
     refused(await call('/market/crosscheck'), 400, 'missing_symbol');
     expect(crossCheck).not.toHaveBeenCalled();

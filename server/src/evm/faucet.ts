@@ -310,7 +310,7 @@ async function sendFromFaucetKey(offer: Offer & { source: 'faucet-key' }, to: Ad
     return {
       sent: false,
       reason: 'faucet_out_of_gas',
-      detail: `The faucet key holds ${formatEther(faucetEth)} ETH and the transfer costs about ${formatEther(cost)}, so nothing was sent.`,
+      detail: `The faucet key holds ${formatEther(faucetEth)} OKB and the transfer costs about ${formatEther(cost)}, so nothing was sent.`,
     };
   }
 
