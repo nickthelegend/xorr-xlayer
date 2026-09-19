@@ -28,18 +28,35 @@ export type Deployment = {
 };
 
 /**
- * None yet (2026-09-18): the X Layer executors — testnet (1952) and a fork of mainnet (196) — are added here as each is
- * deployed, with the address it actually answers at. The Base rows this list carried named another product's servers.
+ * The X Layer executors, as deployed 2026-09-19 (Railway project `xorr-xlayer`). The fork is where fills are real — a
+ * copy of X Layer mainnet's state, so it answers chain id 196 and no public explorer has seen its own transactions; the
+ * testnet serves the source-verified contracts in `contracts/deployments/xlayer-testnet.json`, and nothing fills there.
  */
-export const DEPLOYMENTS: readonly Deployment[] = [];
+export const DEPLOYMENTS: readonly Deployment[] = [
+  {
+    key: 'xlayer-fork',
+    name: 'X Layer (fork of mainnet)',
+    chainId: 196,
+    api: 'https://executor-fork-production-2db8.up.railway.app',
+    explorer: null,
+    test: true,
+  },
+  {
+    key: 'xlayer-testnet',
+    name: 'X Layer testnet',
+    chainId: 1952,
+    api: 'https://executor-testnet-production.up.railway.app',
+    explorer: 'https://www.oklink.com/xlayer-test',
+    test: true,
+  },
+];
 
 const bare = (url: string) => url.replace(/\/+$/, '');
 
 /**
  * The deployment a chain key names, if xorr is deployed on it.
  *
- * `list` is for tests: the real list is empty until an X Layer executor is deployed, and the matching rule should be
- * pinned before then rather than after.
+ * `list` is for tests, which pin the matching rule against rows of their own.
  */
 export function deploymentFor(
   key: string | undefined,
