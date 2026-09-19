@@ -7,13 +7,11 @@
  * doesn't exist` before a single screen mounted — a failure the web bundle can never reproduce,
  * because on web the platform already provides both.
  *
- * These three imports must come FIRST and must stay first. `react-native-get-random-values`
- * installs `crypto.getRandomValues`, `fast-text-encoding` installs `TextEncoder`/`TextDecoder`,
- * and the ethers shims fill in the rest of what the signing path expects. Anything imported above
- * them may capture a global that does not exist yet.
+ * The polyfills must come FIRST and must stay first: anything imported above them may capture a
+ * global that does not exist yet. They are split by platform (`polyfills.native.js` /
+ * `polyfills.web.js`) because a browser already has all of them, and loading the React Native
+ * shims there announced itself in the console of every page.
  */
-import 'react-native-get-random-values';
-import 'fast-text-encoding';
-import '@ethersproject/shims';
+import './polyfills';
 
 import 'expo-router/entry';
