@@ -15,8 +15,15 @@ vi.hoisted(() => {
   process.env.PRIVY_APP_SECRET = 'test';
 });
 
-const quote = vi.fn(async () => ({ outAmount: 0.0045, venues: ['Uniswap v3'], route: 'Uniswap v3', minimumOut: 0, priceImpactPct: null }));
-vi.mock('../venues/uniswap.js', () => ({ quote: (a: unknown) => quote(a), VENUE_NAME: 'Uniswap v3' }));
+type QuoteParams = { inSymbol: string; outSymbol: string; amount: number; market?: boolean };
+const quote = vi.fn(async (_params: QuoteParams) => ({
+  outAmount: 0.0045,
+  venues: ['Uniswap v3'],
+  route: 'Uniswap v3',
+  minimumOut: 0,
+  priceImpactPct: null,
+}));
+vi.mock('../venues/uniswap.js', () => ({ quote: (p: QuoteParams) => quote(p), VENUE_NAME: 'Uniswap v3' }));
 vi.mock('../db/index.js', () => ({ query: async () => [], one: async () => null, pool: { end: async () => undefined } }));
 
 const { market } = await import('./market.js');
@@ -28,9 +35,9 @@ describe('/market/stocks', () => {
     const rows = (await res.json()) as { symbol: string; price: number | null }[];
     expect(rows.length).toBeGreaterThan(0);
     expect(quote).toHaveBeenCalled();
-    for (const call of quote.mock.calls) {
-      expect((call[0] as { market?: boolean }).market).toBe(true);
-      expect((call[0] as { inSymbol: string }).inSymbol).toBe('USDC');
+    for (const [params] of quote.mock.calls) {
+      expect(params.market).toBe(true);
+      expect(params.inSymbol).toBe('USDC');
     }
   });
 });
