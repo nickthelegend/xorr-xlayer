@@ -24,13 +24,23 @@ if [ "$BAL" = "0" ]; then
 fi
 echo "deployer $DEPLOYER_ADDRESS  balance $(cast from-wei "$BAL") OKB"
 
-run() { # script contract
-  SETTLEMENT_TOKEN="$USDC_TESTNET" forge script "$1" --rpc-url "$RPC" --broadcast --slow 2>&1 | tee /dev/stderr \
-    | sed -n "s/.*$2 deployed to: \(0x[0-9a-fA-F]\{40\}\).*/\1/p" | tail -1
+# Addresses and hashes come from Foundry's broadcast receipts, never from the script's stdout: forge prints
+# "deployed to" during simulation too, so a broadcast that failed afterwards would otherwise record an address with no code.
+receipt() { # broadcast-dir field
+  python3 -c "import json,sys;r=json.load(open('broadcast/$1/1952/run-latest.json'))['receipts'][0];assert int(r['status'],16)==1,'reverted';print(r['$2'] if '$2'!='blockNumber' else int(r['blockNumber'],16))"
 }
-DELEGATION=$(run script/Deploy.s.sol:Deploy XorrDelegation)
-ANCHOR=$(run script/DeployAnchor.s.sol:DeployAnchor XorrAuditAnchor)
-[ -n "$DELEGATION" ] && [ -n "$ANCHOR" ] || { echo "a deploy did not report its address"; exit 1; }
+# X Layer's RPC can report the pre-deploy nonce for a moment after a receipt; the next script would then reuse it.
+wait_nonce() { # expected
+  for _ in $(seq 1 30); do [ "$(cast nonce "$DEPLOYER_ADDRESS" --rpc-url "$RPC")" -ge "$1" ] && return 0; sleep 2; done
+  echo "the deployer's nonce never reached $1"; exit 1
+}
+START=$(cast nonce "$DEPLOYER_ADDRESS" --rpc-url "$RPC")
+SETTLEMENT_TOKEN="$USDC_TESTNET" forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC" --broadcast --slow
+wait_nonce $((START + 1))
+forge script script/DeployAnchor.s.sol:DeployAnchor --rpc-url "$RPC" --broadcast --slow
+DELEGATION=$(receipt Deploy.s.sol contractAddress); DELEGATION_TX=$(receipt Deploy.s.sol transactionHash); DELEGATION_BLOCK=$(receipt Deploy.s.sol blockNumber)
+ANCHOR=$(receipt DeployAnchor.s.sol contractAddress); ANCHOR_TX=$(receipt DeployAnchor.s.sol transactionHash); ANCHOR_BLOCK=$(receipt DeployAnchor.s.sol blockNumber)
+for a in "$DELEGATION" "$ANCHOR"; do [ "$(cast code "$a" --rpc-url "$RPC")" != "0x" ] || { echo "no code at $a"; exit 1; }; done
 
 cat > deployments/xlayer-testnet.json <<JSON
 {
@@ -40,8 +50,8 @@ cat > deployments/xlayer-testnet.json <<JSON
   "sourceCommit": "$(git rev-parse HEAD)",
   "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "contracts": {
-    "XorrDelegation": { "address": "$DELEGATION", "constructorArgs": { "settlementToken": "$USDC_TESTNET" } },
-    "XorrAuditAnchor": { "address": "$ANCHOR" }
+    "XorrDelegation": { "address": "$DELEGATION", "deployTx": "$DELEGATION_TX", "blockNumber": $DELEGATION_BLOCK, "constructorArgs": { "settlementToken": "$USDC_TESTNET" } },
+    "XorrAuditAnchor": { "address": "$ANCHOR", "deployTx": "$ANCHOR_TX", "blockNumber": $ANCHOR_BLOCK }
   },
   "explorer": "https://www.oklink.com/xlayer-test/address/$DELEGATION"
 }

@@ -1,0 +1,41 @@
+{
+  "network": "xlayer-testnet",
+  "chainId": 1952,
+  "deployer": "0x1725a1B284D58dC9bb79DfB7B205d4d0D5d4E4eA",
+  "sourceCommit": "26ef6641d490f9d067d7ca4e93f550bd969e7fb9",
+  "deployedAt": "2026-09-19",
+  "contracts": {
+    "XorrDelegation": {
+      "address": "0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+      "deployTx": "0x1b1c3cea3070f4367ab51aa8c83aaf71b62902628626c07ea1572bf7b122e2d0",
+      "blockNumber": 41340720,
+      "constructorArgs": {
+        "settlementToken": "0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3"
+      },
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-19",
+        "lookup": "https://sourcify.dev/server/v2/contract/1952/0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+        "repository": "https://repo.sourcify.dev/1952/0x156DCE9E9d523775AB51f882616A431EdBfBcA22"
+      }
+    },
+    "XorrAuditAnchor": {
+      "address": "0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+      "deployTx": "0xe69b097f9f6de3fd590971cc81dfb6f23d2f97d28c4187728dd070501fb0ea29",
+      "blockNumber": 41340761,
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-19",
+        "lookup": "https://sourcify.dev/server/v2/contract/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+        "repository": "https://repo.sourcify.dev/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196"
+      }
+    }
+  },
+  "explorer": "https://www.oklink.com/xlayer-test/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+  "compiler": {
+    "evmVersion": "cancun",
+    "viaIR": true,
+    "optimizer": true,
+    "optimizerRuns": 200
+  }
+}
