@@ -398,3 +398,10 @@ again in the app (17 signatures, cap back to $100), and the USDT0 → USDC conve
 
 Still blocked by a credential that exists nowhere: OKX DEX routing (`OKX_API_KEY`/`SECRET`/`PASSPHRASE`) and LLM prose
 (`OPENROUTER_API_KEY`). OKX Wallet is offered first in the live sign-in modal; connecting one needs the extension.
+
+**Known cost, not a defect (2026-09-20):** granting costs seventeen wallet confirmations — one approval per tradable
+token, then the grant — because `XorrDelegation` can only pull a token the owner has approved, and the app approves
+the whole tradable set up front so a later sale never stops to ask. The screen says so before you start ("You'll sign
+17 times. Nothing is granted until the last."). It could be three: a buy never needs a stock's approval, only a SALE
+does, so the stock could be approved the first time one is sold. That moves a failure into the sell path, which is the
+journey the demo depends on, so it is written down here rather than attempted the day before submission.
