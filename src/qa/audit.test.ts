@@ -331,7 +331,7 @@ describe('13.9 device matrix — every screen has an answer for a short device',
        * It counted five component names, none of which that screen uses, so it scored three and
        * passed — while measuring 865pt of content in a 667pt viewport with `body` at
        * `overflow: hidden`. Unreachable on that device: the risk warning, and the sentence saying
-       * the wallet is about to ask for three signatures. On the consent screen.
+       * the wallet is about to ask for — one per tradable token, then the grant. On the consent screen.
        *
        * Counting `<Text>` too was tried and over-flags badly: eight screens tripped it that
        * measure FITS in a real 375×667 browser, because a chart or a list inside `Fill` absorbs
@@ -351,7 +351,7 @@ describe('13.9 device matrix — every screen has an answer for a short device',
    * shortest device the design supports. A static block count cannot predict runtime height, so
    * what was actually observed is pinned here instead of inferred:
    *
-   *   /delegate  865pt of content, body overflow:hidden — risk warning and the "3 signatures"
+   *   /delegate  865pt of content, body overflow:hidden — risk warning and the signature-count
    *              sentence both unreachable
    *   /fund      368pt over, three elements hidden including the ADDRESS, on the screen whose
    *              only job is handing someone an address

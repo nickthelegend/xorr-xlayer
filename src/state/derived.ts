@@ -766,7 +766,8 @@ export function rangeChange(
  * live". Same silent-stop as a rotated delegate key: nothing is broken, nothing is wrong, and
  * nothing happens.
  *
- * A day of warning because re-granting costs three signatures and a user should not discover that
+ * A day of warning because re-granting costs a signature per tradable token and then the grant — seventeen on X
+ * Layer today — and a user should not discover that
  * requirement at the moment the permission has already lapsed.
  */
 export const EXPIRY_WARNING_MS = 24 * 60 * 60 * 1000;

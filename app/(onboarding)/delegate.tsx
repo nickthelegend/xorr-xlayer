@@ -117,7 +117,8 @@ export default function GrantDelegation() {
         Measured on a 375×667 viewport — an iPhone SE, which is the shortest device the design
         supports — the content runs to 865pt with `body` at `overflow: hidden`. Unreachable: the
         risk warning ("a bot with permission to trade can lose money inside these limits") and the
-        sentence telling the user their wallet is about to ask for three signatures.
+        sentence telling the user how many signatures their wallet is about to ask for — one per tradable token
+        and then the grant, which is seventeen on X Layer today and is counted, never hard-coded.
 
         Both are on the screen where someone decides whether to give a bot access to their money,
         and a consent screen whose warning cannot be read is not consent.
