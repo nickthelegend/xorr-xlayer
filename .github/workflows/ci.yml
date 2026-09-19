@@ -119,7 +119,10 @@ jobs:
 
       - name: Fork X Layer
         run: |
-          nohup anvil --fork-url "$XLAYER_RPC" --chain-id 196 --port 8545 --silent > anvil.log 2>&1 &
+          # X Layer's public RPC rate-limits shared runner IPs; a fork that stalls on its upstream left a deploy waiting on a
+          # receipt until it timed out. Retry with backoff, throttle what anvil asks, and give each upstream call time.
+          nohup anvil --fork-url "$XLAYER_RPC" --chain-id 196 --port 8545 --silent \
+            --retries 10 --fork-retry-backoff 2000 --timeout 60000 --compute-units-per-second 100 > anvil.log 2>&1 &
           for i in $(seq 1 90); do
             cast chain-id --rpc-url "$FORK_RPC" >/dev/null 2>&1 && exit 0
             sleep 1

@@ -36,6 +36,8 @@ import { FORK_USDC_RESERVE, anvil, dealErc20 } from './fork/anvil.js';
 const RPC = process.env.FORK_RPC ?? 'http://127.0.0.1:8545';
 const chain = { ...xLayer, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
 const pub = createPublicClient({ chain, transport: http(RPC) });
+// See fork-bootstrap.ts: a fork's first touch of a contract waits on X Layer's rate-limited RPC.
+const RECEIPT = { timeout: 600_000, pollingInterval: 1_000 } as const;
 
 let failures = 0;
 function check(ok: boolean, what: string, detail = ''): void {
@@ -79,7 +81,7 @@ async function main() {
   try {
     const reserve = createWalletClient({ account: FORK_USDC_RESERVE, chain, transport: http(RPC) });
     const h = await reserve.writeContract({ address: USDC, abi: erc20Abi, functionName: 'transfer', args: [owner, parseUnits('1000', 6)] });
-    await pub.waitForTransactionReceipt({ hash: h });
+    await pub.waitForTransactionReceipt({ hash: h, ...RECEIPT });
   } finally {
     await anvil(RPC, 'anvil_stopImpersonatingAccount', [FORK_USDC_RESERVE]).catch(() => undefined);
   }
@@ -88,7 +90,7 @@ async function main() {
 
   const send = async (label: string, tx: Promise<Hex>): Promise<Hex> => {
     const hash = await tx;
-    const r = await pub.waitForTransactionReceipt({ hash });
+    const r = await pub.waitForTransactionReceipt({ hash, ...RECEIPT });
     check(r.status === 'success', label, hash);
     return hash;
   };

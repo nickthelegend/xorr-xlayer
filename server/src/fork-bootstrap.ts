@@ -48,6 +48,12 @@ const GAS_OKB = parseEther('10');
 
 const chain = { ...xLayer, rpcUrls: { default: { http: [RPC] }, public: { http: [RPC] } } };
 const pub = createPublicClient({ chain, transport: http(RPC) });
+/**
+ * A fork pulls state from X Layer's public RPC the first time a transaction touches it, and that RPC rate-limits: a
+ * deploy can wait on its upstream for minutes. Anvil mines on arrival, so a slow receipt is a slow upstream, not a lost
+ * transaction — wait for it rather than failing at viem's default.
+ */
+const RECEIPT = { timeout: 600_000, pollingInterval: 1_000 } as const;
 
 async function artifact(name: string): Promise<{ abi: unknown[]; bytecode: Hex }> {
   const file = new URL(`../../contracts/out/${name}.sol/${name}.json`, import.meta.url);
@@ -88,12 +94,12 @@ async function main() {
     // The settlement token: what the daily cap is counted in, and what a close may not sell.
     args: [USDC] as never,
   });
-  const delegation = (await pub.waitForTransactionReceipt({ hash: delegationHash })).contractAddress as Address;
+  const delegation = (await pub.waitForTransactionReceipt({ hash: delegationHash, ...RECEIPT })).contractAddress as Address;
   console.log(`XorrDelegation   ${delegation}`);
 
   const anchorArt = await artifact('XorrAuditAnchor');
   const anchorHash = await wallet.deployContract({ abi: anchorArt.abi as never, bytecode: anchorArt.bytecode } as never);
-  const anchor = (await pub.waitForTransactionReceipt({ hash: anchorHash })).contractAddress as Address;
+  const anchor = (await pub.waitForTransactionReceipt({ hash: anchorHash, ...RECEIPT })).contractAddress as Address;
   console.log(`XorrAuditAnchor  ${anchor}`);
 
   /*
@@ -117,7 +123,7 @@ async function main() {
     try {
       const reserve = createWalletClient({ account: FORK_USDC_RESERVE, chain, transport: http(RPC) });
       const h = await reserve.writeContract({ address: USDC, abi: erc20Abi, functionName: 'transfer', args: [fundTarget, DEMO_USDC] });
-      await pub.waitForTransactionReceipt({ hash: h });
+      await pub.waitForTransactionReceipt({ hash: h, ...RECEIPT });
     } finally {
       await anvil(RPC, 'anvil_stopImpersonatingAccount', [FORK_USDC_RESERVE]).catch(() => undefined);
     }
