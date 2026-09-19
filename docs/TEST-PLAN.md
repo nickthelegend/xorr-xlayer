@@ -143,3 +143,43 @@ report is `docs/screens/qa-report.json`. PASS = every screen `ok`.
 | H07 | Public repo with README | owner action at submission (D14) |
 | H08 | 2–4 min video | owner action (D13/D21) |
 | H09 | Submission form | owner action |
+
+## B — Driven in a browser (added 2026-09-20)
+
+Run against the deployed web build with the console and the network watched on every item. Claude in Chrome for
+everything reachable without a credential; `tools/flows.mjs` for the signed-in journeys, because a one-time code is not
+typed into a page by a tool. A visible console error or a failed request fails the item, third-party wallet-SDK logs
+excepted by name (Coinbase chain support, injected-provider detection).
+
+| ID | Target | Steps | Expected exact result | PASS |
+|---|---|---|---|---|
+| B01 | Sign-in form | `/wallet`, type the test address, "Email me a code", enter the code | the code field appears, the wallet is created, `privy:token` is in storage | token present |
+| B02 | Onboarding validation | `/welcome` → Get started → deselect every goal → Continue | "0 selected", the button is disabled and clicking it stays on `/goals` | still `/goals` |
+| B03 | Search by name | `/search`, type "tesla" | exactly ONE TSLAx row, priced, opening `/asset/TSLAx` | one row |
+| B04 | Search, no match | type "zzzz" | `Nothing matches "zzzz".` and no rows | exact sentence |
+| B05 | Stock hero vs its own chart | `/asset/NVDAx` | the hero price equals the chart's marker to the cent, both from the live pools | equal |
+| B06 | Change label | same screen | the direction word and the figure come from one rounded value; a change that rounds to 0.0% reads "flat", never "down 0.0%" | no contradiction |
+| B07 | Chart windows | 1D / 1W / 1M / 1Y | each pill redraws from the recorded readings; the caption names the window actually covered ("since Sep 19") when the history is shorter | caption matches |
+| B08 | Ticket, signed out | `/order/NVDAx` | "Sign in to trade", Max disabled, backspace reaches $0, no fabricated fee | as stated |
+| B09 | Ticket, floor vs estimate | signed in, $250 | "Minimum received" ≤ the estimate above it, both from the same quote | floor ≤ estimate |
+| B10 | Ticket, past the allowance | signed in, amount over what is left today | the refusal is a sentence naming the remaining allowance and the button cannot be pressed | disabled + sentence |
+| B11 | Tapped buy | signed in with allowance, key $50, press Buy | a filled run with a transaction hash, the position grows on chain, the day's allowance falls by $50 | all three |
+| B12 | Swap, signed out | `/swap`, enter 100 | "Sign in to see a quote" — never a claim that the market will not price it | exact sentence |
+| B13 | Alerts, double submit | `/alerts/new`, press the button twice | exactly one alert exists afterwards | +1 |
+| B14 | Alerts, validation | clear the price | "Enter a symbol and a price", button disabled | as stated |
+| B15 | Alerts, reload mid-flow | reload `/alerts` | the alert is listed once | listed |
+| B16 | Deposit, held USDT0 | `/deposit` holding USDT0 | the balance is shown and converting to USDC is offered | both |
+| B17 | Convert, signed | Review conversion → Convert, confirm each signature | "Converted X USDT0 to USDC.", and the USDT0 is gone on chain | both |
+| B18 | Kill switch | `/safety`, hold "Stop all trading" | `policyOf.revoked` is true on chain, signed by the owner | revoked |
+| B19 | Grant | `/delegate` → Sign this permission | the screen states the count before you start; after the last one the chain holds the cap and expiry | cap on chain |
+| B20 | Rate screen | `/rates` | names the asset the rate is actually paid on (USDT0) and repeats the executor's sentence | names USDT0 |
+| B21 | Judge page | `/judge`, paste an owner address, Re-run | every claim verified; a wallet with no permission on that chain is a named skip, never a failure | 20/20, 0 fail |
+| B22 | Executor unreachable | cut the network mid-session | the last price stays, "Can't reach xorr" names what is unaffected, retry restores and says "Back online" | all three |
+| B23 | Session cleared | clear storage, open a gated screen | a sign-in prompt, no placeholder value, no error screen | prompt |
+| B24 | Unknown symbol | `/asset/NOPE`, `/order/NOPE` | "No price feed." / "No live NOPE price" and "Not tradable here" — never a number | no number |
+| B25 | Unknown route | `/no-such-screen-exists` | "There is nothing here", offering the wallet and the screen index | as stated |
+| B26 | Dev screens in production | `/_dev/ui`, `/_dev/boom` | both redirect to `/welcome` | redirected |
+| B27 | Phone width | 420px | no horizontal overflow, the tab bar renders, unpriced rows show "—" | no overflow |
+| B28 | Welcome hero | `/welcome` | this product's own coin art — no other chain's mark on the first screen | no foreign mark |
+| B29 | Agent gate | a wallet that hired nobody, with a live permission and allowance | no autonomous trade is placed for it, ever | no trade |
+| B30 | Agent, hired | a wallet that hired an agent | its sweep may place ONE entry per symbol it does not already hold, attributed to that agent | ≤1 per symbol |
