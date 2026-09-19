@@ -1,50 +1,31 @@
 /**
- * The web half of `CoinHero`: the landing's coin film itself, muted and looping.
+ * The web half of `CoinHero`: the same still the native build shows.
  *
- * A browser that refuses autoplay, or a person who asked for reduced motion, gets the film's own first frame as the
- * poster, so nothing jumps and nothing moves that should not. The shared parts come from `coinHeroParts`, never from
- * `./CoinHero`, which on the web is this file.
+ * This played the landing's coin film, which opens on a SOL coin — another chain's mark on the first screen of a
+ * product that settles on X Layer (PLAN.md D23). The art that replaced it is a still, so both halves now draw the
+ * same thing and there is nothing to autoplay, nothing for a reduced-motion setting to suppress, and no video to
+ * download before the first screen can be read.
  */
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Asset } from 'expo-asset';
-import { colors, useReducedMotion } from '@/ui';
+import { Image } from 'expo-image';
+import { colors } from '@/ui';
 import { COIN_FOCUS, HeroFades } from './coinHeroParts';
 
-const POSTER = Asset.fromModule(require('../../assets/landing/hero-poster.webp')).uri;
-const WEBM = Asset.fromModule(require('../../assets/landing/hero.webm')).uri;
-const MP4 = Asset.fromModule(require('../../assets/landing/hero.mp4')).uri;
+const POSTER = require('../../assets/brand/coin-hero.webp');
 /** An alpha mask, not a colour: opaque in the middle, clear at the very edges. */
 const SIDE_FADE = 'linear-gradient(to right, transparent 0%, #000 9%, #000 91%, transparent 100%)';
 
 export function CoinHero({ style }: { style?: StyleProp<ViewStyle> }) {
-  const reduced = useReducedMotion();
   return (
     <View style={[styles.frame, style]} accessible={false}>
-      <video
-        key={reduced ? 'still' : 'film'}
-        autoPlay={!reduced}
-        muted
-        loop
-        playsInline
-        preload="auto"
-        poster={POSTER}
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: `${COIN_FOCUS.left} ${COIN_FOCUS.top}`,
-          // On a desktop browser the app is a column on a black page: the film's sides sink into it, as on the landing.
-          maskImage: SIDE_FADE,
-          WebkitMaskImage: SIDE_FADE,
-        }}
-      >
-        <source src={WEBM} type="video/webm" />
-        <source src={MP4} type="video/mp4" />
-      </video>
+      {/* The mask is a web-only CSS property, which the Image style type does not carry — hence the cast. */}
+      <Image
+        source={POSTER}
+        style={[StyleSheet.absoluteFill, { maskImage: SIDE_FADE, WebkitMaskImage: SIDE_FADE } as object]}
+        contentFit="cover"
+        contentPosition={COIN_FOCUS}
+      />
       <HeroFades />
     </View>
   );
