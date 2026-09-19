@@ -863,10 +863,15 @@ async function runStrategyInner(
       // Closing is not spending, so it does not consume the day's allowance — the contract
       // agrees, and the two tallies must not disagree.
       if (!isClose) await recordSpend(walletId, intent.usd, client);
+      /*
+       * Who placed it. A one-shot order an agent placed (the autonomous agent, the basket) names that agent in
+       * `params.placedBy`; its fill row is the trade's only audit row, so the trail must not credit it to the person.
+       */
+      const placedBy = (strategy.params as Record<string, unknown> | null)?.placedBy;
       const auditRow = await append(
         {
           walletId,
-          agent: agentForKind(strategy.kind),
+          agent: typeof placedBy === 'string' && placedBy ? placedBy : agentForKind(strategy.kind),
           action: describeLeg(intent, filledUnits, venue),
           detail: intent.direct
             ? `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} moved. ${intent.because}`

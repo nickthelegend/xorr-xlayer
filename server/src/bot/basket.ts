@@ -345,7 +345,7 @@ async function placeLeg(
   const w = wallet as WalletRow;
 
   if (leg.side === 'buy') {
-    const order = await placeOrder(w, leg.symbol, leg.usd, `Basket · rebalance into ${leg.symbol}`);
+    const order = await placeOrder(w, leg.symbol, leg.usd, `Basket · rebalance into ${leg.symbol}`, { placedBy: 'Basket' });
     if (!order.placed) return { placed: false, detail: order.refusal.detail };
     const out = order.outcome;
     if (out.status === 'filled') return { placed: true, usd: leg.usd, signature: out.signature };

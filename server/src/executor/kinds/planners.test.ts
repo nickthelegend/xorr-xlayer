@@ -49,6 +49,16 @@ describe('tier 1 — recurring buy', () => {
     );
   });
 
+  it('a one-shot order an agent placed names the agent, not the person', () => {
+    const placed = planDca({
+      owner: OWNER,
+      budgetUsd: 24,
+      params: { usd: 24, manual: true, placedBy: 'Momentum Scout' },
+      symbol: 'TSLAx',
+    });
+    expect(placed.because).toBe('Placed by Momentum Scout.');
+  });
+
   it('a one-shot order a person placed says so, and carries the tolerance it was placed with (PLAN.md 3.9)', () => {
     const placed = planDca({ owner: OWNER, budgetUsd: 20, params: { usd: 20, manual: true, slippagePct: 0.5 }, symbol: 'WETH' });
     expect(placed).toMatchObject({ because: 'Placed by you.', slippagePct: 0.5 });

@@ -561,7 +561,8 @@ describe('autonomous xStocks trading agent', () => {
       // The one-shot's label is what the order path attributes the booked fill to: it names the agent.
       expect(label).toContain('Momentum Scout');
       // 50 bps is 0.5%: the order path takes slippage in percent.
-      expect(extra).toEqual({ slippagePct: 0.5 });
+      // The fill's audit row is the trade's only one, so it names the agent that placed it, not the person.
+      expect(extra).toEqual({ slippagePct: 0.5, placedBy: 'Momentum Scout' });
 
       expect(armExitsMock).toHaveBeenCalledTimes(1);
       // Exits hang off the price it filled at, not the price the setup was written at.

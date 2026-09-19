@@ -279,7 +279,12 @@ export function planDca(ctx: PlanContext): TradeIntent {
     outSymbol: ctx.symbol === 'ETH' ? 'WETH' : ctx.symbol,
     amountIn: ctx.budgetUsd,
     usd: ctx.budgetUsd,
-    because: ctx.params.manual === true ? 'Placed by you.' : 'Scheduled recurring buy.',
+    because:
+      typeof ctx.params.placedBy === 'string' && ctx.params.placedBy
+        ? `Placed by ${ctx.params.placedBy}.`
+        : ctx.params.manual === true
+          ? 'Placed by you.'
+          : 'Scheduled recurring buy.',
     // A one-shot order placed with a tolerance of its own — a swap — carries it to settlement (PLAN.md 3.9).
     ...(typeof ctx.params.slippagePct === 'number' ? { slippagePct: ctx.params.slippagePct } : {}),
   };

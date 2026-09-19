@@ -325,6 +325,7 @@ describe('rebalanceOnce', () => {
       'NVDAx',
       expect.closeTo(100, 5),
       expect.stringContaining('NVDAx'),
+      { placedBy: 'Basket' },
     );
     expect(placeSwapMock).not.toHaveBeenCalled();
   });

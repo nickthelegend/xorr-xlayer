@@ -747,7 +747,7 @@ export async function runAutonomousCycle(
     bestSetup.symbol,
     sizeUsd,
     `${bestSetup.personaName} · $${sizeUsd.toFixed(2)} of ${bestSetup.symbol}`,
-    { slippagePct: bestSetup.suggestedSlippageBps / 100 },
+    { slippagePct: bestSetup.suggestedSlippageBps / 100, placedBy: bestSetup.personaName },
   ).catch((e: unknown): OrderResult => ({
     placed: false,
     refusal: {
