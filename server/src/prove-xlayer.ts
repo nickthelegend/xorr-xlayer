@@ -159,6 +159,16 @@ async function main() {
   const remaining = await pub.readContract({ address: DELEGATION_ADDRESS, abi: DELEGATION_ABI, functionName: 'remainingToday', args: [owner] });
   check(remaining === parseUnits('50', 6), 'the close did not spend the cap', `$${formatUnits(remaining as bigint, 6)} left today`);
 
+  // ── The agent's sweep reads real tables ─────────────────────────────────────────────────────────
+  // Against the real schema: a sweep whose query names a column that does not exist threw into an empty wallet list and
+  // traded for nobody, silently. It now throws, so this line fails loudly if it ever regresses.
+  const { autonomousAgentSweep } = await import('./bot/autonomous.js');
+  const swept = await autonomousAgentSweep().then(
+    (n) => ({ ok: true, n }),
+    (e: unknown) => ({ ok: false, n: e instanceof Error ? e.message : String(e) }),
+  );
+  check(swept.ok, "the autonomous agent's sweep runs against the real schema", String(swept.n) + (swept.ok ? ' trade(s) this tick' : ''));
+
   // ── 4. Revoke stops the bot ─────────────────────────────────────────────────────────────────────
   console.log('\n4. the owner revokes');
   await send('owner revokes', ownerWallet.writeContract({ address: DELEGATION_ADDRESS, abi: DELEGATION_ABI, functionName: 'revoke', args: [] }));

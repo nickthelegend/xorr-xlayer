@@ -819,11 +819,16 @@ export async function autonomousAgentSweep(_now: Date = new Date()): Promise<num
    * has to know how long that wallet waits, and a careful wallet waiting thirty minutes while the
    * sweep applied a ten-minute hold would be the setting quietly not taking effect.
    */
+  /*
+   * Most recently active first. This ordered by `updated_at`, which `wallets` does not have, and the `.catch(() => [])`
+   * behind it turned the failed query into "no wallets": the agent swept nobody, every tick, and said nothing. A failed
+   * read is thrown to the scheduler, which logs it as a failed sweep — never an empty one.
+   */
   const wallets = await query<{ id: string; risk_profile: string | null }>(
     `SELECT id, risk_profile FROM wallets
       WHERE address IS NOT NULL AND (agents_stopped IS NULL OR agents_stopped = false)
-      ORDER BY updated_at DESC LIMIT 10`,
-  ).catch(() => []);
+      ORDER BY active_at DESC NULLS LAST, created_at DESC LIMIT 10`,
+  );
 
   let executedCount = 0;
   for (const w of wallets) {
