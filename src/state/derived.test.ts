@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as d from './derived';
+import { NotSignedIn } from '../data/apiError';
 import { MINUS, money } from '../format';
 import { btcBars } from '../data/fixtures/series';
 import { agentFixtures } from '../data/fixtures/agents';
@@ -1131,5 +1132,27 @@ describe('coveredLabel — a change names the window it really measured', () => 
 
   it('keeps the label when there is nothing drawn to date it by', () => {
     expect(d.coveredLabel('1Y', 'past year', undefined, since, now)).toBe('past year');
+  });
+});
+
+describe('receiveHint — what the swap says when there is no quote yet', () => {
+  it('asks for an amount before anything has been typed', () => {
+    expect(d.receiveHint({ amount: 0, loading: false, error: undefined, reason: undefined })).toBe('Enter an amount');
+  });
+
+  it('says it is quoting while the request is out', () => {
+    expect(d.receiveHint({ amount: 100, loading: true, error: undefined, reason: undefined })).toBe('Quoting…');
+  });
+
+  it("blames the sign-in, not the market, when the client refused to ask", () => {
+    const error = new NotSignedIn('/swap/quote');
+    expect(d.receiveHint({ amount: 100, loading: false, error, reason: undefined })).toBe('Sign in to see a quote');
+  });
+
+  it("keeps the executor's own sentence when it gave one, and says No quote only when nothing else is known", () => {
+    expect(d.receiveHint({ amount: 100, loading: false, error: new Error('x'), reason: 'No route for this pair.' })).toBe(
+      'No route for this pair.',
+    );
+    expect(d.receiveHint({ amount: 100, loading: false, error: new Error('x'), reason: undefined })).toBe('No quote');
   });
 });

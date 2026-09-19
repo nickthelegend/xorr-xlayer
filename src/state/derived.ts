@@ -10,6 +10,7 @@ import type { Bar } from '../data/types';
 import type { FigureKind } from '../ui/mask';
 import { DEFAULT_BUY } from '@/data/tradable';
 import type { ChainStanding } from '@/wallet/delegationChain';
+import { NotSignedIn } from '@/data/apiError';
 
 // ── Agent controls (screen 4) ────────────────────────────────────────────────
 
@@ -220,6 +221,25 @@ export const SWAP_SLIPPAGES = [0.1, 0.3, 0.5, 1] as const;
  * How much of `symbol` a balance can pay: the settlement token is cash, anything else is the holding the chain
  * reports. `undefined` while the balance is unknown — never a zero standing in for "not loaded yet".
  */
+/**
+ * What the "you receive" line says while there is no quote to show.
+ *
+ * "No quote" is a claim about the market — that nothing will price this pair — and it was shown to anyone signed out,
+ * because the client refuses the request rather than sending a 401 (`NotSignedIn`). The screen's own button already
+ * says to sign in; the line under the amount now agrees with it instead of blaming the venues.
+ */
+export function receiveHint(params: {
+  amount: number;
+  loading: boolean;
+  error: unknown;
+  reason: string | undefined;
+}): string {
+  if (!(params.amount > 0)) return 'Enter an amount';
+  if (params.loading) return 'Quoting…';
+  if (params.error instanceof NotSignedIn) return 'Sign in to see a quote';
+  return params.reason ?? 'No quote';
+}
+
 export function swapSpendable(
   balance: { cash: number; holdings: readonly { symbol: string; units: number }[] } | null | undefined,
   symbol: string,

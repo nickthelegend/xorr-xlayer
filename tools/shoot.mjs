@@ -211,8 +211,12 @@ const EXPECT = {
   // The asset screen headlines the instrument's NAME, not its ticker — "Bitcoin", not "BTC".
   // Trimmed 2026-09-12: no "Your position: None" row and no agent note on a coin nobody holds.
   '16-asset': { must: [/Bitcoin|BTC/, /\$[\d,]+/], never: [/No agent holds this yet/] },
-  // A stock has a price and no candle feed, and says so in the asset screen's current words.
-  '17-asset-stock': { must: [/Nvidia|NVDA/, /\$[\d,]+/, /No chart yet/] },
+  // A wrapped xStock is charted from the prices this deployment recorded (`/market/stocks/history`), so it has a
+  // price AND a chart, and the change names the window those readings actually cover rather than the pill's.
+  '17-asset-stock': {
+    must: [/Nvidia|NVDA/, /\$[\d,]+/, /1D/, /1W/, /(flat|up|down) .*since|today|past (week|month|year)/],
+    never: [/No chart yet/],
+  },
   // The pills are the candle lengths the feed can cut (`CHART_PLAN`): 15m is gone, 4H is new.
   '18-chart': { must: [/\$[\d,]+/, /1H/, /4H/, /1D/], never: [/15m/] },
   '19-order': { must: [/XBTC|Bitcoin|BTC/] },

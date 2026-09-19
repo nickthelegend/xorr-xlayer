@@ -45,7 +45,7 @@ import {
 } from '@/ui';
 import { useSignedOut } from '@/auth/useSignedOut';
 import { percent } from '@/format';
-import { SWAP_SLIPPAGES, keypadPress, swapRequest, swapSpendable } from '@/state/derived';
+import { SWAP_SLIPPAGES, keypadPress, receiveHint, swapRequest, swapSpendable } from '@/state/derived';
 import { usePrice } from '@/data/usePrices';
 import { repos } from '@/data';
 import { useAsync } from '@/data/useAsync';
@@ -272,11 +272,12 @@ export default function Swap() {
                 <Text variant="secondarySm" numberOfLines={2} style={{ marginTop: space.s4 }}>
                   {q
                     ? `Min ${quantity(q.minimumOut)}`
-                    : !(typed > 0)
-                      ? 'Enter an amount'
-                      : quote.loading
-                        ? 'Quoting…'
-                        : (apiReason(quote.error) ?? 'No quote')}
+                    : receiveHint({
+                        amount: typed,
+                        loading: quote.loading,
+                        error: quote.error,
+                        reason: apiReason(quote.error),
+                      })}
                 </Text>
               </View>
               <TokenPill
