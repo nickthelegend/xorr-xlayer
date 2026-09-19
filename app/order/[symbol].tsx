@@ -186,6 +186,13 @@ export default function OrderTicket() {
     [quoteFor],
   );
   /*
+   * Whether the quote on screen is for the amount on screen. For the debounce's few hundred milliseconds after a key,
+   * `quoted` is still the previous amount and so is its answer: the ticket showed "Minimum received 247.24 USDC" beside a
+   * $20 sale, with Sell live. Until the quote catches up, the rows say "…" and the order waits — nobody should send an
+   * order against a floor that was never shown for it.
+   */
+  const quotePending = routeQuote.loading || quoted !== amount;
+  /*
    * `text` as well as the parsed amount: `0.001` and `0.00` are different states and `parseFloat` makes
    * them one. The first is an order under the executor's floor and the second is an empty field.
    */
@@ -369,7 +376,7 @@ export default function OrderTicket() {
         </Text>
         {/* The route's quote for the amount typed, not a holding: it stays while balances are hidden. */}
         <Price variant="secondary" color={colors.sheet.ink} figure="market">
-          {routeQuote.loading
+          {quotePending
             ? '…'
             : routeQuote.data
               ? `${quantity(routeQuote.data.minimumOut)} ${side === 'buy' ? symbol : 'USDC'}`
@@ -382,7 +389,7 @@ export default function OrderTicket() {
           Network fee
         </Text>
         <Price variant="secondary" color={colors.sheet.ink} figure="market">
-          {routeQuote.loading
+          {quotePending
             ? '…'
             : typeof routeQuote.data?.gas?.feeUsd === 'number'
               ? `On us · ≈ ${money(routeQuote.data.gas.feeUsd)}`
@@ -408,7 +415,11 @@ export default function OrderTicket() {
           backgroundColor={side === 'buy' ? colors.candleUp : colors.candleDown}
           color={colors.ink}
           disabled={
-            settleable === 'checking' || limit.state !== 'ok' || amount <= 0 || filled !== undefined
+            settleable === 'checking' ||
+            limit.state !== 'ok' ||
+            amount <= 0 ||
+            filled !== undefined ||
+            quotePending
           }
           loading={placing}
           onPress={place}
