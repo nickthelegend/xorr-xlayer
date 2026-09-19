@@ -358,3 +358,24 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 | X7 Tapped buy (A10 / J08) | cap spent 2026-09-19 | P0 | tap after the UTC reset (D24) | `NOT STARTED` |
 | X8 D22 on the hosted fork (J10) | needs a new day's sweep | P1 | observe | `NOT STARTED` |
 | X9 USDT0 → USDC convert in the app (B4) | unit only | P1 | fork USDT0 + tap (D24) | `NOT STARTED` |
+
+### Phase 9 — the browser audit (2026-09-20)
+
+Driven in a real browser against the deployed build, clicking rather than reading: Claude in Chrome for everything
+reachable without a credential, and `tools/flows.mjs` (new) for the signed-in journeys — it signs in through the real
+Privy form, double-submits on purpose, reloads mid-flow and checks what the executor recorded. Results in
+`docs/qa/RESULTS.md`.
+
+| # | Found | Sev | Fix | Commit |
+|---|---|---|---|---|
+| Y1 | `/market/stocks` priced every stock against the fork, so each hero froze ($220.17) while its own chart read live ($222.51) | P0 | the snapshot quotes the market; fills still quote the settling chain | `2d5e161` |
+| Y2 | The ticket's floor sat ABOVE its estimate (0.6877 guaranteed, 0.6844 expected) — two prices, one screen | P0 | estimate and floor come from one quote | `b5a3a9f` |
+| Y3 | A finished USDT0 → USDC conversion unmounted its own confirmation, because the refresh that proved it zeroed the balance the card was mounted on | P1 | the card stays until dismissed | `44b8bb0` |
+| Y4 | Search answered "tesla" with TSLAx twice (catalogue + xStocks feed) | P1 | one row per instrument | `e3ac0fc` |
+| Y5 | `/rates` printed "USDC SUPPLY RATE" over a rate paid on USDT0 | P1 | names the asset, repeats the executor's sentence | `55005df` |
+| Y6 | Swap told a signed-out visitor "No quote" — a claim about the market | P2 | "Sign in to see a quote" | `f06b5a2` |
+| Y7 | A −0.04% day read "down 0.0%", and the chip was red while saying "flat" | P2 | word and colour from the same rounding | `e3ac0fc` |
+| Y8 | Welcome opened on a SOL coin (D23) | P1 | new still: the app's own hexagon-and-X coin leading a candlestick coin; web drops the film | — |
+
+Verified after each fix in the same browser, not by rebuilding: prices agree, the floor sits under the estimate, the
+conversion reports itself (5.0016 USDT0 → 0 on chain), search answers one TSLAx, the rate names USDT0.
