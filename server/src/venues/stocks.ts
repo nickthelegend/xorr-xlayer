@@ -184,7 +184,10 @@ export async function stockPriceUsd(symbol: string): Promise<number | null> {
 
   // Imported here to keep `tokens.ts` → `stocks.ts` free of a load-order cycle through the venue.
   const { quote } = await import('./uniswap.js');
-  const q = await quote({ inSymbol: 'USDC', outSymbol: key, amount: PROBE_USD, skipPriceImpact: true }).catch(() => null);
+  // The market's price: on a fork, the live mainnet pools, not the fork's frozen copy of them (see `uniswap.ts` quoter).
+  const q = await quote({ inSymbol: 'USDC', outSymbol: key, amount: PROBE_USD, skipPriceImpact: true, market: true }).catch(
+    () => null,
+  );
   if (!q || !(q.outAmount > 0)) return null;
   const price = PROBE_USD / q.outAmount;
   cache.set(key, { at: Date.now(), price });

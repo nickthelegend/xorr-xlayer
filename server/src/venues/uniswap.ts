@@ -43,8 +43,15 @@ export const ROUTER_ABI = parseAbi([
 
 /** The client quotes are read from. See the file header. */
 let quoteClient: ReturnType<typeof createPublicClient> | undefined;
-async function quoter() {
-  if (IS_MAINNET_STATE) {
+/**
+ * `market`: the live X Layer mainnet pools, whatever chain this executor settles on. A fork is frozen at the block it
+ * was taken from — its pools only move when we trade against them — so a price read from it is the fork's, not the
+ * market's: every observation the same number, and an agent that trades on the market's movement never sees any.
+ * Prices, observations and the agent's signals ask the market; a fill's quote and floor ask the chain it settles on.
+ * On mainnet the two are the same pools.
+ */
+async function quoter(market = false) {
+  if (IS_MAINNET_STATE && !(market && CHAIN_KEY !== 'xlayer')) {
     const { publicClient } = await import('../evm/client.js');
     return publicClient;
   }
@@ -111,8 +118,13 @@ function unscale(raw: bigint, decimals: number): number {
   return Number(raw) / 10 ** decimals;
 }
 
-async function quoteRaw(path: Hex, amountIn: bigint): Promise<{ amountOut: bigint; gasEstimate: bigint }> {
-  const client = await quoter();
+async function quoteRaw(
+  path: Hex,
+  amountIn: bigint,
+  market = false,
+): Promise<{ amountOut: bigint; gasEstimate: bigint }> {
+  const client = await quoter(market);
+  // Mainnet's quoter address is the same contract a fork carries, so either client asks the same address.
   const address = (IS_MAINNET_STATE ? ADDRESSES.uniswapQuoter : QUOTE_ADDRESSES.uniswapQuoter) as Address;
   const { result } = await client.simulateContract({
     address,
@@ -130,6 +142,8 @@ export async function quote(params: {
   slippagePct?: number;
   /** Skip the price-impact cross-check — what makes this quote safe to call FROM a price (see `stocks.ts`). */
   skipPriceImpact?: boolean;
+  /** Ask the live mainnet pools rather than the chain this executor settles on (see `quoter`). For prices, never fills. */
+  market?: boolean;
 }): Promise<SwapQuote> {
   const inSymbol = canonicalSymbol(params.inSymbol);
   const outSymbol = canonicalSymbol(params.outSymbol);
@@ -140,7 +154,7 @@ export async function quote(params: {
 
   const route = routeBetween(inSymbol, outSymbol);
   const slippagePct = params.slippagePct ?? DEFAULT_SLIPPAGE_PCT;
-  const { amountOut, gasEstimate } = await quoteRaw(encodePath(route), scale(params.amount, from.decimals));
+  const { amountOut, gasEstimate } = await quoteRaw(encodePath(route), scale(params.amount, from.decimals), params.market === true);
   if (amountOut <= 0n) throw new Error(`No liquidity for ${inSymbol} -> ${outSymbol} at this size`);
   const outAmount = unscale(amountOut, to.decimals);
   const venues = [VENUE_NAME];
