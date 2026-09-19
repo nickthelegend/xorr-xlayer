@@ -7,6 +7,7 @@
  * that exact SHA — a deploy is not done because the upload finished.
  *
  *   node scripts/deploy-executor.mjs executor-fork
+ *   node scripts/deploy-executor.mjs executor-testnet
  *
  * `-dirty` is appended when `server/` has uncommitted changes, so a hand-patched deploy says so.
  */
@@ -15,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 /** The X Layer executors (Railway project `xorr-xlayer`, backend only — the web app is on Vercel). */
 const SERVICES = {
   'executor-fork': 'https://executor-fork-production-2db8.up.railway.app',
+  'executor-testnet': 'https://executor-testnet-production.up.railway.app',
 };
 
 const service = process.argv[2];
