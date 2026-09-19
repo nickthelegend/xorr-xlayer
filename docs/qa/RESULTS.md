@@ -156,3 +156,29 @@ Privy form is done by `tools/flows.mjs` with Privy's own test credential; Claude
 | 404 route | PASS | "There is nothing here", offers the wallet and the screen index |
 | Mobile width (420px) | PASS | markets list, tab bar and honest "—" for unpriced commodities |
 | Console / network | PASS | no app console errors on any screen tested; only third-party wallet-SDK logs (Coinbase chain support, injected providers) |
+
+## Honest measurement, 2026-09-20 — every item run again
+
+Counted only what was observed in this run. "Verified earlier" does not count.
+
+| Item | Result | Evidence from this run |
+|---|---|---|
+| Contracts enforce cap, expiry, allowlist, floor, revoke | PASS | `forge test` 45/45 unit, 6/6 X Layer fork suite, locally |
+| Contracts deployed and source-verified | PASS | Sourcify `exact_match` for both; 5,597 and 1,523 bytes of code on X Layer testnet |
+| The permission on a public chain (README step 2) | PASS | `prove:testnet` ALL PASSED — grant, `VenueNotAllowed`, `NotDelegate`, revoke, `PolicyRevoked`, each an OKLink transaction |
+| The whole loop on a fork (README step 3) | PASS | `prove:fork` ALL PASSED — $50 TSLAx into the owner's wallet, cap refusal, close outside the cap, revoke |
+| Withdraw to an allowlisted address | PASS | `prove-withdrawal` all checks — 24h cooling-off refusals, TSLAx sold, 300.04 USDT0 out of Aave, 699.95 USDC to cold storage (`0x984a53…bba6`), reported twice and recorded once |
+| Aave yield (USDC → USDT0 → supply → withdraw) | PASS | `prove-yield` ALL CHECKS PASSED |
+| Real persisted database | PASS | a wallet row written at 20:40 UTC survived six executor redeploys; Postgres reports live in `/health` |
+| 202 endpoint contracts | PASS | 202/202, 0 failed |
+| `/verify` on the fork | PASS | 20/20 for a granted owner |
+| `/verify` on the testnet | PASS | 13 pass, 0 fail, 7 skip — each skip names its reason |
+| 101 screens | PASS | 101/101, no console errors |
+| Sign-in → embedded wallet | PASS | real Privy form, test credential |
+| Kill switch, held down, on the web | PASS | `revoked: true` on chain afterwards |
+| The permission signed again in the app | PASS | 17 signatures — one per tradable token, then the grant — cap back to $100 |
+| USDT0 → USDC converted in the app | PASS | both signatures confirmed; 5.0016 → 0 on chain; the card now says so |
+| An agent nobody hired | FIXED | it traded for every granted wallet; now refused by name, proven by 54 unit tests and by `prove-yield` going green |
+| OKX Wallet sign-in | PARTIAL | the live modal lists OKX Wallet first; connecting one needs the extension |
+| OKX DEX routing | BLOCKED | no API credentials anywhere |
+| LLM prose explanations | BLOCKED | no `OPENROUTER_API_KEY` anywhere |
