@@ -58,6 +58,8 @@ export function DepositFunds({ address }: { address: string | undefined }) {
    */
   const [arrivals, setArrivals] = useState(NO_ARRIVALS);
   const [seen, setSeen] = useState<typeof data>(undefined);
+  /** A conversion just finished, so its confirmation is kept on screen after the USDT0 it converted is gone. */
+  const [converted, setConverted] = useState(false);
   if (balances !== undefined && data !== seen) {
     setSeen(data);
     setArrivals(noteFunds(arrivals, asFundsRead(balances, CHAIN_KEY)));
@@ -110,11 +112,21 @@ export function DepositFunds({ address }: { address: string | undefined }) {
               {`Showing ${shortAddress(balances.owner)}, not this address.`}
             </Text>
           ) : null}
-          {canConvert(CHAIN_KEY) && balances.usdt0 && balances.usdt0.amount > 0 && !elsewhere ? (
+          {/*
+            The card outlives the balance that opened it.
+            A conversion ends with the USDT0 at zero, and the refresh that proves it also removed the only card that
+            could say so: the swap settled, the confirmation unmounted mid-sentence, and the screen simply had one
+            section fewer than before. It stays until the person dismisses it, which is what `Done` is for.
+          */}
+          {canConvert(CHAIN_KEY) && ((balances.usdt0 && balances.usdt0.amount > 0) || converted) && !elsewhere ? (
             <ConvertUsdt0
               owner={address as Address | undefined}
               hasGas={balances.gas.amount > 0}
-              onConverted={() => void funds.refresh()}
+              onConverted={() => {
+                setConverted(true);
+                void funds.refresh();
+              }}
+              onDismiss={() => setConverted(false)}
             />
           ) : null}
         </View>
@@ -135,10 +147,13 @@ function ConvertUsdt0({
   owner,
   hasGas,
   onConverted,
+  onDismiss,
 }: {
   owner: Address | undefined;
   hasGas: boolean;
   onConverted: () => void;
+  /** Dismissing the confirmation is what lets the card go, now that it is kept open past the balance it converted. */
+  onDismiss: () => void;
 }) {
   const { state, preview, convert, reset } = useConvertUsdt0(owner, onConverted);
   const shown = 'preview' in state ? state.preview : undefined;
@@ -171,7 +186,14 @@ function ConvertUsdt0({
             <Text variant="footnote" color={colors.ink} figure="units">
               {`Converted ${quantity(state.preview.amountIn, 2)} USDT0 to USDC.`}
             </Text>
-            <Button label="Done" variant="ghost" onPress={reset} />
+            <Button
+              label="Done"
+              variant="ghost"
+              onPress={() => {
+                reset();
+                onDismiss();
+              }}
+            />
           </>
         ) : state.step === 'preview' || state.step === 'signing' || (state.step === 'failed' && state.preview) ? (
           <>

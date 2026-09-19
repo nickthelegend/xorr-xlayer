@@ -189,14 +189,53 @@ async function main() {
   const deposit = await body();
   check(/0x[0-9a-fA-F]{6}/.test(deposit), 'the deposit address is shown');
   const tokens = await apiGet('/wallet/tokens', bearer);
-  const usdt0 = (tokens.tokens ?? tokens ?? []).find?.((t) => t.symbol === 'USDT0');
-  if (usdt0 && Number(usdt0.amount) > 0) {
-    check(/USDT0/.test(deposit), 'a held USDT0 balance is shown', `${usdt0.amount}`);
+  // `/wallet/tokens` reports `units`, the on-chain amount. Reading `amount` here made a funded wallet look empty.
+  const usdt0 = (tokens.tokens ?? []).find((t) => t.symbol === 'USDT0');
+  if (usdt0 && Number(usdt0.units) > 0) {
+    check(/USDT0/.test(deposit), 'a held USDT0 balance is shown', `${usdt0.units}`);
     check(/Convert|convert/.test(deposit), 'converting it to USDC is offered');
   } else {
     console.log('  – no USDT0 held, so the conversion offer is not expected');
   }
   seen.quiet('deposit');
+
+  /*
+   * The conversion itself, signed by the owner — only when asked for (`FLOWS_SIGN=1`).
+   *
+   * This spends real USDT0 on whatever chain the build points at, so it is opt-in and the guard above keeps it to a
+   * copy of mainnet. Two steps, as the screen has them: a preview that quotes and states the floor, then a Convert
+   * the person presses. What it proves is that the app can sign a swap from the embedded wallet end to end.
+   */
+  if (process.env.FLOWS_SIGN === '1' && usdt0 && Number(usdt0.units) > 0) {
+    const health = await (await fetch(`${API}/health`)).json();
+    if (!/fork|localnet|testnet/.test(String(health.chain))) throw new Error(`refusing to sign on ${health.chain}`);
+    console.log('\n3b. converting USDT0 → USDC, signed in the app');
+    seen.clear();
+    await page.getByText(/^Review conversion$/).first().click();
+    await page.waitForSelector('text=/^Convert$/', { timeout: 60_000 });
+    const quoted = await body();
+    check(/1 USDT0 = [\d.]+ USDC/.test(quoted), 'the preview states the rate it will sign', quoted.match(/1 USDT0 = [\d.]+ USDC/)?.[0] ?? '');
+    await page.getByText(/^Convert$/).first().click();
+    /*
+     * Two signatures, each confirmed in Privy's own modal: the token approval, then the swap. The wallet is the
+     * person's, and this is where they say yes — a harness that skipped it would be testing a flow nobody has.
+     */
+    for (let step = 0; step < 2; step += 1) {
+      const approve = page.getByRole('button', { name: /^Approve$/ }).first();
+      await approve.waitFor({ state: 'visible', timeout: 120_000 }).catch(() => undefined);
+      if (!(await approve.isVisible().catch(() => false))) break;
+      await approve.click();
+      check(true, `signature ${step + 1} of 2 confirmed in the wallet's own dialog`);
+      await page.waitForTimeout(6000);
+    }
+    await page.waitForSelector('text=/Converted .* USDT0 to USDC\./', { timeout: 240_000 });
+    const done = await body();
+    check(/Converted [\d.,]+ USDT0 to USDC\./.test(done), 'the app reports the conversion done', done.match(/Converted [^\n]*/)?.[0] ?? '');
+    const after = await apiGet('/wallet/tokens', bearer);
+    const left = (after.tokens ?? []).find((t) => t.symbol === 'USDT0');
+    check(Number(left?.units ?? 0) < Number(usdt0.units), 'the USDT0 left the wallet on chain', `${usdt0.units} → ${left?.units ?? 0}`);
+    seen.quiet('conversion');
+  }
 
   // ── 4. A screen behind the session, after the session is cleared ──────────────────────────────
   console.log('\n4. signed out mid-session');
