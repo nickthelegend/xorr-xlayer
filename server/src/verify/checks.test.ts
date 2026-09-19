@@ -14,9 +14,9 @@ vi.hoisted(() => {
   process.env.PRIVY_APP_SECRET = 'test';
 });
 
-const readPolicy = vi.fn(async () => null);
+const readPolicy = vi.fn(async (_owner: string) => null);
 vi.mock('../evm/delegation.js', () => ({
-  readPolicy: (o: unknown) => readPolicy(o as never),
+  readPolicy: (owner: string) => readPolicy(owner),
   DELEGATION_ADDRESS: '0x156DCE9E9d523775AB51f882616A431EdBfBcA22',
   DELEGATION_ABI: [],
   delegatePublicKey: '0x19033937953479E8F7b0237eB48ee87Be1D1c8ae',
