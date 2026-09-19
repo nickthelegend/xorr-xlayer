@@ -306,9 +306,9 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 | A6 | Withdraw to an allowlisted address | P0 | ✓ | `fork/prove-withdrawal.ts` (local fork) |
 | A7 | The autonomous agent trades on its own on the hosted fork | P0 | ✓ | Momentum Scout bought $24 TSLAx unprompted (`0x7deb69…a81e`), run + position + proposal recorded, attributed to the agent (`91a029c`, `bbf45dc`) |
 | A8 | Web app live, signed-in screens render | P0 | ✓ | `xorr-xlayer.vercel.app`, 101-screen sweep |
-| A9 | Grant signed in the app (Privy embedded wallet) on the fork | P0 | ✗ | never driven through the UI on this build |
+| A9 | Grant signed in the app (Privy embedded wallet) on the fork | P0 | ✓ | iOS simulator, owner signed in: $100/day × 7 days set in the app, "Sign this permission" → approvals + grant from the owner's wallet; `policyOf` = delegate `0xB3e9…EC21`, cap 100e6, expiry 1790452762, revoked false (2026-09-19 UTC) |
 | A10 | Order from the ticket → fill + venue shown in the app | P0 | ✓ | iOS simulator, signed-in owner: Sell $20 TSLAx tapped → `closePosition` status 1 (`0xafd0d5…3990`), Activity "Sold 21% of TSLAx … $19.84", position 0.2649→0.2101; buys fill through the same path (hosted `/orders`, the agent's fills); the ticket refuses past the day's allowance and never sends against a stale quote (`b2251d5`) |
-| A11 | Stop all from the app, without the server | P0 | blocked | Safety reads the live grant from the chain (LIVE, 96% used, 6d, agent key); the press-and-hold needs full-screen control, whose approval was not answered — owner approval or the owner's own tap |
+| A11 | Stop all from the app, without the server | P0 | ✓ | iOS simulator: held "Stop all trading" → "Trading stopped · confirmed on-chain"; tx `0x85c6cb…e50579` status 1 **from the owner** `0x95a0…e615` to the delegation; `policyOf.revoked` = true |
 | A12 | `/judge` green on the deployed executor | P0 | ✓ | 20/20 for a granted wallet |
 | A13 | Gates: typechecks, lint, suites, forge, CI | P0 | ✓ | CI green `26ef664` |
 | A14 | Testnet executor serving the testnet contracts | P0 | ✓ | `executor-testnet-production.up.railway.app`, `/verify` 12 pass 0 fail; `prove:testnet` all pass on OKLink (`6ad1b95`) |
@@ -336,4 +336,4 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 - **6.5 Docs** (A15) — `DONE`. Testnet addresses and verification links in README, SECURITY, SUBMISSION.
 - **6.6 Re-audit** — `DONE`: 2,422/2,422 tests, typechecks and lint clean; fork CI hardened against X Layer's rate-limited RPC (`57c95ab`).
 
-**MEASURED AFTER PHASE 6 (incl. the simulator pass): P0 13/17 = 76%; all items 16/26 = 62%.** Remaining P0: A9, A11 (owner sign-in + consent), A10 (partial, same), A16 video, A17 submission — all owner actions.
+**MEASURED AFTER PHASE 6 (incl. the simulator passes): P0 15/17 = 88%; all items 18/26 = 69%.** Remaining P0: A16 video, A17 submission (owner). A UI-tapped *buy* waits for the UTC day to reset (the agent spent the day's cap); buys through the same path are verified. Remaining P0: A9, A11 (owner sign-in + consent), A10 (partial, same), A16 video, A17 submission — all owner actions.
