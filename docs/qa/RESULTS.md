@@ -129,3 +129,30 @@ its `correct` contract and `observed` result).
 | H07 | OWNER | repo public at submission (history scan clean, I07) |
 | H08 | OWNER | video |
 | H09 | OWNER | Dev Day form |
+
+## Browser audit, 2026-09-19/20 (Chrome + `tools/flows.mjs`)
+
+Every flow below was driven in a real browser against `xorr-xlayer.vercel.app` and the hosted fork executor — clicked,
+typed into, submitted twice, reloaded — with the console and the network watched throughout. Signing in through the
+Privy form is done by `tools/flows.mjs` with Privy's own test credential; Claude in Chrome cannot type a one-time code.
+
+| Flow | Result | Evidence |
+|---|---|---|
+| Sign-in form (email → code → wallet) | PASS | code field appears, wallet created, session held |
+| Onboarding: welcome → goals → wallet | PASS | Continue disables at 0 goals selected and does nothing when clicked |
+| Search by name, empty state, duplicates | FIXED → PASS | "tesla" answered TSLAx twice (catalogue + xStocks); now one row. "zzzz" → `Nothing matches "zzzz".` |
+| Stock asset screen | FIXED → PASS | hero read the fork's frozen $220.17 against its own chart's $222.51; now both live, candles draw, 1D/1W/1M/1Y switch |
+| Change label | FIXED → PASS | read "down 0.0%"; now "flat since Sep 19, 12:20 PM", and the chip is no longer red when flat |
+| Order ticket (signed out) | PASS | "Sign in to trade", keypad, Max disabled, backspace to $0 |
+| Order ticket (signed in, cap spent) | FIXED → PASS | floor 0.6877 sat ABOVE the 0.6844 estimate (two prices); now 0.6877 ≤ 0.6898 from one quote. Refusal in words + button not pressable |
+| Swap (signed out) | FIXED → PASS | said "No quote" (a claim about the market) to a signed-out visitor; now "Sign in to see a quote" |
+| Alerts: create, double-submit, reload, delete | PASS | two clicks → exactly one alert; listed after reload; deleted 200 |
+| Alert form validation | PASS | empty price → "Enter a symbol and a price", button disabled |
+| USDT0 → USDC conversion, signed in the app (B4) | FIXED → PASS | both signatures confirmed in Privy's dialog; "Converted 5.00 USDT0 to USDC."; 5.0016 → 0 on chain. The confirmation used to unmount with the balance |
+| Rate screen | FIXED → PASS | said "USDC SUPPLY RATE" over a rate paid on USDT0; now names USDT0 and repeats the executor's sentence |
+| Judge page (`/judge`) | PASS | 14/20 signed out with skips named; 20/20 with an owner address pasted |
+| Executor unreachable, mid-session | PASS | last price kept, "Can't reach xorr… your funds and permission are on chain", retry works, "Back online" on recovery |
+| Session cleared mid-session | PASS | falls back to a sign-in prompt, no placeholder values leak |
+| 404 route | PASS | "There is nothing here", offers the wallet and the screen index |
+| Mobile width (420px) | PASS | markets list, tab bar and honest "—" for unpriced commodities |
+| Console / network | PASS | no app console errors on any screen tested; only third-party wallet-SDK logs (Coinbase chain support, injected providers) |
