@@ -304,15 +304,15 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 | A4 | Cap and revoke refuse on chain | P0 | ✓ | `prove:fork` |
 | A5 | Sell/close back to USDC outside the cap | P0 | ✓ | `prove:fork` |
 | A6 | Withdraw to an allowlisted address | P0 | ✓ | `fork/prove-withdrawal.ts` (local fork) |
-| A7 | The autonomous agent trades on its own on the hosted fork | P0 | ✗ | unit tests only; never observed |
+| A7 | The autonomous agent trades on its own on the hosted fork | P0 | ✓ | Momentum Scout bought $24 TSLAx unprompted (`0x7deb69…a81e`), run + position + proposal recorded, attributed to the agent (`91a029c`, `bbf45dc`) |
 | A8 | Web app live, signed-in screens render | P0 | ✓ | `xorr-xlayer.vercel.app`, 101-screen sweep |
 | A9 | Grant signed in the app (Privy embedded wallet) on the fork | P0 | ✗ | never driven through the UI on this build |
-| A10 | Order from the ticket → fill + venue shown in the app | P0 | ✗ | API only |
+| A10 | Order from the ticket → fill + venue shown in the app | P0 | partial | xStock ticket now hands off to the order screen (`735649e`); order screen quotes, prices the fee and refuses past the day's allowance (simulator); the tap itself needs a signed-in owner's consent |
 | A11 | Stop all from the app, without the server | P0 | ✗ | never driven through the UI on this build |
 | A12 | `/judge` green on the deployed executor | P0 | ✓ | 20/20 for a granted wallet |
 | A13 | Gates: typechecks, lint, suites, forge, CI | P0 | ✓ | CI green `26ef664` |
-| A14 | Testnet executor serving the testnet contracts | P0 | ✗ | not deployed |
-| A15 | Docs true (README/SECURITY/SUBMISSION name the testnet deployment) | P0 | ✗ | addresses missing |
+| A14 | Testnet executor serving the testnet contracts | P0 | ✓ | `executor-testnet-production.up.railway.app`, `/verify` 12 pass 0 fail; `prove:testnet` all pass on OKLink (`6ad1b95`) |
+| A15 | Docs true (README/SECURITY/SUBMISSION name the testnet deployment) | P0 | ✓ | README, SECURITY, SUBMISSION, DEMO-SCRIPT updated |
 | A16 | Demo video recorded | P0 | owner | — |
 | A17 | Public repo + Dev Day form | P0 | owner | — |
 | B1 | OKX DEX live routing | P1 | blocked | no API key |
@@ -320,8 +320,8 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 | B3 | Yield (USDC→USDT0→Aave) on a fork | P1 | ✓ | `fork/prove-yield.ts` |
 | B4 | USDT0→USDC convert signed in the app | P1 | ✗ | unit only |
 | B5 | Agent explanations in prose (LLM) | P1 | blocked | no `OPENROUTER_API_KEY`; degrades honestly |
-| B6 | iOS simulator build on the X Layer fork executor (D21) | P1 | ✗ | not built |
-| B7 | Networks list names the deployed executors | P1 | ✗ | `DEPLOYMENTS = []` |
+| B6 | iOS simulator build on the X Layer fork executor (D21) | P1 | ✓ | native app on the simulator against the hosted fork executor: Home, stocks, ticket, order, network screenshotted |
+| B7 | Networks list names the deployed executors | P1 | ✓ | fork + testnet rows (`6ad1b95`) |
 | B8 | Landing deployed | P2 | owner | optional |
 
 **INITIAL COMPLETION (this audit): P0 10/17 = 59%; all items 11/26 = 42%.**
@@ -329,9 +329,11 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 **D21 (owner, 2026-09-19):** the phone clip is recorded on the **iOS simulator** running the native app against the X Layer fork executor.
 
 ### Phase 6 — close the verified gaps
-- **6.1 Testnet executor + network rows** (A14, B7) — `NOT STARTED`. Railway `executor-testnet` (own Postgres, delegate + faucet keys generated locally and funded with test OKB from the deployer) serving `0x156D…cA22`; `DEPLOYMENTS` rows for fork + testnet. Accept: `/health` green on 1952, `/verify` passes or skips honestly, Networks screen lists both.
-- **6.2 The journey through the web UI on the fork** (A9, A10, A11, B4) — `NOT STARTED`. Browser pane, Privy test account: sign in → test funds → grant → buy from the ticket → position + venue → stop all → sell → withdraw to an allowlisted address. Fix every break. Accept: each step observed with its transaction.
-- **6.3 The autonomous agent on the hosted fork** (A7) — `NOT STARTED`. Hire an agent for the granted account; observe its sweep place (or refuse, with a reason) a trade. Accept: a filled run attributed to the agent, or a documented refusal with the rule that fired.
-- **6.4 iOS simulator build** (B6, D21) — `NOT STARTED`. Native app built against the hosted fork executor; sign-in, Home, Stocks, an order. Accept: screenshots from the simulator.
-- **6.5 Docs** (A15) — `NOT STARTED`. Testnet addresses and verification links in README, SECURITY, SUBMISSION.
-- **6.6 Re-audit** — `NOT STARTED`. Same table; gates; CI.
+- **6.1 Testnet executor + network rows** (A14, B7) — `DONE` (`6ad1b95`). Railway `executor-testnet` (own Postgres, delegate + faucet keys generated locally and funded with test OKB from the deployer) serving `0x156D…cA22`; `DEPLOYMENTS` rows for fork + testnet. Accept: `/health` green on 1952, `/verify` passes or skips honestly, Networks screen lists both.
+- **6.2 The journey through the web UI on the fork** (A9, A10, A11, B4) — `BLOCKED` on the owner signing in and consenting to the wallet's confirm taps (credentials are not typed by the builder). Found and fixed on the way: the xStock ticket's "not wired up yet" dead end (`735649e`), NOT GRANTED over a live grant on unpinned builds (`c9a30bb`), a buy offered past the day's allowance (`c9a30bb`). Browser pane, Privy test account: sign in → test funds → grant → buy from the ticket → position + venue → stop all → sell → withdraw to an allowlisted address. Fix every break. Accept: each step observed with its transaction.
+- **6.3 The autonomous agent on the hosted fork** (A7) — `DONE`. Two root causes: the sweep's wallet query named a column `wallets` does not have and swallowed the error (`91a029c`), and a frozen fork gives the agent a market that never moves — prices and signals now read live mainnet pools on a fork (`b8bda33`). Plus attribution (`bbf45dc`). Hire an agent for the granted account; observe its sweep place (or refuse, with a reason) a trade. Accept: a filled run attributed to the agent, or a documented refusal with the rule that fired.
+- **6.4 iOS simulator build** (B6, D21) — `DONE`. `start:fork` now points Metro at the X Layer fork executor (it named the Base build's). Native app built against the hosted fork executor; sign-in, Home, Stocks, an order. Accept: screenshots from the simulator.
+- **6.5 Docs** (A15) — `DONE`. Testnet addresses and verification links in README, SECURITY, SUBMISSION.
+- **6.6 Re-audit** — `DONE`: 2,422/2,422 tests, typechecks and lint clean; fork CI hardened against X Layer's rate-limited RPC (`57c95ab`).
+
+**MEASURED AFTER PHASE 6: P0 12/17 = 71%; all items 15/26 = 58%.** Remaining P0: A9, A11 (owner sign-in + consent), A10 (partial, same), A16 video, A17 submission — all owner actions.

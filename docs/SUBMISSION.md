@@ -5,9 +5,11 @@ a history secret scan — PLAN.md D14).
 
 **Live:** web app on Vercel (`xorr-xlayer` project, a `vercel.app` URL — filled in at deploy), executor on Railway at
 `https://executor-fork-production-2db8.up.railway.app` (`/health`, `/verify`), trading against a hosted fork of X Layer
-mainnet (`https://xlayer-fork-production.up.railway.app`, chain 196).
+mainnet (`https://xlayer-fork-production.up.railway.app`, chain 196). Contracts on X Layer testnet, source-verified:
+XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`,
+served by `https://executor-testnet-production.up.railway.app`.
 
-**Video:** 2–4 minutes, web app + a phone clip — script in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
+**Video:** 2–4 minutes, web app + an iOS-simulator clip of the native app (D21) — script in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
 
 Every address and number below was read from the chain or produced by a command in this repo on 2026-09-19.
 
@@ -53,6 +55,8 @@ custody (hand over the funds) or a blank-cheque approval. Neither survives a bad
 
 - `cd contracts && XLAYER_RPC=https://rpc.xlayer.tech forge test` — unit suites plus a fork suite on real X Layer
   state (TSLAx direct, NVDAx via USDG, cap, foreign venue, close, revoke).
+- `cd server && npm run prove:testnet` — the permission on X Layer testnet: grant, read back, `VenueNotAllowed`,
+  `NotDelegate`, revoke, `PolicyRevoked`, each an OKLink transaction.
 - `cd server && npm run setup:fork && npm run prove:fork` — the executor's own order path on a fork: $50 of TSLAx
   into the owner's wallet, a $60 NVDAx buy refused by the on-chain cap, the position sold back for $49.95, revoke
   refusing the next order. Both run in CI on every push.

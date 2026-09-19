@@ -46,7 +46,18 @@ cd contracts && XLAYER_RPC=https://rpc.xlayer.tech forge test -vv
 hop, the daily cap refusing a buy, a venue the owner never allowed refused, a position sold back through
 `closePosition`, and `revoke()` stopping everything.
 
-**2. The whole product loop, through the executor's own code path:**
+**2. The permission on a public chain** — X Layer testnet, the deployed contracts, every step an OKLink transaction
+(needs the deployer's test OKB: `server/.env.deployer`):
+
+```bash
+cd server && set -a && . ./.env.deployer && set +a && npm run prove:testnet
+```
+
+A fresh owner grants the testnet delegate $100/day for 7 days, the chain reads it back, the contract refuses a venue
+the owner never allowed (`VenueNotAllowed`) and anyone but the delegate (`NotDelegate`), the owner revokes with one
+signature, and the delegate is refused from then on (`PolicyRevoked`).
+
+**3. The whole product loop, through the executor's own code path:**
 
 ```bash
 anvil --fork-url https://rpc.xlayer.tech --chain-id 196          # terminal 1
@@ -153,7 +164,8 @@ Open **https://xorr-xlayer.vercel.app** and sign in; `/judge` re-runs every clai
 | Executor (X Layer fork) | https://executor-fork-production-2db8.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-fork`, `node scripts/deploy-executor.mjs executor-fork`) |
 | Fork node | Railway service `xlayer-fork` (anvil v1.7.1 forking chain 196, `/data` volume) — `https://xlayer-fork-production.up.railway.app` |
 | Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses anything but an X Layer fork or testnet executor) |
-| Contracts, X Layer testnet | `contracts/deploy-xlayer-testnet.sh` → `contracts/deployments/xlayer-testnet.json` |
+| Contracts, X Layer testnet | XorrDelegation [`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer-test/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
+| Executor (X Layer testnet) | https://executor-testnet-production.up.railway.app — serves the testnet contracts; nothing fills there (no DEX) |
 
 Chain configuration lives in one place per side: `src/chain.ts` (app) and `server/src/evm/chains.ts` (executor), with
 a test that holds the two to each other.
@@ -182,8 +194,10 @@ cd contracts && forge test                 # + XLAYER_RPC for the fork suite
 
 - **The X Layer testnet has no DEX.** Contracts and wallet flows run there; fills happen on the fork, where the
   pools are mainnet's. Nothing in this repo moves real money, and mainnet needs `ALLOW_MAINNET=yes` to start at all.
-- **A fork is pinned at a block.** Its pools stop moving while the market doesn't, so fill-vs-market figures on the
-  fork mix venue quality with fork drift; the app labels them.
+- **A fork is pinned at a block.** Its pools stop moving while the market doesn't. So on a fork, prices, observations
+  and the agent's signals read the live X Layer mainnet pools, while fills settle against the fork's own pools — the
+  ticket shows both ("$362.38 each · mark $364.95"). Fill-vs-market figures on the fork therefore mix venue quality with
+  fork drift; the app labels them.
 - **OKX DEX routing is dark without an API key.** The code, signing, contract path and tests are in; live quotes
   need the key.
 - **Wrapped xStocks are not the underlying shares.** They track them through Backed's issuance; the backing screen

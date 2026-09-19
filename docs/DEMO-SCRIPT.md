@@ -1,7 +1,7 @@
 # Demo script — about 3:00 (OKX Dev Day)
 
-Recorded on the **web app** against the hosted X Layer fork executor, plus a short **phone clip** (D13). Fills are
-real EVM execution against X Layer mainnet state on the fork; say so once, plainly.
+Recorded on the **web app** against the hosted X Layer fork executor, plus a clip of the **native app on the iOS
+simulator** (D13, D21). Fills are real EVM execution against X Layer mainnet state on the fork; say so once, plainly.
 
 ## Before recording
 
@@ -10,6 +10,16 @@ real EVM execution against X Layer mainnet state on the fork; say so once, plain
 - A demo account signed in on the web build, holding fork USDC (the in-app test-funds button) and a grant of
   **$100/day for 7 days** (D19).
 - Viewport 402 × 874 for the web capture.
+- **iOS simulator** (Xcode at `/Applications/Xcode.app`):
+  ```bash
+  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+  xcrun simctl boot "iPhone 17 Pro"; open "$DEVELOPER_DIR/Applications/Simulator.app"
+  npm run start:fork                      # Metro, pointed at the X Layer fork executor, RPC and delegation
+  xcrun simctl spawn booted defaults write finance.xorr.app RCT_jsLocation localhost:8081
+  xcrun simctl launch booted finance.xorr.app
+  ```
+  The installed debug build (`finance.xorr.app`) runs this repo's JS. `test-8958@privy.io` on the simulator is funded
+  with fork USDC, granted $100/day for 7 days, and already holds a TSLAx position Momentum Scout bought on its own.
 
 ## Beats
 
@@ -22,7 +32,8 @@ real EVM execution against X Layer mainnet state on the fork; say so once, plain
 4. **It can't overspend (1:40–2:05).** Ask for more than today's cap → the contract refuses; the screen says which rule.
 5. **It proves itself (2:05–2:30).** `/judge`: every claim re-checked against the chain, live.
 6. **Take it back (2:30–2:50).** Stop all → one signature → the next run is refused. No server involved.
-7. **Phone clip (2:50–3:00).** The same account on the phone: holdings and the activity trail.
+7. **iOS clip (2:50–3:00).** The native app on the simulator: Home (balance, Permit ✓, ARMED), a stock ticket, and the
+   order screen refusing a buy past today's allowance ("Your permission allows $100.00 more today").
 
 ## If something is off
 

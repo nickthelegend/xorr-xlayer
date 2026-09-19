@@ -6,8 +6,8 @@ trust boundary. Written against the code as it stands, not against intentions.
 ## 1. The delegation primitive — the thing standing between a bug and someone's capital
 
 **What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on the hosted fork of X Layer
-mainnet (`0xf50a4ec95c07e497095ddad99a006cf44ceb7819`, chain 196) and — once the deployer is funded — on X Layer
-testnet (`contracts/deploy-xlayer-testnet.sh` → `contracts/deployments/xlayer-testnet.json`). The owner calls
+mainnet (`0xf50a4ec95c07e497095ddad99a006cf44ceb7819`, chain 196) and on X Layer testnet
+(`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, chain 1952, Sourcify exact match — `contracts/deployments/xlayer-testnet.json`). The owner calls
 `grant(delegate, dailyCap, expiresAt, venues)` from their own wallet; the bot's key may then call `spend()`,
 `spendVia()`, `closePosition()` and `closePositionVia()` for that owner, and nothing else.
 
@@ -86,7 +86,7 @@ JSON, so a tampered row breaks verification for everything after it. The export 
 verification result, so a recipient does not have to trust the exporter.
 
 The head is also published on chain. `XorrAuditAnchor` (`0x9d22e2b3e1d31a6973b6395cbb6d369ef8b6cf12` on the hosted
-X Layer fork; the testnet deployment follows the deployer's funding) holds each commitment, signed by the delegate key and published on an unattended sweep; a count that goes
+X Layer fork; `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196` on X Layer testnet) holds each commitment, signed by the delegate key and published on an unattended sweep; a count that goes
 backwards reverts (`CountWentBackwards`), and `/audit/anchor` shows what the chain holds beside what the executor holds.
 
 *Known limitation:* a party with database superuser rights could still rewrite the trail and anchor a rewrite of equal
@@ -197,8 +197,9 @@ lesson is worth writing down rather than quietly fixing:
 
 ## Delegate key
 
-On the hosted X Layer fork, `0xB3e9E76E710cEf6cB0B064E58b63e4084AecEC21` signs scheduled trades (its key is a Railway
-variable, generated locally, never printed or committed). Its blast radius is bounded by
+On the hosted X Layer fork, `0xB3e9E76E710cEf6cB0B064E58b63e4084AecEC21` signs scheduled trades; on X Layer testnet,
+`0x19033937953479E8F7b0237eB48ee87Be1D1c8ae`. Each key is a Railway variable, generated locally, never printed or
+committed. Its blast radius is bounded by
 `XorrDelegation`: capped per day, venue-allowlisted, time-boxed, and revocable by the user without
 this server's cooperation. **Before any deployment carrying real value it must move to a KMS or an
 HSM** — a file on a host is adequate for a testnet demo and is not adequate beyond that.
