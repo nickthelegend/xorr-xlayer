@@ -358,7 +358,8 @@ const EXPECT = {
    * The rate and its caveat. Where it comes from is named on Sources and How it works; the screen itself stopped naming
    * the pool when the money screens were distilled, and asserting the name here failed a correct screen.
    */
-  '59-rates': { must: [/Rate/, /\d+\.\d+%/, /not a promise/] },
+  // The rate is paid on USDT0, which is what idle USDC is swapped into (PLAN.md D15). This said "USDC SUPPLY RATE".
+  '59-rates': { must: [/Rate/, /\d+\.\d+%/, /not a promise/, /USDT0 SUPPLY RATE/i], never: [/USDC SUPPLY RATE/i] },
   // A forked chain must say so rather than render as healthy.
   '63-audit-chain': { must: [/HASH CHAIN/, /Entry|Forked|unbroken/i] },
   '64-runs': { must: [/Runs/, /All/] },

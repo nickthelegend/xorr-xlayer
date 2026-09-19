@@ -310,6 +310,14 @@ export interface PerpRepository {
 export interface YieldRepository {
   /** `estimatedApy` is a FRACTION (0.0388 = 3.88%), not percentage points. */
   staking(): Promise<{
+    /**
+     * The asset the rate belongs to.
+     *
+     * Idle USDC is swapped to USDT0 and supplied as USDT0 (PLAN.md D15), because USDC pays ~0% on X Layer. The screen
+     * called the number "USDC supply rate" regardless, which named the wrong asset on the one screen whose entire
+     * content is a rate. Absent where an executor is older than the field.
+     */
+    symbol?: string;
     estimatedApy: number;
     /** Always live: `/yield/supply` answers a rate it cannot read with 503 `rate_unavailable`, never a stand-in number. */
     feed: 'live';

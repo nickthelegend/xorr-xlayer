@@ -63,8 +63,9 @@ export default function Rates() {
         ) : (
           <>
             <SheetCard bordered borderRadius={radius.panel} padding={space.s18}>
+              {/* The asset the rate is actually paid on — idle cash is supplied as USDT0, not USDC (PLAN.md D15). */}
               <Text variant="footnote" color={colors.ink55}>
-                USDC SUPPLY RATE
+                {`${(rate.data.symbol ?? 'USDT0').toUpperCase()} SUPPLY RATE`}
               </Text>
               {/*
                 `estimatedApy` is a FRACTION, not percentage points — 0.0412 is 4.12%. Getting that
@@ -73,8 +74,9 @@ export default function Rates() {
               <Text variant="screenTitle" style={{ marginTop: space.s6 }}>
                 {percent(apy * 100, { digits: 2, explicitSign: false })}
               </Text>
+              {/* The executor's own sentence, which names the swap and what USDC would pay instead. */}
               <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s10 }}>
-                It floats. It is not a promise.
+                {rate.data.note?.trim() ? rate.data.note : 'It floats. It is not a promise.'}
               </Text>
               {earnableHere ? null : (
                 <Text variant="secondarySm" color={colors.warn} style={{ marginTop: space.s8 }}>
