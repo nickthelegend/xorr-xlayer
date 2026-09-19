@@ -84,6 +84,12 @@ function watch(page) {
       check(errors.length === 0, `${what}: no console errors`, errors[0] ?? '');
       check(network.length === 0, `${what}: no failed requests`, network.join(' | '));
     },
+    /** As `quiet`, with one expected class of noise named and excused. */
+    quietExcept: (allowed, what) => {
+      const unexpected = errors.filter((e) => !allowed.test(e));
+      check(unexpected.length === 0, `${what}: no unexpected console errors`, unexpected[0] ?? '');
+      check(network.length === 0, `${what}: no failed requests`, network.join(' | '));
+    },
   };
 }
 
@@ -115,18 +121,38 @@ async function main() {
   seen.quiet('order ticket');
 
   /*
-   * What the ticket offers has to agree with what the permission allows.
+   * A floor can never be above the estimate it is a floor UNDER.
    *
-   * With nothing left today the button must not read "Buy $…": the refusal belongs before the signature, in words
-   * (`src/markets/ticket.ts`). With an allowance, the offer is expected.
+   * The estimate was derived from the market price while "Minimum received" came from the route on the chain that
+   * settles the fill. On a fork of mainnet those are two different prices, so the ticket guaranteed more than it
+   * expected — 0.6877 TSLAx against 0.6844. Both numbers now come from the same quote.
    */
-  const offersABuy = /Buy \$[\d,]+/.test(ticket);
-  const said = ticket.match(/Your permission[^.]*\./)?.[0] ?? '';
+  const estimate = Number(ticket.match(/\n([\d.]+) TSLAx\n/)?.[1] ?? NaN);
+  const floor = Number(ticket.match(/Minimum received\s*\n([\d.]+)/)?.[1] ?? NaN);
   check(
-    limits.remainingUsd >= 10 ? offersABuy : !offersABuy && said !== '',
-    limits.remainingUsd >= 10 ? 'with an allowance left, the ticket offers the buy' : 'with nothing left today, the ticket refuses in words',
-    said || `$${limits.remainingUsd} left`,
+    Number.isFinite(estimate) && Number.isFinite(floor) && floor <= estimate,
+    'the minimum received is at or below the estimate above it',
+    `${floor} ≤ ${estimate}`,
   );
+
+  /*
+   * What the ticket lets you SEND has to agree with what the permission allows.
+   *
+   * The refusal belongs before the signature, in words (`src/markets/ticket.ts`), and the button must not be
+   * pressable while it stands — a green button the chain would turn down is the thing this screen exists to avoid.
+   */
+  const said = ticket.match(/Your permission[^.]*\./)?.[0] ?? '';
+  const pressable = await page
+    .getByText(/^(Buy|Sell) \$/)
+    .first()
+    .isEnabled()
+    .catch(() => null);
+  if (limits.remainingUsd >= 10) {
+    check(/Buy \$[\d,]+/.test(ticket), 'with an allowance left, the ticket offers the buy', `$${limits.remainingUsd} left`);
+  } else {
+    check(said !== '', 'with nothing left today, the ticket says so in words', said);
+    check(pressable !== true, 'and the order button cannot be pressed', `enabled=${pressable}`);
+  }
 
   // ── 2. An alert: created once, even when the button is hit twice, and then removed ────────────
   console.log('\n2. alerts — double submit, reload, delete');
@@ -187,7 +213,12 @@ async function main() {
   const signedOut = await body();
   check(/Sign in/i.test(signedOut), 'it asks for a sign-in rather than showing an empty screen');
   check(!/undefined|NaN|\[object/.test(signedOut), 'nothing leaks a placeholder value');
-  seen.quiet('signed out');
+  /*
+   * A 401 here is the app finding out, which is the only way it can: the session was cleared underneath it, and the
+   * request it already had in flight is how it learns to ask for a sign-in. What matters is that it recovers to the
+   * sign-in state rather than an error screen — asserted above — so only OTHER errors are held against this step.
+   */
+  seen.quietExcept(/401/, 'signed out');
 
   await browser.close();
   console.log(failures === 0 ? '\nALL FLOWS PASSED\n' : `\n${failures} CHECK(S) FAILED\n`);

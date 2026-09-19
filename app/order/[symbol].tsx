@@ -174,7 +174,13 @@ export default function OrderTicket() {
     () =>
       quoted > 0 && (side === 'buy' || (held?.mark ?? 0) > 0)
         ? waitOutWarming(() =>
-            api.get<{ minimumOut: number; venues: string[]; slippagePct: number; gas?: SwapQuoteResult['gas'] }>(
+            api.get<{
+              outAmount: number;
+              minimumOut: number;
+              venues: string[];
+              slippagePct: number;
+              gas?: SwapQuoteResult['gas'];
+            }>(
               side === 'buy'
                 ? `/swap/quote?in=USDC&out=${encodeURIComponent(symbol)}&amount=${quoted}`
                 : // A sell is entered in dollars; the route is quoted in units, so it needs the
@@ -313,8 +319,18 @@ export default function OrderTicket() {
         <Price variant="heroAmount" color={colors.sheet.ink} figure="input">
           ${orderAmt}
         </Price>
+        {/*
+          What this order would actually deliver, from the same quote the floor under it comes from.
+          A buy's estimate was derived from the market price while "Minimum received" came from the route on the
+          chain that settles it. On a fork of mainnet those are two different prices, so the ticket showed a floor
+          ABOVE its own estimate — 0.6877 TSLAx guaranteed against 0.6844 expected, which cannot be true of a
+          minimum. While the route is still being quoted the market estimate stands in, and a sale keeps it: a sale
+          is entered in dollars and the units are what it SENDS, which is the route's input, not its output.
+        */}
         <Text variant="body" color={colors.sheet.muted}>
-          {unitsFor(amount, quote, symbol, priceError !== undefined)}
+          {side === 'buy' && !quotePending && routeQuote.data && symbol
+            ? `${quantity(routeQuote.data.outAmount)} ${symbol}`
+            : unitsFor(amount, quote, symbol, priceError !== undefined)}
         </Text>
       </View>
 
