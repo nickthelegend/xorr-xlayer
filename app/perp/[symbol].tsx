@@ -138,7 +138,7 @@ export default function PerpContract() {
             {m && changePct !== null ? (
               <DeltaChip
                 label={`${movePhrase(changePct)} ${RANGE_WORDS[range]}`}
-                tone={pnlTone(changePct)}
+                tone={pnlTone(changePct, 1)}
                 style={{ alignSelf: 'center' }}
               />
             ) : !m ? (

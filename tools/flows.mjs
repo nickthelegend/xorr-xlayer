@@ -13,6 +13,7 @@
  *   APP_URL=https://xorr-xlayer.vercel.app EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app \
  *     node tools/flows.mjs
  */
+import { Buffer } from 'node:buffer';
 import { chromium } from 'playwright';
 
 const BASE = (process.env.APP_URL ?? 'http://localhost:8081').replace(/\/$/, '');
@@ -105,10 +106,6 @@ async function main() {
   seen.clear();
   await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(6000);
-  const digits = async (text) => {
-    for (const d of text) await page.getByText(d === '.' ? '.' : d, { exact: true }).first().click();
-  };
-  await page.getByRole('button', { name: /delete|backspace/i }).first().click({ timeout: 5000 }).catch(() => {});
   const body = () => page.innerText('body');
   const limits = await apiGet('/limits', bearer);
   check(typeof limits.remainingUsd === 'number', 'the executor reports a remaining allowance', `$${limits.remainingUsd}`);
@@ -117,12 +114,19 @@ async function main() {
   check(/Minimum received/i.test(ticket), 'the ticket states a minimum received');
   seen.quiet('order ticket');
 
-  // A buy past what the permission allows today is refused in words, before anything is signed.
-  await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(4000);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  const over = await body();
-  check(!/Buy \$\d/.test(over) || limits.remainingUsd >= 10, 'the ticket does not offer a buy it cannot place', over.match(/Your permission[^.]*\./)?.[0] ?? '');
+  /*
+   * What the ticket offers has to agree with what the permission allows.
+   *
+   * With nothing left today the button must not read "Buy $…": the refusal belongs before the signature, in words
+   * (`src/markets/ticket.ts`). With an allowance, the offer is expected.
+   */
+  const offersABuy = /Buy \$[\d,]+/.test(ticket);
+  const said = ticket.match(/Your permission[^.]*\./)?.[0] ?? '';
+  check(
+    limits.remainingUsd >= 10 ? offersABuy : !offersABuy && said !== '',
+    limits.remainingUsd >= 10 ? 'with an allowance left, the ticket offers the buy' : 'with nothing left today, the ticket refuses in words',
+    said || `$${limits.remainingUsd} left`,
+  );
 
   // ── 2. An alert: created once, even when the button is hit twice, and then removed ────────────
   console.log('\n2. alerts — double submit, reload, delete');

@@ -345,7 +345,8 @@ export default function AssetDetail() {
               {current && hasSeries ? (
                 <DeltaChip
                   label={`${movePhrase(changePct)} ${changeLabel}`}
-                  tone={pnlTone(changePct)}
+                  // One decimal, as the label's own figure is: a chip that says "flat" must not be drawn red.
+                  tone={pnlTone(changePct, 1)}
                   style={{ alignSelf: 'center' }}
                 />
               ) : priceLoading || historyLoading ? (
