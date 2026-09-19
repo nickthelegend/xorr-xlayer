@@ -379,3 +379,22 @@ Privy form, double-submits on purpose, reloads mid-flow and checks what the exec
 
 Verified after each fix in the same browser, not by rebuilding: prices agree, the floor sits under the estimate, the
 conversion reports itself (5.0016 USDT0 → 0 on chain), search answers one TSLAx, the rate names USDT0.
+
+### Phase 10 — the honest measurement (2026-09-20)
+
+Measured by running each item, not by reading it. Counted only what was observed in this run.
+
+**INITIAL: 26 of 36 verified = 72%.**
+
+| # | Found | Sev | Fix | Verified |
+|---|---|---|---|---|
+| Z1 | The autonomous sweep traded for **every** granted wallet — it never read the `agents` table, so a person who hired nobody had an agent buying shares with their money (test-8958: four agent rows, all `hired: false`, $96 spent today) | P0 | `no_agent_hired` before the permission is even read; the sweep asks only for wallets with a hire; the hired roster decides which setups may be taken | 54 unit tests; `prove-yield` went from 2 failures to ALL PASSED once the agent stopped trading the proof's own wallet |
+| Z2 | `/verify` called a wallet with no permission on this chain a FAILURE, twice, on the page a judge opens | P1 | a named skip, as for a request with no wallet | testnet `/verify` 13 pass 0 fail 7 skip |
+| Z3 | Comments said the grant costs "three signatures"; it costs one per tradable token and then the grant | P2 | comments corrected; the screen always counted ("You'll sign 17 times") | — |
+
+Closed from the gap list, each re-run today: the withdrawal proof (allowlist cooling-off, sale, Aave exit, 699.95 USDC
+to cold storage), the Aave yield proof, the kill switch held down on the web (revoked on chain), the permission signed
+again in the app (17 signatures, cap back to $100), and the USDT0 → USDC conversion.
+
+Still blocked by a credential that exists nowhere: OKX DEX routing (`OKX_API_KEY`/`SECRET`/`PASSPHRASE`) and LLM prose
+(`OPENROUTER_API_KEY`). OKX Wallet is offered first in the live sign-in modal; connecting one needs the extension.
