@@ -339,3 +339,22 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 - **6.6 Re-audit** — `DONE`: 2,422/2,422 tests, typechecks and lint clean; fork CI hardened against X Layer's rate-limited RPC (`57c95ab`).
 
 **MEASURED AFTER PHASE 6 (incl. the simulator passes): P0 15/17 = 88%; all items 18/26 = 69%.** Remaining P0: A16 video, A17 submission (owner). A UI-tapped *buy* waits for the UTC day to reset (the agent spent the day's cap); buys through the same path are verified. Remaining P0: A9, A11 (owner sign-in + consent), A10 (partial, same), A16 video, A17 submission — all owner actions.
+
+## 8. Audit 2026-09-20 — CLOSE GAPS run
+
+**INITIAL COMPLETION (this run, same §7 criteria): P0 15/17 = 88%; all items 18/26 = 69%.** Master plan `docs/TEST-PLAN.md`, results `docs/qa/RESULTS.md`.
+
+**D23 (owner, 2026-09-20):** the welcome hero shows **OKB / X Layer coin art** (with an xStock), not the landing's Solana + Bitcoin coins.
+**D24 (owner, 2026-09-20):** the builder may sign on the **fork** from the simulator for J08 (tapped buy) and B4 (USDT0 → USDC convert).
+
+| Gap | Evidence | Sev | Fix | State |
+|---|---|---|---|---|
+| X1 Bot tab: "No live market for TSLAx" while TSLAx fills | proposer's range read CoinGecko only | P1 | range from `price_observations` (`observed-range.ts`) | `DONE` `89fd7b9` — live proposal TSLAx $365.31 |
+| X2 Every xStock asset screen "No chart yet." | app asked `/market/ohlc` (no feed) | P1 | chart from `/market/stocks/history`; "since <date>" when history is short | `DONE` `b0f79f4`, web deployed |
+| X3 Frozen fork readings in the fork's price history | 1,641 rows, one value per symbol 2026-09-18 20:15 → 09-19 06:51 UTC, before `b8bda33` | P1 | purged in a count-checked transaction (owner-approved) | `DONE` — earliest xStock reading 06:51:43 |
+| X4 Gas drip said "real OKB" on a fork, "test ETH" on X Layer | Activity row on a fresh account | P2 | named copy + OKB | `DONE` `73d265e`, verified live |
+| X5 Screen sweep false failures (image wordmark, rolling balance, dead position id, stale bot text) | `tools/shoot.mjs` | P2 | reads accessible names; ids from the account | `DONE` |
+| X6 Welcome hero shows a Solana coin | `app/(onboarding)/welcome.tsx` | P1 | D23 art | `IN PROGRESS` |
+| X7 Tapped buy (A10 / J08) | cap spent 2026-09-19 | P0 | tap after the UTC reset (D24) | `NOT STARTED` |
+| X8 D22 on the hosted fork (J10) | needs a new day's sweep | P1 | observe | `NOT STARTED` |
+| X9 USDT0 → USDC convert in the app (B4) | unit only | P1 | fork USDT0 + tap (D24) | `NOT STARTED` |
