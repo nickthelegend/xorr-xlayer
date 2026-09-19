@@ -154,6 +154,45 @@ async function main() {
     check(pressable !== true, 'and the order button cannot be pressed', `enabled=${pressable}`);
   }
 
+  /*
+   * A buy, tapped (`FLOWS_SIGN=1` and an allowance to spend).
+   *
+   * The executor signs the fill with the delegate key inside the permission the owner granted — the tap is the
+   * owner asking for it. $50 of TSLAx, which is what the demo places (PLAN.md D19).
+   */
+  if (process.env.FLOWS_SIGN === '1' && limits.remainingUsd >= 50) {
+    console.log('\n1b. buying $50 of TSLAx from the ticket');
+    seen.clear();
+    const before = await apiGet('/positions', bearer);
+    const heldBefore = Number((before.find?.((p) => p.symbol === 'TSLAx') ?? {}).units ?? 0);
+    await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(6000);
+    // Clear the default and key in 50, the way a finger does.
+    for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: /Delete|Backspace/i }).first().click().catch(() => undefined);
+    for (const digit of ['5', '0']) await page.getByRole('button', { name: new RegExp(`^${digit}$`) }).first().click();
+    await page.waitForTimeout(7000);
+    const cta = page.getByText(/^Buy \$50 of TSLAx$/).first();
+    check(await cta.isEnabled().catch(() => false), 'the ticket offers the buy for the amount keyed in');
+    await cta.click();
+    await page.waitForSelector('text=/Bought|Already bought|filled/i', { timeout: 180_000 }).catch(() => undefined);
+    await page.waitForTimeout(10_000);
+    const said = await body();
+    check(/Bought/i.test(said), 'the ticket confirms the fill in its own words', said.match(/Bought[^\n]*/)?.[0] ?? said.slice(0, 120));
+    const after = await apiGet('/positions', bearer);
+    const heldAfter = Number((after.find?.((p) => p.symbol === 'TSLAx') ?? {}).units ?? 0);
+    check(heldAfter > heldBefore, 'the position grew on chain', `${heldBefore} → ${heldAfter} TSLAx`);
+    const spent = await apiGet('/limits', bearer);
+    check(
+      Math.abs(spent.remainingUsd - (limits.remainingUsd - 50)) < 0.51,
+      "the day's allowance fell by the amount spent",
+      `$${limits.remainingUsd} → $${spent.remainingUsd}`,
+    );
+    const runs = await apiGet('/runs?limit=3', bearer);
+    const fill = (runs.find?.((r) => r.status === 'filled') ?? {});
+    check(!!fill.signature, 'the fill is recorded with its transaction', `${fill.venue ?? '?'} ${fill.signature ?? ''}`);
+    seen.quiet('tapped buy');
+  }
+
   // ── 2. An alert: created once, even when the button is hit twice, and then removed ────────────
   console.log('\n2. alerts — double submit, reload, delete');
   seen.clear();
@@ -235,6 +274,72 @@ async function main() {
     const left = (after.tokens ?? []).find((t) => t.symbol === 'USDT0');
     check(Number(left?.units ?? 0) < Number(usdt0.units), 'the USDT0 left the wallet on chain', `${usdt0.units} → ${left?.units ?? 0}`);
     seen.quiet('conversion');
+  }
+
+  /*
+   * The kill switch, then the permission again — the two the owner signs, on the fork (`FLOWS_SIGN=1`).
+   *
+   * Stop all is a HOLD, not a tap (`src/ui/holdToCommit.ts`, 600ms), and it is signed by the OWNER against the
+   * delegation, so it works whether or not this server is running. Afterwards the wallet is left as it was found:
+   * granted, because that is the state the rest of the deployment expects.
+   */
+  if (process.env.FLOWS_SIGN === '1') {
+    const health = await (await fetch(`${API}/health`)).json();
+    if (!/fork|localnet|testnet/.test(String(health.chain))) throw new Error(`refusing to sign on ${health.chain}`);
+
+    console.log('\n3c. stop all, held down');
+    seen.clear();
+    // Only where there is something to stop: the button names the state, so a revoked wallet has no "Stop all".
+    const live = await apiGet('/limits', bearer);
+    await page.goto(`${BASE}/safety`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(6000);
+    const stop = page.getByText(/^Stop all trading$/).first();
+    const box = live.revoked === false ? await stop.boundingBox().catch(() => null) : null;
+    if (!box) console.log('  – already revoked, so there is nothing to stop');
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(1400);
+      await page.mouse.up();
+    }
+    for (let i = 0; i < 3; i += 1) {
+      const approve = page.getByRole('button', { name: /^Approve$/ }).first();
+      await approve.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined);
+      if (!(await approve.isVisible().catch(() => false))) break;
+      await approve.click();
+      await page.waitForTimeout(5000);
+    }
+    if (box) {
+      await page.waitForTimeout(12_000);
+      const stopped = await apiGet('/limits', bearer);
+      check(stopped.revoked === true, 'the permission reads revoked on chain after the hold', JSON.stringify({ revoked: stopped.revoked, granted: stopped.granted }));
+      seen.quiet('stop all');
+    }
+
+    console.log('\n3d. granting again, signed in the app');
+    seen.clear();
+    let signatures = 0;
+    await page.goto(`${BASE}/delegate`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(6000);
+    await page.getByText(/^Sign this permission$/).first().click();
+    /*
+     * One confirmation per tradable token, then the grant — the screen says how many ("You'll sign 17 times.
+     * Nothing is granted until the last."). The delegation can only pull a token the owner has approved, and the
+     * app approves the whole tradable set up front so a later sale never stops to ask.
+     */
+    for (let i = 0; i < 24; i += 1) {
+      const approve = page.getByRole('button', { name: /^Approve$/ }).first();
+      await approve.waitFor({ state: 'visible', timeout: 90_000 }).catch(() => undefined);
+      if (!(await approve.isVisible().catch(() => false))) break;
+      await approve.click();
+      signatures += 1;
+      await page.waitForTimeout(4000);
+    }
+    check(signatures > 0, 'every confirmation the screen asked for was given', `${signatures} signatures`);
+    await page.waitForTimeout(20_000);
+    const granted = await apiGet('/limits', bearer);
+    check(granted.granted === true && granted.revoked === false, 'the chain holds a live permission again', JSON.stringify({ cap: granted.dailyCapUsd, remaining: granted.remainingUsd }));
+    seen.quiet('grant');
   }
 
   // ── 4. A screen behind the session, after the session is cleared ──────────────────────────────
