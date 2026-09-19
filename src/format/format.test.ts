@@ -9,6 +9,7 @@ import {
   day,
   mmss,
   money,
+  movePhrase,
   percent,
   price,
   quantity,
@@ -118,5 +119,23 @@ describe('3.5 formatting rules — state.md', () => {
     // and it moves with the calendar, which the hardcoded string could not.
     const monday = new Date('2026-09-07T12:00:00Z');
     expect(businessDaysFromNow(2, monday)).toBe('Wed, Sep 9');
+  });
+});
+
+describe('movePhrase', () => {
+  it('names the direction the figure supports', () => {
+    expect(movePhrase(1.24)).toBe('up 1.2%');
+    expect(movePhrase(-0.42)).toBe('down 0.4%');
+  });
+
+  it("says flat when the change rounds to nothing — never 'down 0.0%'", () => {
+    expect(movePhrase(-0.04)).toBe('flat');
+    expect(movePhrase(0)).toBe('flat');
+    expect(movePhrase(0.049)).toBe('flat');
+  });
+
+  it('keeps a direction for the smallest change that still shows', () => {
+    expect(movePhrase(0.05)).toBe('up 0.1%');
+    expect(movePhrase(-0.05)).toBe('down 0.1%');
   });
 });

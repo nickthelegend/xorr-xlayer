@@ -66,6 +66,18 @@ export function percent(n: number, opts: { digits?: number; explicitSign?: boole
   return `${sign(n, explicitSign, digits)}${localise(n, digits, digits)}%`;
 }
 
+/**
+ * How a price moved, in words: "up 1.2%", "down 0.4%" — or "flat" when it rounds to nothing at the precision shown.
+ *
+ * A −0.04% day rounds to 0.0% and read "down 0.0% since Sep 19", which is a direction the number it quotes does not
+ * support. The word and the figure come from the same rounded value, so they can never disagree.
+ */
+export function movePhrase(pct: number): string {
+  if (!Number.isFinite(pct)) return 'flat';
+  const shown = percent(Math.abs(pct)).replace('+', '');
+  return Number.parseFloat(shown.replace(/,/g, '')) === 0 ? 'flat' : `${pct >= 0 ? 'up' : 'down'} ${shown}`;
+}
+
 /** Crypto quantity — 4dp by default (SOL), 2dp for display balances. */
 export function quantity(n: number, digits = 4): string {
   return `${sign(n, false, digits)}${localise(n, digits, digits)}`;

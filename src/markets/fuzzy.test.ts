@@ -7,7 +7,7 @@
  * search result here is spend money on it.
  */
 import { describe, expect, it } from 'vitest';
-import { fuzzyMatches, fuzzyRank, fuzzyScore } from './fuzzy';
+import { fuzzyMatches, fuzzyRank, fuzzyScore, oneRowPerSymbol } from './fuzzy';
 
 const CATALOG = [
   { symbol: 'NVDAx', name: 'NVIDIA Corporation xStock' },
@@ -159,5 +159,28 @@ describe('the positions it reports', () => {
 
   it('reports none when nothing matched', () => {
     expect(fuzzyScore('zzz', 'NVDAx').positions).toEqual([]);
+  });
+});
+
+describe('oneRowPerSymbol', () => {
+  it('keeps the catalogue row and drops the xStocks feed’s duplicate of it', () => {
+    const rows = [
+      { symbol: 'TSLAx', secondary: 'Tesla · Tokenized share', href: '/asset/TSLAx' },
+      { symbol: 'NVDAx', secondary: 'Nvidia · Tokenized share', href: '/asset/NVDAx' },
+      { symbol: 'TSLAx', secondary: 'Tesla, Inc. · Consumer Discretionary', href: '/xstock/TSLAx' },
+    ];
+    expect(oneRowPerSymbol(rows)).toEqual([rows[0], rows[1]]);
+  });
+
+  it('keeps a token only the second source knows', () => {
+    const rows = [
+      { symbol: 'BTC', href: '/asset/BTC' },
+      { symbol: 'METAx', href: '/xstock/METAx' },
+    ];
+    expect(oneRowPerSymbol(rows)).toEqual(rows);
+  });
+
+  it('matches without case, so one spelling cannot smuggle a second row in', () => {
+    expect(oneRowPerSymbol([{ symbol: 'tslax' }, { symbol: 'TSLAx' }])).toEqual([{ symbol: 'tslax' }]);
   });
 });

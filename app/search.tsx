@@ -44,7 +44,7 @@ import { useMarketPrices } from '@/markets/useMarketPrices';
 import { assetGradient } from '@/design/gradients';
 import { useAsync } from '@/data/useAsync';
 import { system } from '@/data/system';
-import { fuzzyRank } from '@/markets/fuzzy';
+import { fuzzyRank, oneRowPerSymbol } from '@/markets/fuzzy';
 import { openingList } from '@/markets/recents';
 import { useStore } from '@/state/store';
 import { price as fmtPrice } from '@/format';
@@ -129,7 +129,8 @@ export default function Search() {
       href: `/xstock/${r.symbol}`,
     }));
 
-    const all = [...fromClasses, ...fromXStocks];
+    // The catalogue already lists every wrapped xStock, so the two sources overlap (`oneRowPerSymbol`).
+    const all = oneRowPerSymbol([...fromClasses, ...fromXStocks]);
     if (q.trim()) return fuzzyRank(all, q);
 
     /*

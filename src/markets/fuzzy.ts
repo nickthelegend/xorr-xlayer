@@ -98,6 +98,25 @@ export type Searchable = {
 };
 
 /**
+ * One row per instrument, keeping the first.
+ *
+ * Search draws from two sources that overlap: the market catalogue, which already lists the eleven wrapped xStocks
+ * with their price and their change, and `/market/xstocks`, which lists the same tokens with their sector and the
+ * cost breakdown. Concatenated, a search for "tesla" answered TSLAx twice — the same token at the same price, under
+ * two different subtitles, opening two different screens. The catalogue row comes first and wins; a token only the
+ * xStocks feed knows still gets its row.
+ */
+export function oneRowPerSymbol<T extends { symbol: string }>(items: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.symbol.toUpperCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * Rank `items` against a query, dropping what does not match at all.
  *
  * Each item is scored against its symbol and its name and keeps the better of the two, so a query

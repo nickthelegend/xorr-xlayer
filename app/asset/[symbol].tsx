@@ -56,7 +56,7 @@ import {
   typeScale,
 } from '@/ui';
 import { RollingNumber } from '@/ui/RollingNumber';
-import { signedMoney, when } from '@/format';
+import { movePhrase, signedMoney, when } from '@/format';
 import { repos } from '@/data';
 import { api } from '@/data/api';
 import { NotSignedIn } from '@/data/apiError';
@@ -344,7 +344,7 @@ export default function AssetDetail() {
             <View style={{ minHeight: CHANGE_LINE_H, alignItems: 'center', justifyContent: 'center' }}>
               {current && hasSeries ? (
                 <DeltaChip
-                  label={`${up ? 'up' : 'down'} ${percent(Math.abs(changePct)).replace('+', '')} ${changeLabel}`}
+                  label={`${movePhrase(changePct)} ${changeLabel}`}
                   tone={pnlTone(changePct)}
                   style={{ alignSelf: 'center' }}
                 />

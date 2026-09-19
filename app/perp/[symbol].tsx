@@ -41,7 +41,7 @@ import {
   toCandles,
 } from '@/ui';
 import { RollingNumber } from '@/ui/RollingNumber';
-import { compactMoney, countdown } from '@/format';
+import { compactMoney, countdown, movePhrase } from '@/format';
 import { assetGradient } from '@/design/gradients';
 import { repos } from '@/data';
 import { useAsync } from '@/data/useAsync';
@@ -137,7 +137,7 @@ export default function PerpContract() {
             )}
             {m && changePct !== null ? (
               <DeltaChip
-                label={`${changePct >= 0 ? 'up' : 'down'} ${percent(Math.abs(changePct)).replace('+', '')} ${RANGE_WORDS[range]}`}
+                label={`${movePhrase(changePct)} ${RANGE_WORDS[range]}`}
                 tone={pnlTone(changePct)}
                 style={{ alignSelf: 'center' }}
               />
