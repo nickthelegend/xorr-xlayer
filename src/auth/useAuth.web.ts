@@ -85,7 +85,7 @@ export function useSocialLogin(): { login: (provider: SocialProvider) => Promise
 
 /**
  * Bringing a wallet of your own: Privy's modal, opened on its wallet list — OKX Wallet first, then what the browser
- * offers, MetaMask, Coinbase Wallet, Rainbow and WalletConnect (`walletList` in `PrivyProvider.web.tsx`). The wallet signs in; Privy still makes the embedded wallet this
+ * offers, MetaMask, Rainbow and WalletConnect (`walletList` in `PrivyProvider.web.tsx`). The wallet signs in; Privy still makes the embedded wallet this
  * app trades from, so the rest of onboarding is unchanged.
  */
 export function useWalletLogin(): { login?: () => void } {

@@ -70,7 +70,8 @@ function watch(page) {
   const errors = [];
   const network = [];
   page.on('console', (m) => {
-    if (m.type() === 'error' && !/isActive|balanceOf|styled-components|Coinbase/i.test(m.text())) errors.push(m.text());
+    // Privy's own SDK logs two of these from its confirmation modal and its balance reader; nothing else is excused.
+    if (m.type() === 'error' && !/isActive|balanceOf|styled-components/i.test(m.text())) errors.push(m.text());
   });
   page.on('response', (r) => {
     if (r.status() >= 400 && r.status() !== 503 && r.url().includes(API)) network.push(`${r.status()} ${r.url().slice(API.length)}`);

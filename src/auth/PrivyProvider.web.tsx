@@ -39,8 +39,13 @@ export function AppPrivyProvider({ children }: { children: React.ReactNode }) {
            * "Continue with a wallet" (P4.10, D17): OKX Wallet first — it is the wallet X Layer's own users hold — then
            * whatever the browser has injected, then Privy's defaults. `okx_wallet` is Privy's own id for it
            * (`WalletListEntry` in @privy-io/react-auth). EVM only: the app signs on X Layer, nothing else.
+           *
+           * Coinbase Wallet is NOT offered. Its SDK says so itself on every load — "The configured chains are not
+           * supported by Coinbase Smart Wallet: 196, 196, 1952" — so the entry was an offer this app cannot honour on
+           * the only chains it signs on, and the SDK's cross-origin probe put a failed HEAD request in the network
+           * tab of every screen on the way.
            */
-          walletList: ['okx_wallet', 'detected_ethereum_wallets', 'metamask', 'coinbase_wallet', 'rainbow', 'wallet_connect'],
+          walletList: ['okx_wallet', 'detected_ethereum_wallets', 'metamask', 'rainbow', 'wallet_connect'],
           walletChainType: 'ethereum-only',
         },
       }}
