@@ -382,8 +382,16 @@ export async function evaluateBestSetup(
   settings: RiskSettings = settingsFor(DEFAULT_RISK_PROFILE),
   /** Symbols the wallet already holds: one entry per symbol (PLAN.md D22), so none of these is a candidate. */
   held: ReadonlySet<string> = new Set(),
+  /**
+   * The personas this wallet has hired, and so the only ones whose setups may be taken.
+   *
+   * Undefined means "no filter", which is what a caller previewing the market wants; the trading path always passes
+   * the hired set, because a setup belongs to the agent that found it and an agent nobody hired does not trade.
+   */
+  hired?: ReadonlySet<PersonaId>,
 ): Promise<CandidateSetup | null> {
   const candidates: CandidateSetup[] = [];
+  const mayAct = (persona: PersonaId) => hired === undefined || hired.has(persona);
 
   for (const stock of Object.values(XSTOCKS)) {
     if (held.has(stock.symbol)) continue;
@@ -428,6 +436,7 @@ export async function evaluateBestSetup(
 
     // 1. Event-driven: a projected report, far enough out to enter and be flat before the print.
     if (
+      mayAct('earnings-desk') &&
       earnings &&
       earnings.days >= 3 &&
       earnings.days <= 10 &&
@@ -454,7 +463,7 @@ export async function evaluateBestSetup(
     const position = range ? bandPosition(price, range) : null;
 
     // 2. Momentum: near the top of the range this app has actually recorded.
-    if (range && position !== null && position >= settings.momentumEntryAt) {
+    if (mayAct('momentum-scout') && range && position !== null && position >= settings.momentumEntryAt) {
       const stop = Math.max(price * 0.95, range.high * 0.94);
       const target = price + (price - stop) * 2;
       candidates.push({
@@ -476,7 +485,7 @@ export async function evaluateBestSetup(
     }
 
     // 3. DCA: near the bottom of that same recorded range.
-    if (range && position !== null && position < settings.dcaEntryBelow) {
+    if (mayAct('yield-keeper') && range && position !== null && position < settings.dcaEntryBelow) {
       candidates.push({
         symbol: stock.symbol,
         stock,
@@ -627,6 +636,30 @@ export async function runAutonomousCycle(
     };
   }
 
+  /*
+   * Somebody has to have hired an agent.
+   *
+   * This swept every wallet with an address and a permission, and traded for all of them — so a person who signed in,
+   * funded, and granted a permission in order to trade for themselves (or to earn on idle cash) had an agent they
+   * never hired start buying shares with their money, inside the cap but entirely unasked. The app has said "Hired"
+   * and "Not hired" per agent all along; this is the code that was not reading it.
+   *
+   * The hired set also decides WHICH setups may be taken: a setup belongs to the agent that found it, so a wallet
+   * that hired only Yield Keeper never takes Momentum Scout's breakout.
+   */
+  const roster = await query<{ persona_id: string; name: string }>(
+    `SELECT persona_id, name FROM agents WHERE wallet_id = $1 AND hired = true AND fired_at IS NULL`,
+    [walletId],
+  );
+  const hired = new Set(roster.map((a) => a.persona_id as PersonaId));
+  if (hired.size === 0) {
+    return {
+      executed: false,
+      reason: 'no_agent_hired',
+      detail: 'No agent is hired for this wallet, so nothing trades on its own.',
+    };
+  }
+
   // 2. The on-chain XorrDelegation policy, which is what actually authorises any of this.
   const permission = await readPermission(wallet.address);
   if (!permission.ok) return permission.refusal;
@@ -672,7 +705,7 @@ export async function runAutonomousCycle(
       detail: `${options.setup.symbol} is already held; the agent enters a symbol once and lets its exit decide.`,
     };
   }
-  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held));
+  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held, hired));
   if (!bestSetup) {
     return {
       executed: false,
@@ -822,10 +855,15 @@ export async function autonomousAgentSweep(_now: Date = new Date()): Promise<num
    * behind it turned the failed query into "no wallets": the agent swept nobody, every tick, and said nothing. A failed
    * read is thrown to the scheduler, which logs it as a failed sweep — never an empty one.
    */
+  /*
+   * Only wallets that hired somebody. The cycle refuses the rest by name anyway (`no_agent_hired`), but a sweep that
+   * asked every wallet in the deployment spent its tick pricing eleven shares for people who never hired an agent.
+   */
   const wallets = await query<{ id: string; risk_profile: string | null }>(
-    `SELECT id, risk_profile FROM wallets
-      WHERE address IS NOT NULL AND (agents_stopped IS NULL OR agents_stopped = false)
-      ORDER BY active_at DESC NULLS LAST, created_at DESC LIMIT 10`,
+    `SELECT w.id, w.risk_profile FROM wallets w
+      WHERE w.address IS NOT NULL AND (w.agents_stopped IS NULL OR w.agents_stopped = false)
+        AND EXISTS (SELECT 1 FROM agents a WHERE a.wallet_id = w.id AND a.hired = true AND a.fired_at IS NULL)
+      ORDER BY w.active_at DESC NULLS LAST, w.created_at DESC LIMIT 10`,
   );
 
   let executedCount = 0;

@@ -31,6 +31,18 @@ vi.mock('../evm/client.js', () => ({
   },
 }));
 vi.mock('../db/index.js', () => ({ query: async () => [], one: async () => null }));
+/*
+ * Everything else `checks.ts` probes reaches the network. This test is about two rows and their status, so each of
+ * those answers immediately — left real, they ran for whole seconds apiece and the suite timed out on data it never
+ * needed.
+ */
+vi.mock('../market/prices.js', () => ({ priceOf: async () => 1 }));
+vi.mock('../venues/uniswap.js', () => ({ quote: async () => ({ outAmount: 0.27, venues: ['Uniswap v3'] }), VENUE_NAME: 'Uniswap v3' }));
+vi.mock('../market/yield.js', () => ({ usdt0Reserve: async () => null }));
+vi.mock('../audit/anchor.js', () => ({ agreement: async () => null, anchoringConfigured: () => false }));
+vi.mock('../audit/log.js', () => ({ verify: async () => ({ rows: 0, linkBreaks: 0 }) }));
+vi.mock('../venues/stocks.js', () => ({ STOCKS: {}, equitiesFunctional: async () => ({ ok: false, detail: 'none here' }) }));
+vi.mock('../market/edgar.js', () => ({ earningsCalendar: async () => null }));
 
 const { runChecks } = await import('./checks.js');
 

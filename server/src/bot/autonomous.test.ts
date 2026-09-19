@@ -2,6 +2,17 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 const oneMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
 const queryMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown[]>>();
+/**
+ * Who this wallet has hired. Nothing trades on its own without a hire, so the roster is answered by the module mock
+ * rather than by each test's own `query` implementation — a test about sizing should not have to say who was hired.
+ * The hiring tests below set this directly.
+ */
+let hiredRoster: { persona_id: string; name: string }[] = [];
+const ALL_HIRED = [
+  { persona_id: 'momentum-scout', name: 'Momentum Scout' },
+  { persona_id: 'earnings-desk', name: 'Earnings Desk' },
+  { persona_id: 'yield-keeper', name: 'Yield Keeper' },
+];
 const evaluateMock = vi.fn();
 const readPolicyMock = vi.fn();
 const placeOrderMock = vi.fn();
@@ -70,7 +81,9 @@ vi.mock('../market/nasdaq.js', async (importOriginal) => ({
 
 vi.mock('../db/index.js', () => ({
   one: (sql: string, params?: unknown[]) => oneMock(sql, params),
-  query: (sql: string, params?: unknown[]) => queryMock(sql, params),
+  query: async (sql: string, params?: unknown[]) =>
+    // The roster read specifically — not the sweep's `EXISTS (… FROM agents …)`, which is a wallet query.
+    /SELECT persona_id/i.test(sql) ? [...hiredRoster] : queryMock(sql, params),
 }));
 
 vi.mock('../rules/engine.js', () => ({ evaluate: (...a: unknown[]) => evaluateMock(...a) }));
@@ -172,6 +185,7 @@ describe('autonomous xStocks trading agent', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(REGULAR_HOURS);
 
+    hiredRoster = [...ALL_HIRED];
     queryMock.mockResolvedValue([]);
     oneMock.mockResolvedValue(null);
     earningsCalendarMock.mockResolvedValue(null);
@@ -970,6 +984,67 @@ describe('autonomous xStocks trading agent', () => {
       armExitsMock.mockResolvedValue({ strategyId: 'exit-1', sentence: 'Exit set' });
 
       expect(await autonomousAgentSweep()).toBe(1);
+    });
+
+    /*
+     * Hiring is what starts an agent.
+     *
+     * The sweep took every wallet with an address and a permission and traded for all of them, so a person who
+     * granted a permission to trade for themselves — or to earn on idle cash — had an agent they never hired buying
+     * shares with their money. The app has shown "Hired" and "Not hired" per agent all along.
+     */
+    it('asks only for wallets that have hired an agent', async () => {
+      const asked: string[] = [];
+      queryMock.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM wallets')) {
+          asked.push(sql);
+          return [];
+        }
+        return [];
+      });
+      await autonomousAgentSweep();
+      expect(asked).toHaveLength(1);
+      expect(asked[0]).toMatch(/EXISTS[\s\S]*FROM agents[\s\S]*hired = true[\s\S]*fired_at IS NULL/i);
+    });
+  });
+
+  describe('an agent nobody hired', () => {
+    beforeEach(() => {
+      readPolicyMock.mockResolvedValue(livePolicy());
+      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 500 });
+      oneMock.mockImplementation(async (sql: string) =>
+        sql.includes('FROM wallets') ? { id: 'wallet-1', address: OWNER, agents_stopped: false } : null,
+      );
+    });
+
+    it('refuses to trade for a wallet with no hired agent, and names why', async () => {
+      hiredRoster = [];
+      const res = await runAutonomousCycle('wallet-1');
+      expect(res).toEqual({
+        executed: false,
+        reason: 'no_agent_hired',
+        detail: 'No agent is hired for this wallet, so nothing trades on its own.',
+      });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses before it reads the permission, so nothing is priced for someone who hired nobody', async () => {
+      hiredRoster = [];
+      await runAutonomousCycle('wallet-1');
+      expect(readPolicyMock).not.toHaveBeenCalled();
+      expect(xStockPriceMock).not.toHaveBeenCalled();
+    });
+
+    it('takes only the setups of the personas that WERE hired', async () => {
+      queryMock.mockImplementation(async (sql: string) =>
+        sql.includes('price_observations') ? readings(200, 240, 238) : [],
+      );
+      // 238 in a 200-240 band is Momentum Scout's breakout, and nobody else's.
+      hiredRoster = [{ persona_id: 'yield-keeper', name: 'Yield Keeper' }];
+      expect(await evaluateBestSetup(settingsFor('balanced'), new Set(), new Set(['yield-keeper']))).toBeNull();
+      hiredRoster = [{ persona_id: 'momentum-scout', name: 'Momentum Scout' }];
+      const mine = await evaluateBestSetup(settingsFor('balanced'), new Set(), new Set(['momentum-scout']));
+      expect(mine?.persona).toBe('momentum-scout');
     });
   });
 });
