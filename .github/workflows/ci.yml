@@ -122,7 +122,7 @@ jobs:
           # X Layer's public RPC rate-limits shared runner IPs; a fork that stalls on its upstream left a deploy waiting on a
           # receipt until it timed out. Retry with backoff, throttle what anvil asks, and give each upstream call time.
           nohup anvil --fork-url "$XLAYER_RPC" --chain-id 196 --port 8545 --silent \
-            --retries 10 --fork-retry-backoff 2000 --timeout 60000 --compute-units-per-second 100 > anvil.log 2>&1 &
+            --retries 10 --fork-retry-backoff 2000 --timeout 60000 --compute-units-per-second 200 > anvil.log 2>&1 &
           for i in $(seq 1 90); do
             cast chain-id --rpc-url "$FORK_RPC" >/dev/null 2>&1 && exit 0
             sleep 1
@@ -135,8 +135,11 @@ jobs:
         run: npm run migrate
         working-directory: server
 
+      # A deploy on a fork whose upstream is throttling can stall past its own ten-minute receipt wait (seen
+      # 2026-09-19). The second attempt reads a warm cache and takes seconds, so one retry is the difference
+      # between a red run about X Layer's rate limiter and a red run about this repo.
       - name: Bootstrap the fork (deploy delegation + anchor)
-        run: npm run setup:fork
+        run: npm run setup:fork || (echo "::warning::bootstrap timed out on the rate-limited fork; retrying once" && npm run setup:fork)
         working-directory: server
 
       - name: Prove the loop
