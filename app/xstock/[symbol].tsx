@@ -11,16 +11,18 @@
  * report says "Not reported"; it never becomes a zero, which on this screen would read as a cost
  * that was measured and found to be nothing.
  *
- * The confirm is deliberately not here. `executor/place.ts` is the only path that can spend, and no
- * HTTP route reaches it for an xStock yet — so this screen says what the order would cost and
- * says plainly that it cannot yet be placed from the phone. A button that did nothing would be the
- * worse answer, and a button that pretended would be the worst.
+ * Placing is the order screen's job. On X Layer a wrapped xStock is bought and sold through the same `/orders` and
+ * `/positions/close` path as every other token — the delegation's `spend`/`closePosition`, through Uniswap v3 — so once
+ * the cost is on screen this hands the reviewed order (side and size, kept in the store both screens share) to
+ * `/order/[symbol]`, which carries the idempotency key, the policy's refusals and the fill receipt. One way to place
+ * an order, not two.
  */
 import React, { useMemo } from 'react';
 import { ScrollView, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import {
+  Button,
   CloseButton,
   FailureNote,
   Keypad,
@@ -54,6 +56,7 @@ const FORMAT = { money, quantity, price: fmtPrice };
 export default function XStockTicket() {
   const { symbol = '' } = useLocalSearchParams<{ symbol: string }>();
   const goBack = useGoBack();
+  const router = useRouter();
 
   // The same store the order ticket types into, so moving between the two keeps the amount.
   const orderAmt = useStore((s) => s.orderAmt);
@@ -185,21 +188,15 @@ export default function XStockTicket() {
 
       <Keypad light onPress={pressKey} />
 
-      {/*
-        Said once, plainly, where a CTA would be.
-
-        The executor can spend — `guardAndSpend` does, and the on-chain proofs run through it — but
-        nothing serves that path over HTTP for an equity yet. Offering a button here would promise a
-        thing the app cannot do; leaving the space blank would leave someone waiting for one.
-      */}
-      <Text
-        variant="footnote"
-        color={colors.sheet.muted}
-        align="center"
-        style={{ paddingVertical: space.s14 }}
-      >
-        Costs only. Placing an xStock order from the phone is not wired up yet.
-      </Text>
+      <View style={{ paddingVertical: space.s14 }}>
+        <Button
+          label={amount > 0 ? `Review ${side === 'sell' ? 'sale' : 'order'} · ${money(amount)} of ${symbol}` : 'Enter an amount'}
+          backgroundColor={colors.sheet.ink}
+          color={colors.sheet.bg}
+          disabled={!(amount > 0) || !symbol}
+          onPress={() => router.push(`/order/${symbol}?side=${side}` as never)}
+        />
+      </View>
     </Screen>
   );
 }
