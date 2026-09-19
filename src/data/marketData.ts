@@ -262,6 +262,7 @@ export function foldWindow(raw: readonly Bar[], count = CANDLE_COUNT): Bar[] {
 
 /** The feed's rows for a symbol, or null when nothing on this server prices it. */
 async function fetchRows(symbol: string, days: number): Promise<OhlcRow[] | null> {
+  if (isStockSymbol(symbol)) return fetchObservedRows(symbol, days);
   const priced = await pricedSymbols();
   if (priced.size > 0 && !priced.has(symbol)) return null;
   const { rows } = await getJson<{ rows: OhlcRow[] }>(
@@ -269,6 +270,25 @@ async function fetchRows(symbol: string, days: number): Promise<OhlcRow[] | null
     60_000,
   );
   return rows;
+}
+
+/**
+ * A wrapped xStock's rows: the prices this deployment recorded for it (`/market/stocks/history`), each reading a row
+ * whose open, high, low and close are that one price.
+ *
+ * No market-data feed carries these tokens, so `/market/ohlc` answers `no_feed` for every one, and the asset screen
+ * said "No chart yet." under a live price — for the assets this product is about — while the executor held a
+ * thousand readings of each. A reading is a real quote of the pool a fill would use; nothing between them is drawn.
+ * An empty history is `[]`, which the screen shows as no chart yet — true then.
+ */
+async function fetchObservedRows(symbol: string, days: number): Promise<OhlcRow[]> {
+  const { points } = await getJson<{ points: { at: number; usd: number }[] }>(
+    `/market/stocks/history?symbol=${encodeURIComponent(symbol)}&hours=${Math.round(days * 24)}`,
+    60_000,
+  );
+  return points
+    .filter((p) => Number.isFinite(p.at) && Number.isFinite(p.usd) && p.usd > 0)
+    .map((p) => [p.at, p.usd, p.usd, p.usd, p.usd] as const);
 }
 
 const toBar = (r: OhlcRow): Bar => [r[1], r[2], r[3], r[4]];

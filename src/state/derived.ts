@@ -704,6 +704,27 @@ export const RANGE_WINDOW_LABEL: Record<string, string> = {
   All: 'all time',
 };
 
+const RANGE_MS: Record<string, number> = { '1D': 86_400_000, '1W': 7 * 86_400_000, '1M': 30 * 86_400_000, '1Y': 365 * 86_400_000 };
+
+/**
+ * The window a change was really measured over, when the history is shorter than the pill.
+ *
+ * A wrapped xStock's chart is the prices this deployment recorded, which begin when it first priced the token — so a
+ * 1Y pill over two days of readings would read "up 0.9% past year", a claim about a year nobody saw. When the first
+ * candle starts more than a tenth of the window after the window opens, the label says when it really starts.
+ */
+export function coveredLabel(
+  range: string,
+  label: string,
+  firstStartMs: number | undefined,
+  since: (ms: number) => string,
+  now: number = Date.now(),
+): string {
+  const windowMs = RANGE_MS[range];
+  if (firstStartMs === undefined || windowMs === undefined || !Number.isFinite(firstStartMs)) return label;
+  return firstStartMs - (now - windowMs) > windowMs * 0.1 ? `since ${since(firstStartMs)}` : label;
+}
+
 export function rangeChange(
   range: string,
   seriesPct: number,

@@ -132,6 +132,7 @@ describe('what each pill and range asks the executor for', () => {
     clearMarketDataCache();
     resetPricedSymbols();
     asked = [];
+    observed = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       asked.push(url);
@@ -139,12 +140,15 @@ describe('what each pill and range asks the executor for', () => {
         ? ['BTC', 'XBTC']
         : url.includes('/market/ohlc')
           ? { rows: feedRows(url) }
-          : {};
+          : url.includes('/market/stocks/history')
+            ? { points: observed }
+            : {};
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     });
   });
   afterEach(() => vi.restoreAllMocks());
 
+  let observed: { at: number; usd: number }[] = [];
   const ohlcDays = () =>
     asked.filter((u) => u.includes('/market/ohlc')).map((u) => Number(new URL(u).searchParams.get('days')));
 
@@ -182,8 +186,27 @@ describe('what each pill and range asks the executor for', () => {
 
   it('asks no history for a symbol nothing prices, and says so with null', async () => {
     expect(await fetchHistory('IWM', '1M')).toBeNull();
-    expect(await fetchChartCandles('NVDAx', '1H')).toBeNull();
     expect(ohlcDays()).toEqual([]);
+  });
+
+  it("draws a wrapped xStock from the prices this deployment recorded, over the window's hours — never the feed", async () => {
+    const t0 = Date.UTC(2026, 8, 19, 10);
+    observed = Array.from({ length: 24 }, (_, i) => ({ at: t0 + i * 5 * MIN, usd: 220 + i / 10 }));
+    const week = await fetchHistory('NVDAx', '1W');
+    expect(ohlcDays()).toEqual([]);
+    const hist = asked.filter((u) => u.includes('/market/stocks/history'));
+    expect(hist).toHaveLength(1);
+    expect(new URL(hist[0]!).searchParams.get('symbol')).toBe('NVDAx');
+    expect(new URL(hist[0]!).searchParams.get('hours')).toBe('168');
+    // Twenty-four readings, two to a candle: each opens on its first reading and closes on its last.
+    expect(week).toHaveLength(12);
+    expect(week![0]![0]).toBeCloseTo(220, 9);
+    expect(week!.at(-1)![3]).toBeCloseTo(222.3, 9);
+  });
+
+  it('answers an xStock with no readings yet with no candles, not with a line', async () => {
+    observed = [];
+    expect(await fetchHistory('NVDAx', '1M')).toEqual([]);
   });
 
   it('knows a tokenized share by its suffix, and nothing else as one', () => {

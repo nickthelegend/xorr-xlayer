@@ -39,7 +39,7 @@ describe('three answers, not one', () => {
   });
 
   it('answers a symbol nothing prices as unavailable, without asking for its history', async () => {
-    expect(await historySeries('SPYx', '1W')).toEqual({ symbol: 'SPYx', window: '1W', bars: [], feed: 'unavailable' });
+    expect(await historySeries('IWM', '1W')).toEqual({ symbol: 'IWM', window: '1W', bars: [], feed: 'unavailable' });
   });
 
   it('throws a failed read instead of calling it no feed', async () => {

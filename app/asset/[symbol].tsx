@@ -64,7 +64,7 @@ import { fetchTimedHistory, fillsKnownFrom, fillsOf, type HistoryRange } from '@
 import { system } from '@/data/system';
 import { useAsync } from '@/data/useAsync';
 import { useLogo } from '@/data/useLogos';
-import { rangeChange } from '@/state/derived';
+import { coveredLabel, rangeChange } from '@/state/derived';
 import { settlementSymbol } from '@/data/tradable';
 import { useSettleable } from '@/data/useSettleable';
 import { chartFillsNote, listedFills } from '@/markets/chartFills';
@@ -180,7 +180,10 @@ export default function AssetDetail() {
    * deriving it a second way from the candles is what made one asset show 2.1% here and 2.55%
    * there at the same moment.
    */
-  const { pct: changePct, label: changeLabel } = rangeChange(range, seriesPct, quote?.change24h);
+  const { pct: changePct, label: rangeLabel } = rangeChange(range, seriesPct, quote?.change24h);
+  // The 1D figure is the quote's own 24h change where there is one; otherwise it is the series, over what it covers.
+  const changeLabel =
+    range === '1D' && quote?.change24h !== undefined ? rangeLabel : coveredLabel(range, rangeLabel, spans[0]?.start, (ms) => when(ms));
   const up = changePct >= 0;
   // The line keeps the colour of the range it draws, the kept one included.
   const lineUp = drawn ? rangeChange(drawn.range, seriesPct, quote?.change24h).pct >= 0 : up;

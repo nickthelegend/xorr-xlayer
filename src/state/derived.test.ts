@@ -1112,3 +1112,24 @@ describe('setup progress — FEATURES.md #14', () => {
     expect(fundWith({ data: { total: 0.42 }, error: undefined })).toBe('done');
   });
 });
+
+describe('coveredLabel — a change names the window it really measured', () => {
+  const DAY = 86_400_000;
+  const now = Date.UTC(2026, 8, 20, 12);
+  const since = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+  it('keeps the pill\'s label when the history fills the window', () => {
+    expect(d.coveredLabel('1W', 'past week', now - 7 * DAY, since, now)).toBe('past week');
+    // A candle a little short of the window's edge is the feed's rows, not a missing stretch.
+    expect(d.coveredLabel('1M', 'past month', now - 29 * DAY, since, now)).toBe('past month');
+  });
+
+  it('says when the readings begin when they cover much less than the pill — two days are not a year', () => {
+    expect(d.coveredLabel('1Y', 'past year', now - 2 * DAY, since, now)).toBe('since 2026-09-18');
+    expect(d.coveredLabel('1W', 'past week', now - 2 * DAY, since, now)).toBe('since 2026-09-18');
+  });
+
+  it('keeps the label when there is nothing drawn to date it by', () => {
+    expect(d.coveredLabel('1Y', 'past year', undefined, since, now)).toBe('past year');
+  });
+});
