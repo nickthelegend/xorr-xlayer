@@ -141,6 +141,31 @@ function proposalRecord(): Record<string, unknown> | undefined {
   return insert ? JSON.parse(String((insert[1] as unknown[])[3])) : undefined;
 }
 
+/** A setup handed in by the caller, as `places the setup the caller brought` builds it. */
+const chosenSetup = () => ({
+    symbol: 'AAPLx',
+    stock: { ...STOCKS.AAPLx, address: STOCKS.AAPLx.address as `0x${string}`, raw: STOCKS.AAPLx.raw as `0x${string}`, sector: 'Technology' as const },
+    strategyKind: 'dca' as const,
+    persona: 'yield-keeper' as const,
+    personaName: 'Yield Keeper',
+    score: 72,
+    currentPrice: 190,
+    stopPrice: 174.8,
+    targetPrice: 209,
+    reason: 'Handed in by the caller.',
+    marketCondition: 'Lower band',
+    corporateAction: { multiplier: 1, pending: null, hoursUntil: null },
+    offHoursGuard: {
+      session: 'regular' as const,
+      spreadBps: 0,
+      spreadPct: 0,
+      action: 'normal' as const,
+      suggestedSlippageBps: 50,
+      reason: 'Nasdaq regular hours.',
+    },
+    suggestedSlippageBps: 50,
+  });
+
 describe('autonomous xStocks trading agent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -621,6 +646,38 @@ describe('autonomous xStocks trading agent', () => {
         expect.any(String),
         expect.anything(),
       );
+    });
+
+
+    /*
+     * One entry per symbol (PLAN.md D22): re-entering every cooldown bought TSLAx six times in an hour on the hosted fork.
+     */
+    it('does not enter a symbol the wallet already holds', async () => {
+      ready();
+      queryMock.mockImplementation(async (sql: string) =>
+        String(sql).includes('FROM positions') ? [{ symbol: 'AAPLx' }] : [],
+      );
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25, setup: chosenSetup() });
+      expect(result).toMatchObject({ executed: false, reason: 'already_held' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the holdings cannot be read, rather than risk a second entry', async () => {
+      ready();
+      queryMock.mockImplementation(async (sql: string) => {
+        if (String(sql).includes('FROM positions')) throw new Error('connection terminated');
+        return [];
+      });
+      const result = await runAutonomousCycle('wallet-1', { fixedUsd: 25, setup: chosenSetup() });
+      expect(result).toMatchObject({ executed: false, reason: 'positions_unreadable' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('never scores a held symbol', async () => {
+      ready();
+      queryMock.mockResolvedValue([]);
+      const all = new Set(Object.keys(STOCKS));
+      expect(await evaluateBestSetup(undefined, all)).toBeNull();
     });
 
     /*

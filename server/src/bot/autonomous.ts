@@ -22,6 +22,7 @@
 import { randomUUID } from 'node:crypto';
 import { isAddress, type Address } from 'viem';
 import { one, query } from '../db/index.js';
+import { THIS_CHAIN } from '../db/chain-scope.js';
 import { log } from '../http/request-id.js';
 import { evaluate, type RuleVerdict } from '../rules/engine.js';
 import { XSTOCKS, xStockPriceUsd, type XStockToken } from '../venues/xstocks.js';
@@ -411,10 +412,13 @@ async function corporateActionSignal(stock: XStockToken): Promise<CorporateActio
  */
 export async function evaluateBestSetup(
   settings: RiskSettings = settingsFor(DEFAULT_RISK_PROFILE),
+  /** Symbols the wallet already holds: one entry per symbol (PLAN.md D22), so none of these is a candidate. */
+  held: ReadonlySet<string> = new Set(),
 ): Promise<CandidateSetup | null> {
   const candidates: CandidateSetup[] = [];
 
   for (const stock of Object.values(XSTOCKS)) {
+    if (held.has(stock.symbol)) continue;
     const price = await xStockPriceUsd(stock.symbol).catch(() => null);
     if (!price || price <= 0) continue;
 
@@ -673,8 +677,34 @@ export async function runAutonomousCycle(
     : DEFAULT_RISK_PROFILE;
   const settings = settingsFor(riskProfile);
 
-  // 3. The setup the caller brought, or the best one the current conditions support.
-  const bestSetup = options.setup ?? (await evaluateBestSetup(settings));
+  /*
+   * 3. The setup the caller brought, or the best one the current conditions support — in a symbol the wallet does not
+   *    already hold (PLAN.md D22). An agent that re-entered every cooldown bought TSLAx six times in an hour on the
+   *    hosted fork, each a smaller slice of what the cap had left: one position, entered once, then its exit decides.
+   *    A holding that cannot be read refuses rather than risking a second entry.
+   */
+  let held: Set<string>;
+  try {
+    const rows = await query<{ symbol: string }>(
+      `SELECT symbol FROM positions WHERE wallet_id = $1 AND chain = ${THIS_CHAIN} AND units > 0.000001`,
+      [walletId],
+    );
+    held = new Set(rows.map((r) => r.symbol));
+  } catch (e) {
+    return {
+      executed: false,
+      reason: 'positions_unreadable',
+      detail: `The current holdings could not be read, so nothing was placed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+  if (options.setup && held.has(options.setup.symbol)) {
+    return {
+      executed: false,
+      reason: 'already_held',
+      detail: `${options.setup.symbol} is already held; the agent enters a symbol once and lets its exit decide.`,
+    };
+  }
+  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held));
   if (!bestSetup) {
     return {
       executed: false,

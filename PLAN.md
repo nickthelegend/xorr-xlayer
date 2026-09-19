@@ -326,6 +326,8 @@ Measured against §1.2 and the judging table in §1.3, counting only what was **
 
 **INITIAL COMPLETION (this audit): P0 10/17 = 59%; all items 11/26 = 42%.**
 
+**D22 (owner, 2026-09-20):** one autonomous entry per symbol — an agent never opens a new entry in a symbol the wallet already holds; that position's exit decides, and the agent moves to the next-best setup.
+
 **D21 (owner, 2026-09-19):** the phone clip is recorded on the **iOS simulator** running the native app against the X Layer fork executor.
 
 ### Phase 6 — close the verified gaps
