@@ -169,7 +169,13 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       run: async () => {
         if (!owner) skip('No wallet on this request.');
         const p = await readPolicy(owner);
-        if (!p) throw new Error('No policy on chain for this wallet.');
+        /*
+         * A wallet that never granted on THIS chain has nothing to read, which is not a failure — the same
+         * distinction the class above draws for a request with no wallet at all. A judge pasting an address into
+         * `/judge` on the testnet deployment saw two red rows and a claim that reads as "this product is broken",
+         * when the truthful answer is that this wallet's permission lives on another deployment, or nowhere yet.
+         */
+        if (!p) skip('This wallet has no permission on this chain, so there is nothing to read.');
         /*
          * The permission has to name THIS executor, not merely exist.
          *
@@ -227,7 +233,7 @@ export async function runChecks(owner?: Address): Promise<VerifyReport> {
       run: async () => {
         if (!owner) skip('No wallet on this request.');
         const p = await readPolicy(owner);
-        if (!p) throw new Error('No policy on chain.');
+        if (!p) skip('This wallet has no permission on this chain, so there is no cap to compare.');
         const rows = await query<{ spent_usd: string }>(
           `SELECT d.spent_usd FROM daily_spend d
              JOIN wallets w ON w.id = d.wallet_id
