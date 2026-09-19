@@ -95,3 +95,23 @@ describe('the amount itself, before any balance', () => {
     });
   });
 });
+
+describe('the day\'s allowance', () => {
+  it('refuses a buy over what the permission allows today, and names the amount left', () => {
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 250, cashUsd: 1_000, held: 0, remainingTodayUsd: 100 })).toEqual({
+      state: 'refused',
+      reason: 'Your permission allows $100.00 more today.',
+    });
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 100, cashUsd: 1_000, held: 0, remainingTodayUsd: 100 }).state).toBe('ok');
+  });
+  it('says the day is spent when nothing is left, and never blocks a sale on it', () => {
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 10, cashUsd: 1_000, held: 0, remainingTodayUsd: 0 })).toEqual({
+      state: 'refused',
+      reason: 'Your permission has nothing left to spend today. It resets at midnight UTC.',
+    });
+    expect(ticketLimit({ side: 'sell', symbol: 'TSLAx', amountUsd: 10, cashUsd: 1_000, held: 50, remainingTodayUsd: 0 }).state).toBe('ok');
+  });
+  it('does not guess while the allowance is unread', () => {
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 250, cashUsd: 1_000, held: 0 }).state).toBe('ok');
+  });
+});

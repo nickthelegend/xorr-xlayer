@@ -70,9 +70,9 @@ import {
   type SetupStepState,
 } from '@/state/derived';
 import type { Address } from 'viem';
-import { pinnedDelegation } from '@/chain';
 import { chainAccess } from '@/wallet/chainAccess';
 import { standingOnChain } from '@/wallet/delegationChain';
+import { contractToRead } from '@/wallet/contractToRead';
 import { killSwitchChip } from '@/state/killSwitch';
 import { KillSwitchChip } from '@/ui/KillSwitchChip';
 import { TradingTicker } from '@/ui/TradingTicker';
@@ -354,7 +354,9 @@ export default function Home() {
   const standing = useAsync<SetupStanding>(async () => {
     const owner = wallet?.address as Address | undefined;
     if (!owner) return 'none';
-    return (await standingOnChain(chainAccess, owner, pinnedDelegation, Date.now())).kind;
+    const contract = await contractToRead();
+    if (contract === 'unreadable') return 'unreadable';
+    return (await standingOnChain(chainAccess, owner, contract, Date.now())).kind;
   }, [wallet?.address]);
   /* The trade step is a fill the executor recorded, not a strategy somebody created. */
   const recordedRuns = useAsync(() => system.runs(50), []);

@@ -38,6 +38,7 @@ import { api } from '@/data/api';
 import { unitsFor, usePrice } from '@/data/usePrices';
 import { repos } from '@/data';
 import { useAsync } from '@/data/useAsync';
+import { system } from '@/data/system';
 import { useIntentKeys } from '@/data/useIntentKeys';
 import { useDebounced } from '@/data/useDebounced';
 import { useStore } from '@/state/store';
@@ -122,6 +123,8 @@ export default function OrderTicket() {
    * actually be spent, and it is the one the home screen's "Available to trade" row already uses.
    */
   const balanceRead = useAsync(() => repos.portfolio.balance(), []);
+  // What the permission allows today: a buy over it is refused on chain, so it is refused here first.
+  const limitsRead = useAsync(() => system.limits(), []);
   const signedOut = useSignedOut();
   const availableUsd = balanceRead.data?.cash;
   // A cash read that failed, for someone signed in. Max stays off without the number, and that should not be a mystery.
@@ -191,6 +194,7 @@ export default function OrderTicket() {
     symbol,
     amountUsd: amount,
     cashUsd: availableUsd,
+    remainingTodayUsd: limitsRead.data?.granted === false ? undefined : limitsRead.data?.remainingUsd,
     held: heldRead,
     text: orderAmt,
   });

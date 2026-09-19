@@ -55,12 +55,12 @@ import { useStore } from '@/state/store';
 import { delegationOrUnknown, delegationScope } from '@/accounts/delegationScope';
 import { readDelegationIntoStore } from '@/wallet/readDelegation';
 import { useNow } from '@/state/useNow';
-import { pinnedDelegation } from '@/chain';
 import { useAllowlist } from '@/wallet/allowlist';
 import { useApprovals, type ApprovalsView } from '@/wallet/useApprovals';
 import { planResume, type GrantOptions } from '@/wallet/grantPlan';
 import { chainAccess } from '@/wallet/chainAccess';
 import { standingOnChain, type ChainStanding } from '@/wallet/delegationChain';
+import { contractToRead } from '@/wallet/contractToRead';
 import { useAuth } from '@/auth/useAuth';
 import { useGrantDelegation } from '@/auth/useGrantDelegation';
 import { repos } from '@/data';
@@ -199,9 +199,15 @@ export default function Safety() {
     if (delegationError === undefined || !owner) return;
     let alive = true;
     const after = delegationError;
-    void standingOnChain(chainAccess, owner, pinnedDelegation, Date.now()).then((standing) => {
-      if (alive) setChainRead({ after, owner, standing });
-    });
+    void contractToRead()
+      .then((contract) =>
+        contract === 'unreadable'
+          ? ({ kind: 'unreadable' } as ChainStanding)
+          : standingOnChain(chainAccess, owner, contract, Date.now()),
+      )
+      .then((standing) => {
+        if (alive) setChainRead({ after, owner, standing });
+      });
     return () => {
       alive = false;
     };

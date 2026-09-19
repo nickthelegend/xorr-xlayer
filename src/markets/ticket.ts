@@ -29,6 +29,12 @@ export function ticketLimit(input: {
   amountUsd: number;
   /** Spendable cash, once read. */
   cashUsd: number | undefined;
+  /**
+   * What the permission allows today (`/limits` remainingUsd), once read. A buy over it is refused by the contract
+   * (`DailyCapExceeded`); saying so on the ticket beats a green button the chain will turn down. Undefined is unread,
+   * and the executor still enforces the cap either way.
+   */
+  remainingTodayUsd?: number;
   /** What the position is worth — 0 when there is none — or where the read of it stands. */
   held: number | 'loading' | 'unread';
   /** The field exactly as typed, where the caller has it: `0.001` and `0.00` are not the same state. */
@@ -47,9 +53,18 @@ export function ticketLimit(input: {
       available:
         cashUsd === undefined ? undefined : { usd: cashUsd, reason: (usd) => `You have ${money(usd)}.` },
     });
-    return amount.state === 'refused'
-      ? { state: 'refused', reason: amount.reason, code: amount.code }
-      : { state: 'ok' };
+    if (amount.state === 'refused') return { state: 'refused', reason: amount.reason, code: amount.code };
+    const left = input.remainingTodayUsd;
+    if (left !== undefined && amountUsd > left + 1e-9) {
+      return {
+        state: 'refused',
+        reason:
+          left < 0.01
+            ? 'Your permission has nothing left to spend today. It resets at midnight UTC.'
+            : `Your permission allows ${money(left)} more today.`,
+      };
+    }
+    return { state: 'ok' };
   }
 
   // A sale's ceiling is the position, so the holding has to be read before the amount can be judged at all.
