@@ -194,7 +194,7 @@ routes.post('/wallet/create', async (c) => {
     walletId: row.id,
     agent: 'xorr',
     action: 'Wallet connected',
-    detail: `Your keys, held by you. ${CHAIN_KEY}.`,
+    detail: `Your keys, held by you, on ${networkName(CHAIN_KEY)}.`,
     kind: 'risk',
   });
 
@@ -287,7 +287,7 @@ routes.post('/wallet/connect', async (c) => {
       walletId: row.id,
       agent: 'xorr',
       action: 'Wallet connected',
-      detail: `Your keys, held by you. ${CHAIN_KEY}.`,
+      detail: `Your keys, held by you, on ${networkName(CHAIN_KEY)}.`,
       kind: 'risk',
     }).catch(() => undefined);
 

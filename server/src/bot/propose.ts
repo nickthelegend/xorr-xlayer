@@ -23,6 +23,8 @@ import { speak } from './llm.js';
 import { TONE_INSTRUCTIONS, type ToneId } from './tone.js';
 import { readPolicy } from '../evm/delegation.js';
 import { SETTLEMENT_SYMBOL } from '../venues/tokens.js';
+import { observedRange } from './observed-range.js';
+import { DEFAULT_RISK_PROFILE, isRiskProfile, settingsFor } from './risk-profile.js';
 import type { Address } from 'viem';
 
 /**
@@ -99,10 +101,17 @@ const money = (n: number) =>
  */
 const RANGE_TTL_MS = 6 * 60 * 60_000;
 
-/** Recent daily range for the symbol — the reference a breakout is measured against. */
-async function range(symbol: string): Promise<{ high: number; low: number } | null> {
+/**
+ * Recent range for the symbol — the reference a breakout is measured against.
+ *
+ * CoinGecko's daily history where it has the asset. The wrapped xStocks it does not list, and this returned null for
+ * every one of them, so a wallet whose strategy was TSLAx was told "No live market for TSLAx." on every visit to the
+ * Bot tab while the same executor was quoting and filling TSLAx. Those read the band this app has recorded — the one
+ * the autonomous agent trades on.
+ */
+async function range(symbol: string, minObservations: number): Promise<{ high: number; low: number } | null> {
   const id = IDS[symbol];
-  if (!id) return null;
+  if (!id) return observedRange(symbol, minObservations);
   const rows = await getJson<[number, number, number, number, number][]>(
     `${COINGECKO}/coins/${id}/ohlc?vs_currency=usd&days=30`,
     RANGE_TTL_MS,
@@ -141,8 +150,8 @@ export async function propose(walletId: string, tone: ToneId = 'dry'): Promise<P
    *
    * `readPolicy` is what `/orders`, `/strategies` and `run.ts` already use.
    */
-  const wallet = await one<{ address: string; agents_stopped?: boolean }>(
-    `SELECT address, agents_stopped FROM wallets WHERE id = $1`,
+  const wallet = await one<{ address: string; agents_stopped?: boolean; risk_profile?: string | null }>(
+    `SELECT address, agents_stopped, risk_profile FROM wallets WHERE id = $1`,
     [walletId],
   );
   const ownerAddress = wallet?.address as Address | undefined;
@@ -200,9 +209,21 @@ export async function propose(walletId: string, tone: ToneId = 'dry'): Promise<P
     };
   }
 
-  const [price, band] = await Promise.all([priceOf(symbol).catch(() => 0), range(symbol)]);
-  if (!price || !band) {
+  const profile = isRiskProfile(wallet?.risk_profile) ? wallet.risk_profile : DEFAULT_RISK_PROFILE;
+  const [price, band] = await Promise.all([
+    priceOf(symbol).catch(() => 0),
+    range(symbol, settingsFor(profile).minObservations),
+  ]);
+  if (!price) {
     return { created: false, reason: 'no_market_data', detail: `No live market for ${symbol}.` };
+  }
+  if (!band) {
+    // A live price with too little history to draw a band against is not "no market" — it is not enough seen yet.
+    return {
+      created: false,
+      reason: 'no_market_data',
+      detail: `${symbol} is trading, but I have not seen enough of its price yet to judge a range.`,
+    };
   }
 
   // Size it at a quarter of the remaining daily cap, so a proposal can never be the whole budget.

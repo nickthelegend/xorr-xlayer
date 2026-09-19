@@ -58,10 +58,10 @@ const ROUTES = [
   ['20-order-stock', '/order/NVDAx'],
   ['21-swap', '/swap'],
   ['22-perp', '/perp/BTC'],
-  // A REAL position id, so these two screens are shot in their loaded state rather than their
-  // empty one. Override with QA_POSITION_ID when the database is reseeded.
-  ['23-position', `/position/${process.env.QA_POSITION_ID ?? '50ec6e5f-54d6-45c1-a1e5-cfd15c134b29'}`],
-  ['24-auto-close', `/auto-close/${process.env.QA_POSITION_ID ?? '50ec6e5f-54d6-45c1-a1e5-cfd15c134b29'}`],
+  // The signed-in account's own open position, read at runtime (`resolveIds`), so these two are shot loaded. A
+  // hardcoded id belonged to another database and shot both as not-found. QA_POSITION_ID still overrides.
+  ['23-position', 'POSITION:/position/{id}'],
+  ['24-auto-close', 'POSITION:/auto-close/{id}'],
   ['25-bot', '/bot'],
   ['26-bot-roster', '/bot/roster'],
   ['27-bot-leaderboard', '/bot/leaderboard'],
@@ -234,7 +234,12 @@ const EXPECT = {
    * that the agent answered TODAY — a proposal or a decline, either is the product — so this
    * asserts the persona and a message under today's divider instead of guessing the wording.
    */
-  '25-bot': { must: [/Momentum Scout|Value Hunter|Range Keeper|Risk Warden/, /Today/] },
+  // The Messages inbox: every agent with its latest line. "Today" was the chat's greeting, which this screen no longer
+  // opens on. TSLAx is quoted and filled here, so an agent saying it has no market for it is a defect (propose.ts).
+  '25-bot': {
+    must: [/Momentum Scout/, /Earnings Desk/, /Yield Keeper/, /Drawdown Guard/],
+    never: [/No live market for (TSLAx|NVDAx|AAPLx|SPYx|QQQx)/],
+  },
   '26-bot-roster': { must: [/Momentum Scout/] },
   '27-bot-leaderboard': { must: [/Momentum Scout|Leaderboard|leaderboard/] },
   // Whichever agent the id names — and never a different one silently substituted.
@@ -573,11 +578,14 @@ const resolveIds = async () => {
     const token = execFileSync('npx', ['tsx', 'server/src/e2e-token.ts', email], {
       encoding: 'utf8',
     }).trim();
-    const res = await fetch(`${API}/agents`, { headers: { authorization: `Bearer ${token}` } });
+    const auth = { headers: { authorization: `Bearer ${token}` } };
+    const res = await fetch(`${API}/agents`, auth);
     const agents = res.ok ? await res.json() : [];
-    return { agentId: agents[0]?.id };
+    const pos = await fetch(`${API}/positions`, auth);
+    const positions = pos.ok ? await pos.json() : [];
+    return { agentId: agents[0]?.id, positionId: process.env.QA_POSITION_ID ?? positions[0]?.id };
   } catch {
-    return { agentId: undefined };
+    return { agentId: undefined, positionId: process.env.QA_POSITION_ID };
   }
 };
 
@@ -676,15 +684,18 @@ const main = async () => {
     if (r.status() >= 400 && r.status() !== 503 && !/^https:\/\/app\.hyperliquid\.xyz\/coins\//.test(r.url())) netFail.push(`${r.status()} ${r.url().slice(0, 110)}`);
   });
 
-  const { agentId } = await resolveIds();
+  const { agentId, positionId } = await resolveIds();
   console.log(agentId ? `agent ${agentId}` : 'no agents on this account — agent screens will show not-found');
+  console.log(positionId ? `position ${positionId}` : 'no open position on this account — position screens will show not-found');
 
   const report = [];
   for (const [stem, template] of ROUTES) {
     // `AGENT:` routes are filled in from this account's own roster.
     const route = template.startsWith('AGENT:')
       ? template.slice('AGENT:'.length).replace('{id}', agentId ?? 'none')
-      : template;
+      : template.startsWith('POSITION:')
+        ? template.slice('POSITION:'.length).replace('{id}', positionId ?? 'none')
+        : template;
     errors.length = 0;
     netFail.length = 0;
     await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 45_000 }).catch(() => {});
