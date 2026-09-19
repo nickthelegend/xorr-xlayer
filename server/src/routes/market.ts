@@ -609,7 +609,15 @@ async function probeStocks(): Promise<unknown[]> {
   const rows = await Promise.all(
     Object.values(STOCKS).map(async (s) => {
       try {
-        const q = await quote({ inSymbol: 'USDC', outSymbol: s.symbol, amount: STOCK_PROBE_USD });
+        /*
+         * The MARKET's price, not the fork's copy of it (`venues/uniswap.ts`, `venues/stocks.ts`).
+         *
+         * This is the number every stock screen puts in its hero and every market row shows. Quoted against the fork,
+         * it froze at the block the fork was taken from: NVDAx read $220.17 here while the same deployment's recorded
+         * history — and its agent — had it at $222.52, so the headline disagreed with the chart underneath it. A fill
+         * still quotes the chain it settles on; a price quotes the market.
+         */
+        const q = await quote({ inSymbol: 'USDC', outSymbol: s.symbol, amount: STOCK_PROBE_USD, market: true });
         if (!(q.outAmount > 0)) throw new Error('no route');
         return {
           symbol: s.symbol,
