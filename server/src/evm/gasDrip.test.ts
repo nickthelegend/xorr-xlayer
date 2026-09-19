@@ -116,12 +116,25 @@ describe('dripGasIfNeeded', () => {
     expect(order).toEqual(['recorded', 'send']);
   });
 
-  it("sends nothing on X Layer mainnet's state — a fork of it included — though the faucet could pay", async () => {
+  it('sends nothing on a fork of X Layer mainnet, and says where its gas comes from — not that it is real', async () => {
     process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
     balances(0n, parseEther('0.05'));
     h.chain = 'xlayer-fork';
     h.baseState = true;
-    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({ sent: false, reason: 'refusing to send real OKB on xlayer-fork' });
+    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({
+      sent: false,
+      reason: 'on a fork of X Layer mainnet gas comes with the test USDC on Deposit',
+    });
+    expect(getBalance).not.toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing on X Layer mainnet's state under a key it does not know, though the faucet could pay", async () => {
+    process.env.FAUCET_PRIVATE_KEY = FAUCET_KEY;
+    balances(0n, parseEther('0.05'));
+    h.chain = 'some-mainnet';
+    h.baseState = true;
+    expect(await dripGasIfNeeded(NEW_WALLET)).toEqual({ sent: false, reason: 'refusing to send real OKB on some-mainnet' });
     expect(getBalance).not.toHaveBeenCalled();
     expect(sendTransaction).not.toHaveBeenCalled();
   });

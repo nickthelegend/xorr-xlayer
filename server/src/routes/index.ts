@@ -36,6 +36,7 @@ import { backingDetail } from '../venues/backing-detail.js';
 import { dividendYield } from '../venues/dividend-yield.js';
 import { XSTOCKS, xStockKey } from '../venues/xstocks.js';
 import { ADDRESSES, APPROVABLE_TOKENS, CHAIN_KEY, IS_MAINNET_STATE, OKX_DEX_APPROVE_SPENDER, SETTLEMENT_VENUES, explorerTx } from '../evm/chains.js';
+import { networkName } from '../evm/money.js';
 import { allowanceView, chainAllowance, routerAllowance, routerSpender } from '../evm/allowances.js';
 import { delegateAccount } from '../evm/client.js';
 import { dripGasIfNeeded } from '../evm/gasDrip.js';
@@ -217,9 +218,9 @@ routes.post('/wallet/create', async (c) => {
   await append({
     walletId: row.id,
     agent: 'xorr',
-    action: drip.sent ? `Sent ${drip.amountEth} test ETH for gas` : 'No gas sent',
+    action: drip.sent ? `Sent ${drip.amountEth} test OKB for gas` : 'No gas sent',
     detail: drip.sent
-      ? `${CHAIN_KEY} test ETH, so you can sign the permission. It has no value and buys nothing.`
+      ? `${networkName(CHAIN_KEY)} test OKB, so you can sign the permission. It has no value and buys nothing.`
       : `Not sent — ${drip.reason}.`,
     kind: 'risk',
     payload: drip.sent ? { hash: drip.hash } : { reason: drip.reason },
@@ -310,9 +311,9 @@ routes.post('/wallet/connect', async (c) => {
     await append({
       walletId: row.id,
       agent: 'xorr',
-      action: drip.sent ? `Sent ${drip.amountEth} test ETH for gas` : 'No gas sent',
+      action: drip.sent ? `Sent ${drip.amountEth} test OKB for gas` : 'No gas sent',
       detail: drip.sent
-        ? `${CHAIN_KEY} test ETH, so you can sign the permission. It has no value and buys nothing.`
+        ? `${networkName(CHAIN_KEY)} test OKB, so you can sign the permission. It has no value and buys nothing.`
         : `Not sent — ${drip.reason}.`,
       kind: 'risk',
       payload: drip.sent ? { hash: drip.hash } : { reason: drip.reason },

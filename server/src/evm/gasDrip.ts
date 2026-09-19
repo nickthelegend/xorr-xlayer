@@ -33,7 +33,7 @@ import { createWalletClient, formatEther, http, parseEther, type Address, type H
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import { publicClient } from './client.js';
 import { IS_MAINNET_STATE, CHAIN_KEY, chain, rpcUrl } from './chains.js';
-import { moneyOn } from './money.js';
+import { moneyOn, networkName } from './money.js';
 import { markBroadcast } from '../http/request-id.js';
 
 /** Enough for the approvals and the grant on an L2, and not a penny of use beyond that. */
@@ -56,6 +56,13 @@ export async function dripGasIfNeeded(to: Address): Promise<DripResult> {
    * Never on Base's own state, and never on a chain whose money is real (`evm/money.ts`). Only the first was here, so a
    * mainnet under any other key, with a faucet key set, would have been sent real OKB from that key.
    */
+  /*
+   * A copy of mainnet holds no real OKB, but a drip there would still sign from a key against mainnet's state, and the
+   * copy has its own way to gas: the faucet sets the balance (`evm/faucet.ts`). Saying "real OKB" there was untrue.
+   */
+  if (moneyOn(CHAIN_KEY) === 'copy') {
+    return { sent: false, reason: `on ${networkName(CHAIN_KEY)} gas comes with the test USDC on Deposit` };
+  }
   if (IS_MAINNET_STATE || moneyOn(CHAIN_KEY) === 'real') {
     return { sent: false, reason: `refusing to send real OKB on ${CHAIN_KEY}` };
   }

@@ -48,7 +48,7 @@ async function registrationRows(ask: Caller): Promise<number> {
   const rows = (Array.isArray(body) ? body : ((body as { entries?: unknown[] } | null)?.entries ?? [])) as {
     action?: string;
   }[];
-  return rows.filter((r) => r.action === 'Wallet connected' || /test ETH for gas|^No gas sent$/.test(r.action ?? ''))
+  return rows.filter((r) => r.action === 'Wallet connected' || /test (ETH|OKB) for gas|^No gas sent$/.test(r.action ?? ''))
     .length;
 }
 

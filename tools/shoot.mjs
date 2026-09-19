@@ -608,6 +608,24 @@ const waitForWarm = async () => {
   return false;
 };
 
+/**
+ * What a person reads on the screen: the visible text, then every accessible name. `innerText` alone missed the
+ * welcome's XORR. wordmark (an image, named by its label) and Home's balance (a RollingNumber, one element per
+ * character, named whole by its label) — both on screen, both reported missing.
+ */
+async function readScreen(page) {
+  const text = await page.innerText('body').catch(() => '');
+  const names = await page
+    .evaluate(() =>
+      [...document.querySelectorAll('[aria-label], img[alt]')]
+        .map((el) => el.getAttribute('aria-label') ?? el.getAttribute('alt') ?? '')
+        .filter(Boolean)
+        .join('\n'),
+    )
+    .catch(() => '');
+  return names ? `${text}\n${names}` : text;
+}
+
 const main = async () => {
   await fs.mkdir(OUT, { recursive: true });
   await waitForWarm();
@@ -693,10 +711,10 @@ const main = async () => {
      * timeout per screen: a screen that is already settled costs nothing, and a slow one is given
      * until the budget runs out before it is called wrong.
      */
-    let full = await page.innerText('body').catch(() => '');
+    let full = await readScreen(page);
     for (let waited = 0; waited < SETTLE_BUDGET_MS && contentFailures(stem, full).length; waited += 1000) {
       await page.waitForTimeout(1000);
-      full = await page.innerText('body').catch(() => '');
+      full = await readScreen(page);
     }
     await page.screenshot({ path: path.join(OUT, `${stem}.png`) });
     // Privy's own SDK logs two of these from its confirmation modal and balance reader. They are
