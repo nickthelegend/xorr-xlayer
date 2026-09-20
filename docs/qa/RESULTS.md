@@ -222,3 +222,35 @@ Network and console on every item above: no app errors, no failed requests. Two 
 source rather than excused — Coinbase Wallet's "chains are not supported" and its failed HEAD probe (the connector
 cannot serve X Layer, so it is no longer offered), and the React Native shims' "Shims Injected" (web does not load
 them). What remains on a page load is one Privy debug line: `Detected injected providers: Array(0)`.
+
+## The fork was rebuilt, and everything re-verified on it (2026-09-20 00:22–01:00 UTC)
+
+**What happened.** The hosted fork's clock only moved when something was sent, so at 00:00 UTC the day rolled over and
+`remainingToday(owner)` still answered yesterday's spend — a judge opening the live link after midnight would have seen
+a stale cap. Giving the node a block time (`--block-time 12`) fixed that at the root, and restarting it to apply the
+change brought it up on an empty volume: anvil forked X Layer afresh, so the old chain, its contracts and every balance
+on it were gone.
+
+**How it was rebuilt** — in the project's own documented order, nothing improvised:
+
+| Step | Result |
+|---|---|
+| `fork-bootstrap` | XorrDelegation `0xba23ece812dab11f66a39c9d273d40b716ecc93a`, XorrAuditAnchor `0x62d4ae85ad16df82b006173e1c4f158689d14140` |
+| executor variables + redeploy | `/health` up, delegate funded, all dependencies green |
+| `fork-grant` × 2 | both wallets granted $100/day to the hosted delegate `0xB3e9…EC21` |
+| fork USDC | 1,000 USDC to each wallet, from the fork-only reserve |
+| `reconcile:orphans --apply` | 21 runs the new chain never saw taken out of the book; `daily_spend` and every position corrected to match the chain |
+| `deploy:web` | re-pinned to the new delegation, verified in the bundle |
+
+**Re-verified on the rebuilt chain, from scratch:**
+
+| Item | Result |
+|---|---|
+| `/verify` | 20 pass, 0 fail, 0 skip |
+| Tapped buy | "Bought 0.1369 TSLAx", position 0 → 0.136859309 on chain, allowance $100 → $50, `0x5690205e…21cb` |
+| Alerts: double submit, reload, delete | one alert created, listed, removed |
+| USDT0 → USDC in the app | "Converted 8.00 USDT0 to USDC.", 8.0016 → 0 on chain |
+| Kill switch, held | `revoked: true` on chain |
+| Grant, 17 signatures | cap and expiry back on chain |
+| Signed-out state | sign-in prompt, nothing leaked |
+| Fork clock | 4 blocks in 45s, within 5 seconds of real time — the cap will roll over on its own from now on |
