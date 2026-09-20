@@ -182,3 +182,43 @@ Counted only what was observed in this run. "Verified earlier" does not count.
 | OKX Wallet sign-in | PARTIAL | the live modal lists OKX Wallet first; connecting one needs the extension |
 | OKX DEX routing | BLOCKED | no API credentials anywhere |
 | LLM prose explanations | BLOCKED | no `OPENROUTER_API_KEY` anywhere |
+
+## B — browser-driven items, final status (2026-09-20)
+
+| ID | Status | Evidence |
+|---|---|---|
+| B01 | PASS | signed in through the real Privy form; the code field appears and the session holds |
+| B02 | PASS | 0 goals selected → Continue disabled, clicking stays on `/goals` |
+| B03 | PASS | "tesla" → exactly one TSLAx row (was two) |
+| B04 | PASS | `Nothing matches "zzzz".` |
+| B05 | PASS | TSLAx hero $365.38 = the chart's own marker; NVDAx $222.51 likewise (was $220.17 against $222.51) |
+| B06 | PASS | "up 0.1% since Sep 19, 12:21 PM"; a rounded-to-zero change reads "flat" and is not drawn red |
+| B07 | PASS | 1D/1W/1M/1Y redraw; the caption names the window the readings actually cover |
+| B08 | PASS | "Sign in to trade", Max disabled, backspace to $0, no invented fee |
+| B09 | PASS | 0.6877 ≤ 0.6898, both from one quote (the floor used to sit above the estimate) |
+| B10 | PASS | "Your permission allows $4.00 more today." and the button cannot be pressed |
+| B11 | PASS | "Bought 0.1380 TSLAx"; position 0.3201 → 0.4581 on chain; allowance $58 → $8; `0xc062c7…3bc` on Uniswap v3 |
+| B12 | PASS | "Sign in to see a quote" (was "No quote") |
+| B13 | PASS | two clicks → exactly one alert |
+| B14 | PASS | "Enter a symbol and a price", button disabled |
+| B15 | PASS | listed once after a reload |
+| B16 | PASS | 25.0078 USDT0 shown, conversion offered |
+| B17 | PASS | "Converted 5.00 USDT0 to USDC.", 5.0016 → 0 on chain |
+| B18 | PASS | held down → `revoked: true` on chain, signed by the owner |
+| B19 | PASS | 17 signatures, as the screen says; cap and expiry on chain afterwards |
+| B20 | PASS | "USDT0 SUPPLY RATE 3.48%" with the executor's own sentence |
+| B21 | PASS | 20/20 for a granted owner; 0 fail / 5 skip for an address that never granted |
+| B22 | PASS | last price kept, "Can't reach xorr", retry restores, "Back online" |
+| B23 | PASS | sign-in prompt, no placeholder value |
+| B24 | PASS | "No price feed." / "No live NOPE price" / "Not tradable here" |
+| B25 | PASS | "There is nothing here" |
+| B26 | PASS | `/_dev/ui` and `/_dev/boom` both redirect to `/welcome` |
+| B27 | PASS | 420px: no horizontal overflow, tab bar renders, "—" for unpriced |
+| B28 | PASS | the new coin art (1086×1448), no video element, no other chain's mark |
+| B29 | PASS | the wallet that hired nobody was never traded: its only fills say "Placed by you" |
+| B30 | PASS | the wallet that hired Momentum Scout was traded unprompted — GOOGLx $24 at 00:01, AMZNx $18 at 00:11 — and skipped the TSLAx it already held (D22) |
+
+Network and console on every item above: no app errors, no failed requests. Two third-party lines were removed at
+source rather than excused — Coinbase Wallet's "chains are not supported" and its failed HEAD probe (the connector
+cannot serve X Layer, so it is no longer offered), and the React Native shims' "Shims Injected" (web does not load
+them). What remains on a page load is one Privy debug line: `Detected injected providers: Array(0)`.
