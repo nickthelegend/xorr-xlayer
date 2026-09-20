@@ -23,6 +23,7 @@ import { nextRuns } from './schedule.js';
 import { TOKENS as VENUE_TOKENS, canonicalSymbol } from '../venues/tokens.js';
 import { CHAIN_KEY } from '../evm/chains.js';
 import { readPolicy } from '../evm/delegation.js';
+import { usdcRawOf } from './fill-measure.js';
 import type { WalletRow } from '../routes/wallet-context.js';
 
 /** An order's own label. `toLocaleString` so a four-figure order keeps its separator. */
@@ -64,6 +65,28 @@ export async function placeOrder(
   }
   if (policy.expiresAt <= Date.now()) {
     return refuse('delegation_expired', 'The trading permission has expired. Renew it before placing an order.');
+  }
+
+  /*
+   * The money has to be there.
+   *
+   * `spend()` pulls USDC from the owner, so an order for more than the owner holds cannot settle — and without this
+   * the attempt went all the way to the contract, where the simulation came back with ERC20's own words: "The
+   * contract function \"spend\" reverted with the following reason: ERC20: transfer amount exceeds balance", contract
+   * address and calldata included. That string is what the run detail screen shows a person, verbatim and on purpose
+   * (`app/runs/[id].tsx`), and it tells them nothing they can act on. Seen on 2026-09-20 when an agent traded a
+   * wallet whose permission was live before its USDC had arrived.
+   *
+   * A balance that cannot be READ is not a refusal: the chain is the authority on this and an unreadable answer is an
+   * outage, which the contract will catch anyway.
+   */
+  const heldRaw = await usdcRawOf(w.address as Address);
+  if (heldRaw !== undefined && heldRaw < BigInt(Math.ceil(usd * 1e6))) {
+    const held = Number(heldRaw) / 1e6;
+    return refuse(
+      'insufficient_funds',
+      `This wallet holds $${held.toFixed(2)} of USDC, and the order needs $${usd.toFixed(2)}. Add funds, or place a smaller order.`,
+    );
   }
 
   // A one-shot `buy`: no cadence, so `advance()` never reschedules it.
