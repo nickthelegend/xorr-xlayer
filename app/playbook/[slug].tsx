@@ -27,6 +27,7 @@ import { useGoBack } from '@/nav/useGoBack';
 import {
   AreaChart,
   ErrorState,
+  Ring,
   Fill,
   HeaderBar,
   Placeholder,
@@ -53,6 +54,22 @@ const TIER_TONE: Record<StrategyTier, 'up' | 'neutral' | 'warn'> = {
   measured: 'neutral',
   archive: 'warn',
 };
+
+/**
+ * The strategy's own description, when it has one worth showing.
+ *
+ * A hundred of the 313 carry a docstring whose first line is just the slug and a colon — `b200_sess_8:` — and
+ * forty-five carry none at all. Rendering those put a line under the tier that said the name of the thing you
+ * were already looking at. The first line that is neither empty nor the slug again, or nothing.
+ */
+function describe(doc: string, slug: string): string | null {
+  const bare = (t: string) => t.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  for (const line of doc.split('\n')) {
+    const t = line.trim();
+    if (t && bare(t) !== bare(slug)) return t;
+  }
+  return null;
+}
 
 /** A measured number, or a dash. `null` and `undefined` both mean "not measured" and read the same. */
 function fig(v: number | null | undefined, render: (n: number) => string): string {
@@ -208,9 +225,9 @@ export default function StrategyReport() {
               <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s10 }}>
                 {TIER_MEANS[data.tier]}
               </Text>
-              {data.doc ? (
+              {describe(data.doc, data.slug) ? (
                 <Text variant="secondarySm" color={colors.ink55} style={{ marginTop: space.s10 }}>
-                  {data.doc.split('\n')[0]}
+                  {describe(data.doc, data.slug)}
                 </Text>
               ) : null}
             </SheetCard>
@@ -223,6 +240,16 @@ export default function StrategyReport() {
               <Price variant="screenTitle" tone={tone} style={{ marginTop: space.s6 }}>
                 {fig(u.returnPct, (n) => percent(n, { digits: 2 }))}
               </Price>
+              {/*
+                The money beside the percentage. They are the same fact — the book starts every strategy at $100, so
+                a +2.34% return IS $2.34 — and a reader looking for "what did it make" should not have to do the
+                arithmetic to find out. It comes from the structure, which is the one place the costs are all in.
+              */}
+              {data.structure ? (
+                <Price variant="rowPrimary" tone={pnlTone(data.structure.netPnlUsd)} style={{ marginTop: space.s6 }}>
+                  {money(data.structure.netPnlUsd)}
+                </Price>
+              ) : null}
               <Text variant="secondarySm" color={colors.ink55} style={{ marginTop: space.s6 }}>
                 {traded
                   ? `${u.trades} trades it had never seen · ${fig(data.known.returnPct, (n) => percent(n, { digits: 2 }))} on the half it was built from`
@@ -309,6 +336,44 @@ export default function StrategyReport() {
                     tone="down"
                   />
                   <Stat label="Avg bars held" value={fig(data.extremes?.avgBarsInTrade, (n) => ratio(n, 1))} />
+                </View>
+              </SheetCard>
+            ) : null}
+
+            {/*
+              The win rate as a share of the whole, and the split it is a share OF.
+              
+              The ring is white rather than green: a win rate is not a profit. Sixty-one percent of trades won and
+              the strategy can still have lost money, which is exactly why the net sits above it and the two are
+              read together. The bar underneath is the same two numbers at their real proportions, because "61.4%"
+              over 44 trades and over 4,400 are different claims and only the count says which this is.
+            */}
+            {traded && typeof u.wins === 'number' ? (
+              <SheetCard bordered borderRadius={radius.panel} padding={space.s16}>
+                <Text variant="footnote" color={colors.ink55} style={{ marginBottom: space.s12 }}>
+                  WINS AND LOSSES
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s16 }}>
+                  <Ring
+                    fraction={u.trades > 0 ? u.wins / u.trades : undefined}
+                    value={fig(u.winRate, (n) => percent(n, { digits: 1, explicitSign: false }))}
+                    label="Win rate"
+                    accessibilityLabel={`Win rate, ${u.wins} of ${u.trades} trades won`}
+                  />
+                  <View style={{ flex: 1, gap: space.s8 }}>
+                    <View style={{ flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden' }}>
+                      <View style={{ flex: Math.max(u.wins, 0.0001), backgroundColor: colors.up }} />
+                      <View style={{ flex: Math.max(u.trades - u.wins, 0.0001), backgroundColor: colors.down }} />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Price variant="secondarySm" tone="up">
+                        {u.wins} won
+                      </Price>
+                      <Price variant="secondarySm" tone="down">
+                        {u.trades - u.wins} lost
+                      </Price>
+                    </View>
+                  </View>
                 </View>
               </SheetCard>
             ) : null}
