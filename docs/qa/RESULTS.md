@@ -254,3 +254,22 @@ on it were gone.
 | Grant, 17 signatures | cap and expiry back on chain |
 | Signed-out state | sign-in prompt, nothing leaked |
 | Fork clock | 4 blocks in 45s, within 5 seconds of real time — the cap will roll over on its own from now on |
+
+## Final pass on the rebuilt chain (2026-09-20 01:0x UTC)
+
+Everything re-run after the rebuild and after the last fix, against `4e3fab0` / the web build pinned to
+`0xba23ece8…cc93a`:
+
+| Suite | Result |
+|---|---|
+| Screens | **101 / 101**, no console errors, no failed requests |
+| Endpoint contracts | **202 / 202** |
+| Signed-in journeys (`tools/flows.mjs`) | **ALL FLOWS PASSED** — including the refusal branch: "Your permission has nothing left to spend today." with the button disabled |
+| `/verify`, fork | 20 pass, 0 fail, 0 skip (also 20/20 in the browser) |
+| `/verify`, testnet | 13 pass, 0 fail, 7 named skips |
+| Unit + integration | 2,455 passed |
+| Typechecks, lint | clean |
+| CI | green on the last five commits |
+| Agent, hired wallet | GOOGLx $24, then AMZNx $18 — unprompted, inside the cap, never repeating a symbol it holds |
+| Agent, unhired wallet | no trade at all; its only fills read "Placed by you" |
+| Order beyond the wallet | "This wallet holds $908.00 of USDC, and the order needs $999999.00." — refused before signing |
