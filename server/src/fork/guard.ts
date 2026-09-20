@@ -26,7 +26,7 @@ export type NamedTargets = {
  * node, a local database — are not accepted either: an orphan is a transaction THIS node lacks, so the node and the
  * database must both be named on purpose.
  */
-export async function assertBaseFork(env: NamedTargets, rpc: (method: string) => Promise<unknown>): Promise<void> {
+export async function assertXLayerFork(env: NamedTargets, rpc: (method: string) => Promise<unknown>): Promise<void> {
   if (env.XORR_CHAIN !== 'xlayer-fork') {
     throw new Error(
       `XORR_CHAIN=${env.XORR_CHAIN ?? '(unset)'}: this reconciles an xlayer-fork executor only, and refuses every other chain.`,

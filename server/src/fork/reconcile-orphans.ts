@@ -18,8 +18,8 @@
  * fork of X Layer, and any XORR_CHAIN but xlayer-fork.
  */
 import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
-import { assertBaseFork } from './guard.js';
+import { xLayer } from 'viem/chains';
+import { assertXLayerFork } from './guard.js';
 
 // What the command line named, read before the database module — which loads a `.env` — is.
 const named = {
@@ -44,12 +44,18 @@ async function rpc(method: string): Promise<unknown> {
   return res.result;
 }
 
-await assertBaseFork(named, rpc);
+await assertXLayerFork(named, rpc);
 
 // Loaded only now. A `.env` read here cannot change what was checked above: it never overrides a variable already set.
 const { reconcile } = await import('./orphans.js');
 const { pool } = await import('../db/index.js');
-const chain = createPublicClient({ chain: base, transport: http(node) });
+/*
+ * X Layer, not Base. The guard above has just proved the node is chain 196; this client then declared 8453 to viem.
+ * Reads survived it — an explicit transport does not consult `chain.id` — but everything viem derives from the chain
+ * (its id, its multicall address, its formatters) was another network's, on a tool whose whole job is deciding whether
+ * a transaction is really absent from THIS one. A leftover from before the X Layer migration.
+ */
+const chain = createPublicClient({ chain: xLayer, transport: http(node) });
 const client = await pool.connect();
 try {
   await reconcile({ client, chain, apply, walletId, out: (line) => console.log(line) });
