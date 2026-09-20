@@ -219,6 +219,41 @@ async function main() {
     seen.quiet('tapped buy');
   }
 
+  /*
+   * The same ask after a reload, which is what somebody does when a request looks stuck.
+   *
+   * The key an attempt holds is written down (`src/data/heldKeys.ts`), so the repeat carries it and the executor
+   * answers with what it already did. Without that this bought twice: measured on 2026-09-20, two fills and $20 gone
+   * for one thing asked for once.
+   */
+  if (process.env.FLOWS_SIGN === '1' && (await apiGet('/limits', bearer)).remainingUsd >= 10) {
+    console.log('\n1c. reload mid-order, then ask again');
+    seen.clear();
+    const filledBefore = ((await apiGet('/runs?limit=50', bearer)) ?? []).filter((r) => r.status === 'filled').length;
+    const spentBefore = (await apiGet('/limits', bearer)).remainingUsd;
+    const keyIn = async () => {
+      await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(6000);
+      for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: /Delete|Backspace/i }).first().click().catch(() => undefined);
+      for (const digit of ['1', '0']) await page.getByRole('button', { name: new RegExp(`^${digit}$`) }).first().click();
+      await page.waitForTimeout(6000);
+      const cta = page.getByText(/^Buy \$10 of TSLAx$/).first();
+      for (let i = 0; i < 20 && !(await cta.isEnabled().catch(() => false)); i += 1) await page.waitForTimeout(1500);
+      return cta;
+    };
+    await (await keyIn()).click();
+    await page.waitForTimeout(1200);
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
+    await page.waitForTimeout(20_000);
+    await (await keyIn()).click();
+    await page.waitForTimeout(25_000);
+    const filledAfter = ((await apiGet('/runs?limit=50', bearer)) ?? []).filter((r) => r.status === 'filled').length;
+    const spentAfter = (await apiGet('/limits', bearer)).remainingUsd;
+    check(filledAfter - filledBefore === 1, 'one ask, one fill — the repeat replayed the first answer', `${filledBefore} → ${filledAfter} filled`);
+    check(Math.abs(spentBefore - spentAfter - 10) < 0.51, "and the day's allowance fell once", `$${spentBefore} → $${spentAfter}`);
+    seen.quiet('reload mid-order');
+  }
+
   // ── 2. An alert: created once, even when the button is hit twice, and then removed ────────────
   console.log('\n2. alerts — double submit, reload, delete');
   seen.clear();
