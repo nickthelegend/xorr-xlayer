@@ -13,6 +13,10 @@ Chain: **OKX X Layer** (chain 196). Assets: **xStocks** (Backed's tokenized equi
 Venues: **Uniswap v3** on X Layer and the **OKX DEX aggregator**. Yield: **Aave v3 on X Layer** (USDT0).
 Built for OKX Dev Day 2026.
 
+**[▶ Watch the demo](docs/demo/xorr-demo.mp4)** (2:43) — the permission, the agent's own fills, the cap refusing an order,
+and `/judge` re-checking all 20 claims against the chain. Recorded against the live build by
+[`tools/record-demo.mjs`](tools/record-demo.mjs); re-run it and you get a fresh one.
+
 ---
 
 ## The idea in one paragraph

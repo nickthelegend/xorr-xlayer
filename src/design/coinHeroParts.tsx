@@ -10,8 +10,13 @@ import { StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { alpha, colors } from '@/ui';
 
-/** Where the lead coin sits in the frame, so a portrait crop keeps it. */
-export const COIN_FOCUS = { left: '38%', top: '52%' } as const;
+/**
+ * Where the lead coin sits in the frame, so a portrait crop keeps it.
+ *
+ * Measured off `assets/brand/coin-hero.webp`, and it moves when the art does: the OKX-marked coin in the 2026-09-20
+ * render stands further left and higher than the one before it, and at the old 38%/52% a narrow phone cropped its rim.
+ */
+export const COIN_FOCUS = { left: '31%', top: '45%' } as const;
 
 /** Black in from the top for the wordmark, and down into the screen at the bottom for the headline. */
 export function HeroFades() {

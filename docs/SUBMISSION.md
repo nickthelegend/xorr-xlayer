@@ -3,13 +3,17 @@
 **Deadline:** 2026-09-25 23:59 UTC. **Repo:** https://github.com/nickthelegend/xorr-xlayer (public at submission, after
 a history secret scan — PLAN.md D14).
 
-**Live:** web app on Vercel (`xorr-xlayer` project, a `vercel.app` URL — filled in at deploy), executor on Railway at
+**Live:** **https://xorr-xlayer.vercel.app** (Vercel project `xorr-xlayer`), executor on Railway at
 `https://executor-fork-production-2db8.up.railway.app` (`/health`, `/verify`), trading against a hosted fork of X Layer
 mainnet (`https://xlayer-fork-production.up.railway.app`, chain 196). Contracts on X Layer testnet, source-verified:
 XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`,
 served by `https://executor-testnet-production.up.railway.app`.
 
-**Video:** 2–4 minutes, web app + an iOS-simulator clip of the native app (D21) — script in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
+**Video:** [`demo/xorr-demo.mp4`](demo/xorr-demo.mp4) — 2:43, recorded against the deployed build on 2026-09-20 by
+[`tools/record-demo.mjs`](../tools/record-demo.mjs), which signs in, walks the beats in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md)
+and captions them. Nothing in it is staged: every figure on screen is what the executor and the chain answered while it
+was recording, and where a list is filtered the filter is the product's own, tapped on camera. Re-run the script to get
+a fresh one against live data.
 
 Every address and number below was read from the chain or produced by a command in this repo on 2026-09-19.
 

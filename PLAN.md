@@ -273,7 +273,12 @@ Audit method: full-repo grep for mock/stub/TODO/FIXME/fake/dummy/placeholder/har
 - **D11 Testnet deployer:** **generated 2026-09-19 — address `0x1725a1B284D58dC9bb79DfB7B205d4d0D5d4E4eA`, key in `server/.env.deployer` (gitignored, mode 600); owner to fund with test OKB (balance 0 at generation).** The builder generated a fresh key locally (stored only in `server/.env` as `DEPLOYER_PRIVATE_KEY` and in Railway; never printed or committed), gives the owner its **address**, and the owner claims test OKB to it at https://web3.okx.com/xlayer/faucet. P3.5 unblocks when the balance shows on 1952.
 - **D12 Web URL:** the live link is the new Vercel project's **vercel.app** URL (no custom domain).
 - **D13 Video:** record the core journey on the **live web app** (repeatable with `tools/demo.mjs`) plus a **short iPhone-simulator clip** of the native app.
-- **D14 Public repo:** stays private while building; before submission the builder runs a secret scan of **all history** (`gitleaks detect` or equivalent + a grep for key/secret/mnemonic/private patterns), then the owner flips it public on Sep 25.
+- **D14 Public repo:** `DONE` (2026-09-20). Every commit on every ref was dumped (`git log --all -p`, 897k lines) and
+  scanned for key material: 64-hex private keys, mnemonics, `sk-`/`ghp_`/`AKIA`/`xoxb-` provider tokens, and secret-shaped
+  assignments. Three hits, all benign: the anvil account-0 key in a vendored forge-std test (public by design), a 1inch
+  `solidity-utils` README's example `PRIVATE_KEY=` (a third party's own published docs, in a library dir since removed), and
+  CI's throwaway `PRIVY_APP_ID`/`PRIVY_APP_SECRET` beside a job-local Postgres — the proof never calls Privy, the names just
+  have to load. No `.env`, `.keys/`, `.pem` or keystore was ever committed. Repo made public on 2026-09-20.
 - **D15 Yield asset:** the yield strategy **swaps idle USDC → USDT0 and supplies USDT0 to Aave v3 on X Layer** (~3.4% vs ≈0% for USDC), and swaps back to USDC on withdraw. The app states the swap and the depeg risk plainly.
 - **D16 Deposits:** accept **USDT0** as a deposit (OKX withdraws it on X Layer) and convert it to USDC in the app, **plus** an "Open OKX" link (buy there, withdraw on the X Layer network). QR/address on X Layer and the fork/testnet faucet stay. No card on-ramp.
 - **D17 Extra OKX touchpoint (may slip, D3):** **OKX Wallet in the web sign-in wallet list** (P4.10).
