@@ -2,13 +2,11 @@
  {
   "stem": "01-welcome",
   "route": "/welcome",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /XORR/"
-  ],
-  "text": "A bot that trades while you get on with your life\nGet started\nSign in\nBy continuing you agree to the \nTerms\n and \nPrivacy Policy\n."
+  "content": [],
+  "text": "A bot that trades while you get on with your life\nGet started\nSign in\nBy continuing you agree to the \nTerms\n and \nPrivacy Policy\n.\nXORR\nRead the Terms\nRead the Privacy Policy"
  },
  {
   "stem": "02-goals",
@@ -17,7 +15,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "1/3\nWhat should your\nbot optimise for?\nPick any.\nGrow long term\nTrade actively\nEarn yield\nHedge my job\nLearn first\nHow much drawdown can you sit through?\nSteady\nBalanced\nAggressive\n1 selected · Balanced\nContinue"
+  "text": "1/3\nWhat should your\nbot optimise for?\nPick any.\nGrow long term\nTrade actively\nEarn yield\nHedge my job\nLearn first\nHow much drawdown can you sit through?\nSteady\nBalanced\nAggressive\n1 selected · Balanced\nContinue\nBack\nGrow long term\nTrade actively\nEarn yield\nHedge my job\nLearn first"
  },
  {
   "stem": "03-wallet",
@@ -35,7 +33,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "3/3\nFund the wallet\nTest network\nSend USDC or USDT0 to your address on X Layer fork.\nSEND USDC OR USDT0 TO\n0x95A0b368588713011a15f4b1041423f31B08e615\nCopy address\nA copy of X Layer. Test funds only.\nBALANCE\nUSDC\n0.00\nUSDT0\n0.00\nOKB\nFor gas\n0.0000\nNothing here yet. Send USDC or USDT0 to the address above.\nGet 1,000 test USDC\nContinue — set the limits"
+  "text": "3/3\nFund the wallet\nTest network\nSend USDC or USDT0 to your address on X Layer fork.\nSEND USDC OR USDT0 TO\n0x95A0b368588713011a15f4b1041423f31B08e615\nCopy address\nA copy of X Layer. Test funds only.\nBALANCE\nUSDC\n908.00\nUSDT0\n0.00\nOKB\nFor gas\n9.9973\nGet 1,000 test USDC\nAvailable again in 7 h\nContinue — set the limits\nBack\nTest network. See every network"
  },
  {
   "stem": "05-delegate",
@@ -44,7 +42,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Let the bot trade\nWhat it can and can’t do.\nIt can place trades\nUp to $1,600/day.\nIt cannot move your money out\nNo transfers or withdrawals, ever.\nIt expires on its own\nAfter 3 days.\nYou can take it back in one tap\nFrom Safety, anytime.\nMost it can spend a day\n−\n$1,600\n+\nFor how long\n3 Days\nTrading can lose money within these limits.\nYou’ll sign 17 times. Nothing is granted until the last.\nSign th"
+  "text": "Let the bot trade\nWhat it can and can’t do.\nIt can place trades\nUp to $100/day.\nIt cannot move your money out\nNo transfers or withdrawals, ever.\nIt expires on its own\nAfter 7 days.\nYou can take it back in one tap\nFrom Safety, anytime.\nMost it can spend a day\n−\n$100\n+\nFor how long\n7 Days\nTrading can lose money within these limits.\nYou’ll sign 17 times. Nothing is granted until the last.\nSign this p"
  },
  {
   "stem": "06-proposal",
@@ -53,18 +51,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Your draft portfolio\nAdjust the weights. Nothing trades until you start.\nBlue-chip crypto\n−\n55%\n+\nBitcoin and OKB, the liquid core the bot rebalances.\nTokenized equities\n−\n30%\n+\nNVDAx, AAPLx and nine more tokenized stocks.\nStable yield\n−\n15%\n+\nIdle USDC earning the lending pool’s rate.\nAllocated\n100%\nStart rebalancing"
+  "text": "Your draft portfolio\nAdjust the weights. Nothing trades until you start.\nBlue-chip crypto\n−\n55%\n+\nBitcoin and OKB, the liquid core the bot rebalances.\nTokenized equities\n−\n30%\n+\nNVDAx, AAPLx and nine more tokenized stocks.\nStable yield\n−\n15%\n+\nIdle USDC earning the lending pool’s rate.\nAllocated\n100%\nStart rebalancing\nDecrease\nIncrease\nDecrease\nIncrease\nDecrease\nIncrease"
  },
  {
   "stem": "07-home",
   "route": "/",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /\\$[\\d,]+\\.\\d\\d/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\nYour profile, test-8958@privy.io\nNotifications\nTotal balance. Opens your portfolio.\nBalance shown, $1,008.04\n$1,008.04\nNo agent is trading right now\nAgen"
  },
  {
   "stem": "08-markets",
@@ -73,7 +69,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Markets\nCrypto\nStocks\nCommodities\nIndices\nPre-IPO\nOnly gold has a price feed. None trade here yet.\n9 shown · 24/7\nXAUT\nGold · Perp · spot feed\n$4,380\n+0.93%\nXAGT\nSilver · Perp · spot feed\n—\nCL\nWTI Crude · Perp · ICE feed\n—\nBZ\nBrent Crude · Perp · ICE feed\n—\nHG\nCopper · Perp · delivery ref\n—\nPL\nPlatinum · Perp · spot feed\n—\nPA\nPalladium · Perp · spot feed\n—\nNG\nNatural Gas · Perp · ICE feed\n—\nZW\nWhe"
+  "text": "Markets\nCrypto\nStocks\nCommodities\nIndices\nPre-IPO\nOnly gold has a price feed. None trade here yet.\n9 shown · 24/7\nXAUT\nGold · Perp · spot feed\n$4,373\n−0.04%\nXAGT\nSilver · Perp · spot feed\n—\nCL\nWTI Crude · Perp · ICE feed\n—\nBZ\nBrent Crude · Perp · ICE feed\n—\nHG\nCopper · Perp · delivery ref\n—\nPL\nPlatinum · Perp · spot feed\n—\nPA\nPalladium · Perp · spot feed\n—\nNG\nNatural Gas · Perp · ICE feed\n—\nZW\nWhe"
  },
  {
   "stem": "09-markets-crypto",
@@ -82,7 +78,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Crypto\n9 of 9 markets\nSpot prices, live\nBTC\nBitcoin · Perp\n$80,992\n+5.75%\nETH\nEthereum · Perp\n$2,628\n+7.11%\nSOL\nSolana · Spot · Perp\n$113.40\n+12.12%\nXRP\nXRP · Perp\n$1.40\n+7.91%\nDOGE\nDogecoin · Perp\n$0.0878\n+7.27%\nHYPE\nHyperliquid · Spot · Perp\n$91.93\n+10.36%\nAAVE\nAave · Spot · Perp\n$139.10\n+7.84%\nLINK\nChainlink · Perp\n$12.37\n+8.96%\nTON\nToncoin · Spot · Perp\n$1.37\n+2.50%"
+  "text": "Crypto\n9 of 9 markets\nSpot prices, live\nBTC\nBitcoin · Perp\n$81,267\n−0.10%\nETH\nEthereum · Perp\n$2,628\n+0.26%\nSOL\nSolana · Spot · Perp\n$110.95\n−2.22%\nXRP\nXRP · Perp\n$1.41\n−0.25%\nDOGE\nDogecoin · Perp\n$0.0876\n−0.20%\nHYPE\nHyperliquid · Spot · Perp\n$92.12\n−1.39%\nAAVE\nAave · Spot · Perp\n$140.70\n−1.94%\nLINK\nChainlink · Perp\n$12.41\n+0.23%\nTON\nToncoin · Spot · Perp\n$1.39\n+0.96%\nBack"
  },
  {
   "stem": "10-markets-stocks",
@@ -91,7 +87,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Stocks\n11 of 11 markets\nTokenized shares\nNVDAx\nNvidia · Tokenized share\n$220.17\nAAPLx\nApple · Tokenized share\n$337.38\nTSLAx\nTesla · Tokenized share\n$362.49\nMETAx\nMeta · Tokenized share\n$673.89\nMSFTx\nMicrosoft · Tokenized share\n$498.86\nAMZNx\nAmazon · Tokenized share\n$254.56\nGOOGLx\nAlphabet · Tokenized share\n$352.70\nMSTRx\nStrategy · Tokenized share\n$154.47\nCOINx\nCoinbase · Tokenized share\n$195.41\nSP"
+  "text": "Stocks\n11 of 11 markets\nTokenized shares\nNVDAx\nNvidia · Tokenized share\n$222.70\nAAPLx\nApple · Tokenized share\n$336.13\nTSLAx\nTesla · Tokenized share\n$365.48\nMETAx\nMeta · Tokenized share\n$674.94\nMSFTx\nMicrosoft · Tokenized share\n$498.35\nAMZNx\nAmazon · Tokenized share\n$254.62\nGOOGLx\nAlphabet · Tokenized share\n$352.77\nMSTRx\nStrategy · Tokenized share\n$159.54\nCOINx\nCoinbase · Tokenized share\n$195.67\nSP"
  },
  {
   "stem": "11-markets-commodities",
@@ -100,7 +96,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Commodities\n9 of 9 markets\nOnly gold has a price feed. None trade here yet.\nXAUT\nGold · Perp · spot feed\n$4,380\n+0.93%\nXAGT\nSilver · Perp · spot feed\n—\nCL\nWTI Crude · Perp · ICE feed\n—\nBZ\nBrent Crude · Perp · ICE feed\n—\nHG\nCopper · Perp · delivery ref\n—\nPL\nPlatinum · Perp · spot feed\n—\nPA\nPalladium · Perp · spot feed\n—\nNG\nNatural Gas · Perp · ICE feed\n—\nZW\nWheat · Perp · CBOT ref\n—"
+  "text": "Commodities\n9 of 9 markets\nOnly gold has a price feed. None trade here yet.\nXAUT\nGold · Perp · spot feed\n$4,373\n−0.04%\nXAGT\nSilver · Perp · spot feed\n—\nCL\nWTI Crude · Perp · ICE feed\n—\nBZ\nBrent Crude · Perp · ICE feed\n—\nHG\nCopper · Perp · delivery ref\n—\nPL\nPlatinum · Perp · spot feed\n—\nPA\nPalladium · Perp · spot feed\n—\nNG\nNatural Gas · Perp · ICE feed\n—\nZW\nWheat · Perp · CBOT ref\n—\nBack"
  },
  {
   "stem": "12-markets-indices",
@@ -109,7 +105,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Indices\n7 of 7 markets\nNo price feed. None trade here yet.\nIWM\nRussell 2000 · Perp\n—\nDIA\nDow 30 · Perp\n—\nEFA\nMSCI EAFE · Perp\n—\nGLD\nGold ETF · Spot · Perp\n—\nTLT\n20Y Treasury · Perp\n—\nHYG\nHigh Yield · Perp\n—\nVIX\nVolatility · Perp\n—"
+  "text": "Indices\n7 of 7 markets\nNo price feed. None trade here yet.\nIWM\nRussell 2000 · Perp\n—\nDIA\nDow 30 · Perp\n—\nEFA\nMSCI EAFE · Perp\n—\nGLD\nGold ETF · Spot · Perp\n—\nTLT\n20Y Treasury · Perp\n—\nHYG\nHigh Yield · Perp\n—\nVIX\nVolatility · Perp\n—\nBack"
  },
  {
   "stem": "13-markets-preipo",
@@ -118,7 +114,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Pre-IPO\n9 of 9 markets\nNo price feed. Private companies have no token.\nOPENAI\nOpenAI · Pre-IPO perp\n—\nANTHRP\nAnthropic · Pre-IPO perp\n—\nSPACEX\nSpaceX · Pre-IPO perp\n—\nXAI\nxAI · Pre-IPO perp\n—\nSTRIPE\nStripe · Pre-IPO perp\n—\nDBRK\nDatabricks · Pre-IPO perp\n—\nPPLX\nPerplexity · Pre-IPO perp\n—\nFIGMA\nFigma · Lists at IPO\n—\nCANVA\nCanva · Pre-IPO perp\n—"
+  "text": "Pre-IPO\n9 of 9 markets\nNo price feed. Private companies have no token.\nOPENAI\nOpenAI · Pre-IPO perp\n—\nANTHRP\nAnthropic · Pre-IPO perp\n—\nSPACEX\nSpaceX · Pre-IPO perp\n—\nXAI\nxAI · Pre-IPO perp\n—\nSTRIPE\nStripe · Pre-IPO perp\n—\nDBRK\nDatabricks · Pre-IPO perp\n—\nPPLX\nPerplexity · Pre-IPO perp\n—\nFIGMA\nFigma · Lists at IPO\n—\nCANVA\nCanva · Pre-IPO perp\n—\nBack"
  },
  {
   "stem": "14-watchlist",
@@ -127,7 +123,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Watchlist\nWhat the bot can follow here.\nCrypto\nStocks\n5 MARKETS · 24H\nArrange\nUSDC\n$0.9998\n+0.02%\nUSDG\n$1.0000\n+0.00%\nUSDT0\n$0.9997\n+0.06%\nXBTC\n$81,046\n+5.78%\nWOKB\n$117.08\n+4.04%"
+  "text": "Watchlist\nWhat the bot can follow here.\nCrypto\nStocks\n6 MARKETS · 24H\nArrange\nUSDC\n$0.9997\n+0.01%\nUSDG\n$0.9999\n−0.01%\nUSDT0\n$0.9997\n+0.00%\nXBTC\n$81,281\n−0.05%\nWOKB\n$117.53\n+0.72%\nWETH\n$2,629\n+0.39%\nBack\nArrange your watchlist\nSet an alert on USDC\nSet an alert on USDG\nSet an alert on USDT0\nSet an alert on XBTC\nSet an alert on WOKB\nSet an alert on WETH"
  },
  {
   "stem": "15-search",
@@ -136,7 +132,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Search\nBTC\nBitcoin · Perp\n$80,992\n+5.75%\nETH\nEthereum · Perp\n$2,628\n+7.11%\nSOL\nSolana · Spot · Perp\n$113.40\n+12.12%\nXRP\nXRP · Perp\n$1.40\n+7.91%\nDOGE\nDogecoin · Perp\n$0.0878\n+7.27%\nHYPE\nHyperliquid · Spot · Perp\n$91.93\n+10.36%\nAAVE\nAave · Spot · Perp\n$139.10\n+7.84%\nLINK\nChainlink · Perp\n$12.37\n+8.96%\nTON\nToncoin · Spot · Perp\n$1.37\n+2.50%\nNVDAx\nNVIDIA Corporation · Technology\n$220.17\nAAPLx\nApple In"
+  "text": "Search\nBTC\nBitcoin · Perp\n$81,267\n−0.10%\nETH\nEthereum · Perp\n$2,628\n+0.26%\nSOL\nSolana · Spot · Perp\n$110.95\n−2.22%\nXRP\nXRP · Perp\n$1.41\n−0.25%\nDOGE\nDogecoin · Perp\n$0.0876\n−0.20%\nHYPE\nHyperliquid · Spot · Perp\n$92.12\n−1.39%\nAAVE\nAave · Spot · Perp\n$140.70\n−1.94%\nLINK\nChainlink · Perp\n$12.41\n+0.23%\nTON\nToncoin · Spot · Perp\n$1.39\n+0.96%\nNVDAx\nNvidia · Tokenized share\n$222.73\nAAPLx\nApple · Tokenized"
  },
  {
   "stem": "16-asset",
@@ -145,18 +141,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Bitcoin\n$\n8\n0\n,\n9\n9\n2\nup 5.8% today\nCandles\nLine\n$81,193\n1D\n1W\n1M\n1Y\nSell\nBuy"
+  "text": "Bitcoin\n$\n8\n1\n,\n2\n6\n7\ndown 0.1% today\nCandles\nLine\n$81,281\n1D\n1W\n1M\n1Y\nSell\nBuy\nBack\n$81,267\nChart, +0.3% over its range"
  },
  {
   "stem": "17-asset-stock",
   "route": "/asset/NVDAx",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /\\$[\\d,]+/"
-  ],
-  "text": "Nvidia\n$\n2\n2\n0\n.\n1\n7\nNo chart yet.\n1D\n1W\n1M\n1Y\nSell\nBuy"
+  "content": [],
+  "text": "Nvidia\n$\n2\n2\n2\n.\n7\n3\nup 0.1% since Sep 19, 12:20 PM\nCandles\nLine\n$222.75\n1D\n1W\n1M\n1Y\nSell\nBuy\nBack\n$222.73\nChart, +0.1% over its range"
  },
  {
   "stem": "18-chart",
@@ -165,7 +159,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "BTC/USD\n$81,193\n+4.45%\n+$3,458.00 past 12 hours\n81.4K\n80.4K\n79.5K\n78.5K\n77.5K\n$81,193\n1H\n4H\n1D\nSell\nBuy"
+  "text": "BTC/USD\n$81,281\n+0.09%\n+$72.00 past 12 hours\n82.0K\n81.7K\n81.4K\n81.1K\n80.8K\n$81,281\n1H\n4H\n1D\nSell\nBuy\nBack\nCandle 1 of 12\nCandle 2 of 12\nCandle 3 of 12\nCandle 4 of 12\nCandle 5 of 12\nCandle 6 of 12\nCandle 7 of 12\nCandle 8 of 12\nCandle 9 of 12\nCandle 10 of 12\nCandle 11 of 12\nCandle 12 of 12"
  },
  {
   "stem": "19-order",
@@ -174,7 +168,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "XBTC\nBuy\nSell\n$250\n0.0031 XBTC\n$100\n$500\nMax\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nMinimum received\n0.0031 XBTC\nNetwork fee\nOn us · ≈ $0.02\nBuy $250 of XBTC\nYou have $0.00."
+  "text": "XBTC\nBuy\nSell\n$250\n0.0031 XBTC\n$100\n$500\nMax\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nMinimum received\n0.0031 XBTC\nNetwork fee\nOn us · ≈ $0.02\nBuy $250 of XBTC\nYour permission has nothing left to spend today. It resets at midnight UTC.\nClose\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\nDelete"
  },
  {
   "stem": "20-order-stock",
@@ -183,7 +177,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "NVDAx\nBuy\nSell\n$250\n1.1355 NVDAx\n$100\n$500\nMax\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nMinimum received\n1.1322 NVDAx\nNetwork fee\nOn us · ≈ $0.03\nBuy $250 of NVDAx\nYou have $0.00."
+  "text": "NVDAx\nBuy\nSell\n$250\n1.1229 NVDAx\n$100\n$500\nMax\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nMinimum received\n1.1195 NVDAx\nNetwork fee\nOn us · ≈ $0.03\nBuy $250 of NVDAx\nYour permission has nothing left to spend today. It resets at midnight UTC.\nClose\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\nDelete"
  },
  {
   "stem": "21-swap",
@@ -192,7 +186,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Swap\nYOU PAY\nBalance 0.0000\n0\n$0.00\nUSDC\nYOU RECEIVE\n—\nEnter an amount\nNVDAx\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nReview swap"
+  "text": "Swap\nYOU PAY\nBalance 908.00\n0\n$0.00\nUSDC\nYOU RECEIVE\n—\nEnter an amount\nNVDAx\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nReview swap\nClose swap\nSwap settings\nChoose the token you pay\nPay NVDAx and receive USDC instead\nChoose the token you receive\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\nDelete"
  },
  {
   "stem": "22-perp",
@@ -201,46 +195,34 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "BTC\nPERP\nUP TO 40X\n$\n8\n1\n,\n0\n3\n0\nup 5.9% today\nCandles\nLine\n$81,019\n1D\n1W\n1M\n1Y\nFUNDING / HOUR\n+0.0013%\nNEXT FUNDING\n00:22:25\nOPEN INTEREST\n$3.47B\n24H VOLUME\n$3.74B\nMarket data from Hyperliquid. xorr does not trade futures."
+  "text": "BTC\nPERP\nUP TO 40X\n$\n8\n1\n,\n3\n2\n2\ndown 0.5% today\nCandles\nLine\n$81,326\n1D\n1W\n1M\n1Y\nFUNDING / HOUR\n+0.0013%\nNEXT FUNDING\n00:03:24\nOPEN INTEREST\n$3.45B\n24H VOLUME\n$1.22B\nMarket data from Hyperliquid. xorr does not trade futures.\nBack\n$81,322\nBTC candlestick chart, 1D. Switch to the line view.\nChart, −0.5% over its range"
  },
  {
   "stem": "23-position",
-  "route": "/position/50ec6e5f-54d6-45c1-a1e5-cfd15c134b29",
-  "ok": false,
-  "errors": [
-   "Failed to load resource: the server responded with a status of 404 ()"
-  ],
-  "network": [
-   "404 https://executor-fork-production-2db8.up.railway.app/positions/50ec6e5f-54d6-45c1-a1e5-cfd15c134b29"
-  ],
+  "route": "/position/f8020c27-f1a7-49e5-9266-85ca182a43bc",
+  "ok": true,
+  "errors": [],
+  "network": [],
   "content": [],
-  "text": "Position\nThis position is no longer open."
+  "text": "TSLAx long\nUNREALISED\n+$0.04\n+0.0% on $100.04 held\n1D\n1W\n1M\n1Y\nEntry\n$365.35\nMark\n$365.48\nSize\n0.2737 TSLAx\nFunding paid\nNone — spot\nClose\n50%\n25%\n50%\n75%\n100%\nRealises +$0.02 and frees $50.00.\nEdit TP/SL\nClose 50%\nBack\nChart, +0.1% over its range, 2 buys marked"
  },
  {
   "stem": "24-auto-close",
-  "route": "/auto-close/50ec6e5f-54d6-45c1-a1e5-cfd15c134b29",
-  "ok": false,
-  "errors": [
-   "Failed to load resource: the server responded with a status of 404 ()"
-  ],
-  "network": [
-   "404 https://executor-fork-production-2db8.up.railway.app/positions/50ec6e5f-54d6-45c1-a1e5-cfd15c134b29"
-  ],
-  "content": [
-   "missing /Take profit|Stop|stop/i"
-  ],
-  "text": "Auto Close\nThis position is no longer open."
+  "route": "/auto-close/f8020c27-f1a7-49e5-9266-85ca182a43bc",
+  "ok": true,
+  "errors": [],
+  "network": [],
+  "content": [],
+  "text": "Auto Close\nNo chart for TSLAx right now.\nTake Profit\n−\n+3.0%\n+\nStop Loss\n−\n−3.0%\n+\nTrailing Stop\n−\nOff\n+\nAn agent set this at +10.0% / −5.0%, outside the hand range. Yours replaces it.\nCancel\nReplace\nMake $3.00 at TP or lose $3.00 at SL\nClose\nDecrease\nIncrease\nDecrease\nIncrease\nDecrease\nIncrease"
  },
  {
   "stem": "25-bot",
   "route": "/bot",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Today/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nT\nMomentum Scout\nEarnings Desk\nYield Keeper\nDrawdown Guard\nNew agent\nMomentum Scout\n2:08 AM\nNo trading permission has been grante"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nT\nMomentum Scout\nEarnings Desk\nYield Keeper\nDrawdown Guard\nNew agent\nMomentum Scout\n6:26 AM\nToday's cap is used up — already went out Nothing more unti"
  },
  {
   "stem": "26-bot-roster",
@@ -249,7 +231,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Agents\n0 of 4 hired\nMomentum Scout\nRides breakouts on liquid majors\nNo trades yet\nHire\nEarnings Desk\nTrades tokenized equity earnings\nNo trades yet\nHire\nYield Keeper\nMoves idle cash into the best rate\nNo trades yet\nHire\nDrawdown Guard\nCuts risk when the book bleeds\nNo trades yet\nHire\nPast performance of a strategy says nothing about tomorrow."
+  "text": "Agents\n0 of 4 hired\nMomentum Scout\nRides breakouts on liquid majors\nNo trades yet\nHire\nEarnings Desk\nTrades tokenized equity earnings\nNo trades yet\nHire\nYield Keeper\nMoves idle cash into the best rate\nNo trades yet\nHire\nDrawdown Guard\nCuts risk when the book bleeds\nNo trades yet\nHire\nPast performance of a strategy says nothing about tomorrow.\nBack\nMake an agent\nMomentum Scout, Rides breakouts on l"
  },
  {
   "stem": "27-bot-leaderboard",
@@ -258,7 +240,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Leaderboard\nP&L\nWin rate\nTrades\n01\nMomentum Scout\nNo trades yet\n$0.00\n02\nEarnings Desk\nNo trades yet\n$0.00\n03\nYield Keeper\nNo trades yet\n$0.00\n04\nDrawdown Guard\nNo trades yet\n$0.00\nRanked by P&L · last 30 days"
+  "text": "Leaderboard\nP&L\nWin rate\nTrades\n01\nMomentum Scout\nNo trades yet\n$0.00\n02\nEarnings Desk\nNo trades yet\n$0.00\n03\nYield Keeper\nNo trades yet\n$0.00\n04\nDrawdown Guard\nNo trades yet\n$0.00\nRanked by P&L · last 30 days\nBack\nChange sort"
  },
  {
   "stem": "28-bot-intro",
@@ -267,7 +249,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Momentum Scout\nRides breakouts on liquid majors\nRuns for you 24/7\nYour rules keep running while you are offline.\nEvery run on the record\nFills and refusals alike.\nYou are always in control\nPause anytime. It never trades outside your limits.\nGet Started\nAll agents can make mistakes. Markets are risky."
+  "text": "Momentum Scout\nRides breakouts on liquid majors\nRuns for you 24/7\nYour rules keep running while you are offline.\nEvery run on the record\nFills and refusals alike.\nYou are always in control\nPause anytime. It never trades outside your limits.\nGet Started\nAll agents can make mistakes. Markets are risky.\nClose"
  },
  {
   "stem": "29-bot-settings",
@@ -276,7 +258,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Trade Settings\nOne permission for the whole wallet, not just this agent.\nLimits\nRun For\n3 Days\nDaily Spend Cap\n−\n$1,600/day\n+\n$200 · conservative\n$5,000 · max\nSign these limits\nSigned by you. Revoke anytime in Safety."
+  "text": "Trade Settings\nOne permission for the whole wallet, not just this agent.\nLimits\nRun For\n7 Days\nDaily Spend Cap\n−\n$100/day\n+\n$50 · conservative\n$5,000 · max\nSign these limits\nSigned by you. Revoke anytime in Safety.\nDecrease\nIncrease"
  },
  {
   "stem": "30-bot-backtest",
@@ -285,7 +267,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Backtest\nMomentum Scout, on real history at your current limits. Nothing here is a promise.\n30d\n90d\n6m\n1y\nOpen Momentum Scout"
+  "text": "Backtest\nMomentum Scout, on real history at your current limits. Nothing here is a promise.\n30d\n90d\n6m\n1y\nRETURN\n+35.8%\nMAX DD\n−5.5%\nSHARPE\n2.8\nTRADES\n1\nIf you'd started with\n−\n$5,000\n+\n$6,790.00\n+$1,790.00\ncoingecko market_chart, daily closes · 20-day breakout, 8% stop · Entries and stops fill at the daily close, so a stop is only checked once a day. Nothing here is a promise.\nOpen Momentum Scout"
  },
  {
   "stem": "31-strategies",
@@ -294,7 +276,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Strategies\n0 running\nWhat runs for you, and what you can add.\nRunning\nAdd new\nNothing running yet.\nSet up a recurring buy ›\nA recurring buy is the simplest place to start.\nSet up a recurring buy"
+  "text": "Strategies\n1 running\nWhat runs for you, and what you can add.\nRunning\nAdd new\nExit TSLAx at +10.0% / -5.0%\nNext run Sun, Sep 20\n$0\nLive\nRun now\nPause\nPausing stops one strategy. Your permission stays live and everything else keeps trading — only the kill switch revokes it on chain.\nOpen the kill switch ›\nBack\nRun now\nPause\nOpen the kill switch"
  },
  {
   "stem": "32-strategy-dca",
@@ -303,7 +285,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Recurring buy\nXBTC\nWOKB\n$50\nof XBTC, weekly\nDaily\nWeekly\nEvery 2 wks\nMonthly\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nNEXT THREE RUNS\nSat, Sep 26\n$50\nSat, Oct 3\n$50\nSat, Oct 10\n$50\nBuy $50 of XBTC, weekly\nWithin your daily cap. Pause anytime."
+  "text": "Recurring buy\nXBTC\nWOKB\n$50\nof XBTC, weekly\nDaily\nWeekly\nEvery 2 wks\nMonthly\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nNEXT THREE RUNS\nSun, Sep 27\n$50\nSun, Oct 4\n$50\nSun, Oct 11\n$50\nBuy $50 of XBTC, weekly\nWithin your daily cap. Pause anytime.\nClose\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\nDelete"
  },
  {
   "stem": "32b-strategy-yield",
@@ -312,7 +294,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Idle cash to yield\nUSDC SUPPLY\nVariable rate.\n3.48%\n$250\nswept at most, daily\nDaily\nWeekly\nEvery 2 wks\nMonthly\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nALWAYS KEEP SPENDABLE\n$50\n$100\n$250\n$500\nIF IT RAN NOW\nSpendable cash\n$0.00\nKept back\n$0.00\nWould move\nnothing\nMoves nothing under $25.\nNEXT THREE RUNS\nSun, Sep 20\nup to $250\nMon, Sep 21\nup to $250\nTue, Sep 22\nup to $250\nSweep up to $250 daily\nOnly you can withdraw"
+  "text": "Idle cash to yield\nUSDC SUPPLY\nVariable rate.\n3.40%\n$250\nswept at most, daily\nDaily\nWeekly\nEvery 2 wks\nMonthly\n1\n2\n3\n4\n5\n6\n7\n8\n9\n.\n0\n⌫\nALWAYS KEEP SPENDABLE\n$50\n$100\n$250\n$500\nIF IT RAN NOW\nSpendable cash\n$908.00\nKept back\n$100.00\nWould move\n$250.00\nNEXT THREE RUNS\nMon, Sep 21\nup to $250\nTue, Sep 22\nup to $250\nWed, Sep 23\nup to $250\nSweep up to $250 daily\nOnly you can withdraw.\nClose\n1\n2\n3\n4\n5\n6\n7"
  },
  {
   "stem": "32c-strategy-grid",
@@ -321,7 +303,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Range accumulation\nWETH\nCBBTC\nWETH right now\n$2,626.91\nSuggest\nBOTTOM OF RANGE\nTOP OF RANGE\nRUNGS\n2\n4\n6\n8\nEACH RUNG BUYS\nAt most $200.00 at work, one buy per rung at a time.\nIf WETH leaves the range it stops, and you keep what it bought.\nCheck daily\nCheck weekly\nSet a range and a rung size\nIts first run only takes a reading."
+  "text": "Range accumulation\nWETH\nCBBTC\nWETH right now\n$2,628.74\nSuggest\nBOTTOM OF RANGE\nTOP OF RANGE\nRUNGS\n2\n4\n6\n8\nEACH RUNG BUYS\nAt most $200.00 at work, one buy per rung at a time.\nIf WETH leaves the range it stops, and you keep what it bought.\nCheck daily\nCheck weekly\nSet a range and a rung size\nIts first run only takes a reading.\nClose\nSuggest a range around the current price\nBottom of range\nTop of ran"
  },
  {
   "stem": "32d-yield-position",
@@ -330,7 +312,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Earning\nSUPPLIED\n$0.00\n3.48% a year, paid into the balance.\nNothing earning yet.\nWithdraw all of it\nOnly you can withdraw."
+  "text": "Earning\nSUPPLIED\n$0.00\n3.40% a year, paid into the balance.\nNothing earning yet.\nWithdraw all of it\nOnly you can withdraw.\nClose"
  },
  {
   "stem": "32e-flatten",
@@ -339,7 +321,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Sell everything\nEvery position to USDC, in your own wallet. Your permission is untouched.\nNothing to sell.\nNo positions above $1.00. It is already cash.\nSell everything\nLands in your wallet. Doesn’t use your daily cap."
+  "text": "Sell everything\nEvery position to USDC, in your own wallet. Your permission is untouched.\nWOULD SELL\nTSLAx\n0.273713 TSLAx\n$100.04\nRoughly\n$100.04\nMarket orders, up to 2% slippage, so the exit fills.\nSell $100.04 into USDC\nLands in your wallet. Doesn’t use your daily cap.\nClose"
  },
  {
   "stem": "32f-judge",
@@ -348,7 +330,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Check it yourself\nShare\nRe-run\nEvery claim this app makes about itself, checked against the chain and the feeds right now — not when this was written.\nOWNER\n15/20\nverified · 4 failing\n1 skipped — each says why on its own row. Skipped is not passed.\nPASS\nThe app is talking to a real chain.\nchain 196 (xlayer-fork) at block 70991537\nPASS\nXorrDelegation is deployed and has code.\n5596 bytes at 0xf50a4e"
+  "text": "Check it yourself\nShare\nRe-run\nEvery claim this app makes about itself, checked against the chain and the feeds right now — not when this was written.\nOWNER\n20/20\nclaims verified\nPASS\nThe app is talking to a real chain.\nchain 196 (xlayer-fork) at block 71094891\nPASS\nXorrDelegation is deployed and has code.\n5596 bytes at 0xba23ece812dab11f66a39c9d273d40b716ecc93a\nPASS\nThe permission is read from th"
  },
  {
   "stem": "33-holdings",
@@ -357,7 +339,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Assets\nPORTFOLIO VALUE\n$0.00\nTARGET MIX\nBlue-chip crypto\n55%\nTokenized equities\n30%\nStable yield\n15%\nHoldings\nNothing held yet.\nSet up a recurring buy ›\nTokens\nNo tokens in this wallet yet.\nAdd funds ›\nWALLET\n0x95A0b368588713011a15f4b1041423f31B08e615\nCreated in xorr\n1"
+  "text": "Assets\nPORTFOLIO VALUE\n$1,008.04\nTARGET MIX\nBlue-chip crypto\n55%\nTokenized equities\n30%\nStable yield\n15%\nHoldings\nTSLAx\n0.2737 · avg $365.35\n$100.04\n+0.0%\nTokens\nOKB\n10.00\n$1,174.68\nUSDC\n908.00\n$907.73\nTSLAx\n0.2737\n$100.04\nWALLET\n0x95A0b368588713011a15f4b1041423f31B08e615\nCreated in xorr\n1\nHome\nSwap\nMessages, 1 new"
  },
  {
   "stem": "34-activity",
@@ -366,18 +348,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Activity\nWhat agents did, and didn’t.\nAll\nTrades\nRisk\nBlocked\nNo gas sent\nNot sent — refusing to send real OKB on xlayer-fork.\nxorr · 08:32 PM\nWallet connected\nYour keys, held by you. xlayer-fork.\nxorr · 08:32 PM\nReceipts (CSV)\nDisposals (CSV)\nExport audit trail"
+  "text": "Activity\nWhat agents did, and didn’t.\nAll\nTrades\nRisk\nBlocked\nTrading permission granted\nUp to $100 a day, expiring Sun Sep 27 2026.\nxorr · 12:50 AM\n0xe6bc0865…\nAll agents stopped\nPermission revoked on-chain. Open positions are untouched.\nxorr · 12:48 AM\n0xe95b1b3c…\nBought 0.1369 TSLAx\n$50 at $365.48. Placed by you.\nxorr · 12:46 AM\n0xdecc8fec…\nTrading permission granted\nUp to $100 a day, expiring "
  },
  {
   "stem": "35-history",
   "route": "/history",
-  "ok": false,
+  "ok": true,
   "errors": [],
-  "network": [
-   "FAILED GET https://executor-fork-production-2db8.up.railway.app/history?limit=50"
-  ],
+  "network": [],
   "content": [],
-  "text": "History\nThat did not load.\nThe executor did not answer within 45s. It may still be working — check Activity before trying again.\nRef 9dfd4760\nTry again\nCheck Activity ›"
+  "text": "History\nSpent USDC for TSLAx\nSep 20, 6:16 AM\n0xdecc8fec…\n50.00 USDC\n$50.00\nSpent USDC for TSLAx\nSep 20, 6:09 AM\n0x5690205e…\n50.00 USDC\n$50.00\nBack"
  },
  {
   "stem": "36-briefing",
@@ -386,7 +366,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Briefing\nLoaded 2:12 AM\nOnly what moved your book, and what each agent did about it.\nMACRO\n48m\nCoinbase files to bring single-stock perpetual futures to US market\nMACRO\n2h\nBinance launches 24/7 FX perps with weekend pricing system\nMACRO\n3h\nCrypto stocks rebound after CLARITY Act selloff\nNo agent comments: this build has no language model.\nAsk for the full rundown"
+  "text": "Briefing\nLoaded 6:29 AM\nOnly what moved your book, and what each agent did about it.\nMACRO\n6h\nREX launches 2x leveraged ETF tied to Bitcoin treasury firm Strive\nMACRO\n6h\nKalshi joins Coinbase with filing for US stock perpetual futures\nMACRO\n9h\nVanEck criticizes Metaplanet over executive dilution despite compensation cuts\nNo agent comments: this build has no language model.\nAsk for the full rundown"
  },
  {
   "stem": "37-inbox",
@@ -395,20 +375,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Inbox\nWhat would have interrupted you.\nNothing needs you.\nWhat the bot can do ›"
+  "text": "Inbox\nWhat would have interrupted you.\nBought 0.1369 TSLAx\n$50 at $365.48. Placed by you. · 12:46 AM\nBought 0.1369 TSLAx\n$50 at $365.48. Placed by you. · 12:39 AM\nBought 0.1380 TSLAx\n$50 at $365.48. Placed by you. · 12:06 AM\nBought 0.1380 TSLAx\n$50 at $365.48. Placed by you. · 12:04 AM\nBought 0.0276 TSLAx\n$10 at $364.95. Placed by Momentum Scout. · 08:13 AM\nBought 0.0276 TSLAx\n$10 at $364.95. Plac"
  },
  {
   "stem": "38-safety",
   "route": "/safety",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Your wallet/",
-   "missing /Agent key/",
-   "missing /0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}/"
-  ],
-  "text": "Safety\nNOT GRANTED\nNothing can trade yet\nNothing is granted yet, so nothing can trade.\nNothing granted yet\nSet limits\nWallet policy\nOff\nAllowlist\n0 addresses\nRecovery\nReview\nSell everything to cash ›"
+  "content": [],
+  "text": "Safety\nLIVE\nTrading is live\n1 strategy can trade within your limits.\n100%\nCap used\n6d\nTime left\nYour wallet\n0x95A0…e615\nAgent key\nCan’t withdraw\n0xB3e9…EC21\nTOKEN APPROVALS\nUSDC\nUp to 3,000.00\nRevoke\nUSDT0\nNo limit\nRevoke\nUSDG\nNo limit\nRevoke\nWETH\nNo limit\nRevoke\nXBTC\nNo limit\nRevoke\nTSLAx\nNo limit\nRevoke\nQQQx\nNo limit\nRevoke\nGOOGLx\nNo limit\nRevoke\nCOINx\nNo limit\nRevoke\nSPYx\nNo limit\nRevoke\nNVDAx\n"
  },
  {
   "stem": "39-settings",
@@ -417,7 +393,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Settings\nWALLET\nAddress\n0x95…e615\nRecovery\nReview\nExplore\nEverything else\nPERMISSION\nStatus\nNot granted\nDaily cap\n—\nAllowlist\n0 addresses\nVOICE\nDry\nSharp\nFlat\nUnderstated, with the odd dry aside.\nNOTIFICATIONS\nAlerts\nManage\nLEGAL\nTerms\nPrivacy policy\nRisk disclosure\nSESSION\nSign out\nYour permission stays on. Stop it in Safety.\nABOUT\nVersion\nd6bc54d"
+  "text": "Settings\nWALLET\nAddress\n0x95…e615\nRecovery\nReview\nExplore\nEverything else\nPERMISSION\nStatus\nLive\nDaily cap\n$100/day\nAllowlist\n0 addresses\nVOICE\nDry\nSharp\nFlat\nUnderstated, with the odd dry aside.\nNOTIFICATIONS\nAlerts\nManage\nLEGAL\nTerms\nPrivacy policy\nRisk disclosure\nSESSION\nSign out\nYour permission stays on. Stop it in Safety.\nABOUT\nVersion\nDevelopment build\nClose"
  },
  {
   "stem": "40-alerts",
@@ -435,7 +411,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "New alert\nTells you when a price crosses a level. It never trades.\nSYMBOL\nABOVE\nFires each time the price crosses above it, even with the app closed.\nAlert me when XBTC is above $85,041"
+  "text": "New alert\nTells you when a price crosses a level. It never trades.\nSYMBOL\nABOVE\nFires each time the price crosses above it, even with the app closed.\nAlert me when XBTC is above $85,309\nClose\nSymbol\nAbove"
  },
  {
   "stem": "42-allowlist",
@@ -444,7 +420,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Allowlist\nFunds can only go here. A new address unlocks 24 hours after you add it.\nNo addresses yet.\nAdd an address"
+  "text": "Allowlist\nFunds can only go here. A new address unlocks 24 hours after you add it.\nNo addresses yet.\nAdd an address\nBack"
  },
  {
   "stem": "43-send",
@@ -453,7 +429,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Send\nTest network\nTO\nManage\nNo addresses yet.\nTOKEN\nUSDC\nUSDG\nUSDT0\nXBTC\nWOKB\nTSLAx\nQQQx\nGOOGLx\nCOINx\nSPYx\nNVDAx\nAAPLx\nMSFTx\nMETAx\nMSTRx\nAMZNx\nAMOUNT\nBalance\n0.0000 USDC\nNetwork fee\n—\nNew addresses unlock after a cooling-off period.\nSend\nWithdraw everything ›"
+  "text": "Send\nTest network\nTO\nManage\nNo addresses yet.\nTOKEN\nUSDC\nUSDG\nUSDT0\nXBTC\nWOKB\nWETH\nTSLAx\nQQQx\nGOOGLx\nCOINx\nSPYx\nNVDAx\nAAPLx\nMSFTx\nMETAx\nMSTRx\nAMZNx\nAMOUNT\nBalance\n907.9984 USDC\nNetwork fee\n—\nNew addresses unlock after a cooling-off period.\nSend\nWithdraw everything ›\nBack\nTest network. See every network\nManage your allowlist\nAmount in USDC\nWithdraw everything"
  },
  {
   "stem": "44-recovery",
@@ -462,7 +438,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Recovery\nYour email is the way back\nSign in with it on any device to open this wallet.\nEMAIL\ntest-8958@privy.io\nExport private key\nShown in a secure window. xorr never sees it.\nI can open this email"
+  "text": "Recovery\nYour email is the way back\nSign in with it on any device to open this wallet.\nEMAIL\ntest-8958@privy.io\nExport private key\nShown in a secure window. xorr never sees it.\nI can open this email\nBack"
  },
  {
   "stem": "45-legal",
@@ -489,7 +465,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Today's limit\nREMAINING TODAY\nNothing granted yet\n$0.00 spent\n$0.00 cap\nResets at midnight UTC."
+  "text": "Today's limit\nREMAINING TODAY\n$0.00\n$100.00 spent\n$100.00 cap\nResets at midnight UTC.\nBack"
  },
  {
   "stem": "52-balance",
@@ -498,20 +474,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Balance\nTOTAL\n$0.00\nCash\n$0.00\n0.0%\nSpendable now. The cap draws from this.\nHeld\n$0.00\n0.0%\nMarked at what a sale would get.\nSupplied\n$0.00\n0.0%\nEarning. Withdraw it to spend it.\nWhere it sits"
+  "text": "Balance\nTOTAL\n$1,008.04\nCash\n$908.00\n90.1%\nSpendable now. The cap draws from this.\nHeld\n$100.04\n9.9%\nMarked at what a sale would get.\nSupplied\n$0.00\n0.0%\nEarning. Withdraw it to spend it.\nWhere it sits\nBack"
  },
  {
   "stem": "53-delegation",
   "route": "/delegation",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /STATE/",
-   "missing /Daily cap/",
-   "missing /0x[0-9a-fA-F]{4}/"
-  ],
-  "text": "Permission\nNothing has been granted. The bot cannot place an order."
+  "content": [],
+  "text": "Permission\nSTATE\nLive\nDaily cap\n$100.00\nExpiry\nIn 6 days\nSep 27\nOwner\n0x95A0…e615\nDelegate\n0xB3e9…EC21\nVENUES IT MAY REACH\n0x4f0C…9bcA\n0x7c5b…aeaf\n0x8b77…F000\n0xE3F3…f116\nBack"
  },
  {
   "stem": "54-approvals",
@@ -520,7 +492,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Approvals\nWhat can take tokens from this wallet, read from the chain.\nSpender · the delegation contract\n0xf50a…7819\nNo unlimited approvals.\nUSDC\nNone\n0xB6CE…3061\nUSDT0\nNone\n0x779D…3736\nUSDG\nNone\n0x4ae4…2dc8\nWETH\nNone\n0x5A77…C71c\nXBTC\nNone\n0xb7C0…6b4f\nTSLAx\nNone\n0xc3fd…1171\nQQQx\nNone\n0x4c1a…01f7\nGOOGLx\nNone\n0xf8c5…aa6f\nCOINx\nNone\n0x44c7…d56e\nSPYx\nNone\n0xe7e5…b540\nNVDAx\nNone\n0xa8dd…50d5\nAAPLx\nNone\n0"
+  "text": "Approvals\nWhat can take tokens from this wallet, read from the chain.\nSpender · the delegation contract\n0xba23…c93a\n15 tokens are approved without a limit.\nUSDC\nLimited\n0xB6CE…3061\n3,000.00 USDC\n3000000000\nTake it back\nUSDT0\nUnlimited\n0x779D…3736\n115792089237316195423570985008687907853269984665640564039457584007913129639935\nTake it back\nUSDG\nUnlimited\n0x4ae4…2dc8\n1157920892373161954235709850086879"
  },
  {
   "stem": "55-verify",
@@ -529,7 +501,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Verification\nShare\nEach claim, how it was tested, and what came back.\n15\nPassed\n4\nFailed\n1\nNot asked\nxlayer-fork · Sep 19, 2:15 AM\nThe app is talking to a real chain.\neth_chainId + eth_blockNumber against http://xlayer-fork.railway.internal:8545\nchain 196 (xlayer-fork) at block 70991537\nXorrDelegation is deployed and has code.\neth_getCode 0xf50a4ec95c07e497095ddad99a006cf44ceb7819\n5596 bytes at 0x"
+  "text": "Verification\nShare\nEach claim, how it was tested, and what came back.\n20\nPassed\n0\nFailed\n0\nNot asked\nxlayer-fork · Sep 20, 6:31 AM\nThe app is talking to a real chain.\neth_chainId + eth_blockNumber against http://xlayer-fork.railway.internal:8545\nchain 196 (xlayer-fork) at block 71094904\nXorrDelegation is deployed and has code.\neth_getCode 0xba23ece812dab11f66a39c9d273d40b716ecc93a\n5596 bytes at 0x"
  },
  {
   "stem": "56-metrics",
@@ -538,7 +510,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Metrics\nEverything this executor has done, across every wallet on it — not only yours.\nRUNS BY OUTCOME\nNothing has run yet.\nSTRATEGIES BY STATE\nNone exist.\nHOW CLOSE TO THE MARKET PRICE\nNo fills to measure yet.\nALERTS\n0 enabled · 0 fired\nSPENT TODAY\n$0.00\nUTC day, every wallet on this executor."
+  "text": "Metrics\nEverything this executor has done, across every wallet on it — not only yours.\nRUNS BY OUTCOME\nfailed\n23\nfilled\n5\n82.1% of attempts broke rather than filled.\nSTRATEGIES BY STATE\nended\n49\nlive\n4\nWHY RUNS FAILED · LAST 7 DAYS\nother\n23\nWHERE FILLS SETTLED\nUniswap v3\n5\nHOW CLOSE TO THE MARKET PRICE\nuniswap-v3 · equities · 5 fills\n+5.5 bps\nworst 3.3 · best +11.5\n5 measured · includes fork drift"
  },
  {
   "stem": "57-system",
@@ -547,7 +519,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "System\nEXECUTOR\nUp\nxlayer-fork · up 20m\n0xf50a…7819\npostgres\n4ms\nresponded just now\nrpc\n9ms\nxlayer-fork at block 70991537\ndelegation\n8ms\n5596 bytes\ngas\nnot critical\n8ms\n10.0000 OKB\nupstreams\nnot critical\n1ms\nno breaker open"
+  "text": "System\nEXECUTOR\nUp\nxlayer-fork · up 3m\n0xba23…c93a\npostgres\n5ms\nresponded just now\nrpc\n5ms\nxlayer-fork at block 71094905\ndelegation\n6ms\n5596 bytes\ngas\nnot critical\n6ms\n99.9982 OKB\nupstreams\nnot critical\n1ms\nno breaker open\nBack"
  },
  {
   "stem": "58-network",
@@ -556,7 +528,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Network\nCHAIN\na fork of X Layer mainnet\nChain 196 · xlayer-fork\nA fork of X Layer. Fills are real here and nowhere else.\nBLOCK\n70,991,537\nRPC answered in 12ms\nDELEGATION CONTRACT\n0xf50a…7819\n0xf50a4ec95c07e497095ddad99a006cf44ceb7819\nGAS WALLET\n10.0000 OKB\nEXPLORER\nNone. A fork’s own transactions are on no public explorer.\nEverything the system needs\nEvery network"
+  "text": "Network\nCHAIN\nThis app\nX Layer (fork of mainnet)\nChain 196 · xlayer-fork\nA fork of X Layer. Fills are real here and nowhere else.\nWHAT WORKS HERE\nTrades settle here.\nIdle cash can earn.\nTest network. Not real money.\nBLOCK\n71,094,906\nRPC answered in 4ms\nDELEGATION CONTRACT\n0xba23…c93a\n0xba23ece812dab11f66a39c9d273d40b716ecc93a\nGAS WALLET\n99.9982 OKB\nEXPLORER\nNone. A fork’s own transactions are on n"
  },
  {
   "stem": "59-rates",
@@ -565,7 +537,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Rate\nUSDC SUPPLY RATE\n3.48%\nIt floats. It is not a promise.\nYOURS\n$0.00 supplied · $0.00 idle\nIdle cash would earn about $0.00 a year, if today's rate held.\nEarn on idle cash\nWithdraw"
+  "text": "Rate\nUSDT0 SUPPLY RATE\n3.40%\nIdle cash is supplied to Aave v3 on X Layer as USDT0, which pays 3.40% against 1.50% on USDC. The rate floats; it is not a promise.\nYOURS\n$0.00 supplied · $908.00 idle\nIdle cash would earn about $30.85 a year, if today's rate held.\nEarn on idle cash\nWithdraw\nBack"
  },
  {
   "stem": "63-audit-chain",
@@ -574,7 +546,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "The trail\nHASH CHAIN\nUnbroken\n2 entries, each one committing to the hash of the entry before it.\n2 of 2 rows still hash to their own contents.\nA broken chain can be reported, never repaired.\nThat check is ours. The latest hash is also on chain, where anyone can read it.\nSee it on chain\nThe full trail\nNo gas sent\nxorr · 08:32 PM\nrisk\nWallet connected\nxorr · 08:32 PM\nrisk"
+  "text": "The trail\nHASH CHAIN\nUnbroken\n27 entries, each one committing to the hash of the entry before it.\n27 of 27 rows still hash to their own contents.\nA broken chain can be reported, never repaired.\nThat check is ours. The latest hash is also on chain, where anyone can read it.\nSee it on chain\nThe full trail\nTrading permission granted\nxorr · 12:50 AM\nrisk\nAll agents stopped\nxorr · 12:48 AM\nrisk\nBought "
  },
  {
   "stem": "64-runs",
@@ -583,7 +555,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Runs\nAll\nFilled\nRefused\nSkipped\nFailed\nNo strategy has run yet."
+  "text": "Runs\nAll\nFilled\nRefused\nSkipped\nFailed\nTSLAx\n$50 of TSLAx · Sep 20, 6:16 AM\n$50.00\n0.1369\nTSLAx\n$50 of TSLAx · Sep 20, 6:09 AM\n$50.00\n0.1369\nTSLAx\n$50 of TSLAx · Sep 20, 5:36 AM\nFailed\nTSLAx\n$50 of TSLAx · Sep 20, 5:34 AM\nFailed\nTSLAx\nSold 21% of TSLAx · Sep 19, 7:54 PM\nFailed\nTSLAx\nMomentum Scout · $10.00 of TSLAx · Sep 19, 1:43 PM\nFailed\nTSLAx\nMomentum Scout · $10.00 of TSLAx · Sep 19, 1:33 PM\nF"
  },
  {
   "stem": "65-proposals",
@@ -592,7 +564,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Proposals\nAll\nApproved\nSkipped\nExpired\nThe bot has not proposed anything yet."
+  "text": "Proposals\nAll\nApproved\nSkipped\nExpired\nMomentum Scout\nExpired unanswered\nBuy 0.0274 TSLAx · $10.00\nSep 20, 5:13 AM\nMomentum Scout\nExpired unanswered\nBuy 0.0274 TSLAx · $10.00\nSep 20, 4:14 AM\nMomentum Scout\nExpired unanswered\nBuy 0.0274 TSLAx · $10.00\nSep 20, 3:25 AM\nMomentum Scout\nExpired unanswered\nBuy 0.0274 TSLAx · $10.00\nSep 20, 2:29 AM\nMomentum Scout\nExpired unanswered\nBuy 0.0274 TSLAx · $10."
  },
  {
   "stem": "66-pnl",
@@ -601,7 +573,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Realised\nNothing has been sold yet, so nothing is realised.\nSee what is held ›"
+  "text": "Realised\nNothing has been sold yet, so nothing is realised.\nSee what is held ›\nBack\nSee what is held"
  },
  {
   "stem": "67-disposals",
@@ -610,7 +582,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Disposals\nOne row per sale, with the cost it was matched against.\nNothing has been sold, so there is nothing to report."
+  "text": "Disposals\nOne row per sale, with the cost it was matched against.\nNothing has been sold, so there is nothing to report.\nBack"
  },
  {
   "stem": "69-schedule",
@@ -628,7 +600,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Allocation\nNothing held yet."
+  "text": "Allocation\nTOTAL\n$1,008.04\nCash\n$908.00\n90.1%\nTSLAx\n$100.04\n9.9%\nBack"
  },
  {
   "stem": "71-sources",
@@ -646,7 +618,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "How it works\nWhat each one does here, and the evidence it is doing it.\nX Layer\nPartly\nOKX's EVM chain, and where the money moves. The permission you sign, every trade and every withdrawal settle on it; gas is paid in OKB, by the bot for its own trades.\nNothing has settled on X Layer fork for this deployment yet.\nThe network\nUniswap v3\nPartly\nEvery trade has a Uniswap v3 route. The executor quotes "
+  "text": "How it works\nWhat each one does here, and the evidence it is doing it.\nX Layer\nLive\nOKX's EVM chain, and where the money moves. The permission you sign, every trade and every withdrawal settle on it; gas is paid in OKB, by the bot for its own trades.\n5 fills settled on X Layer fork, counted from the runs that filled.\nThe network\nUniswap v3\nLive\nEvery trade has a Uniswap v3 route. The executor quot"
  },
  {
   "stem": "73-venues",
@@ -655,7 +627,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Venues\nThe only places a trade can fill.\nNothing is granted, so no trade can fill."
+  "text": "Venues\nThe only places a trade can fill.\nCONTRACT\n0xba23…c93a\ngranted to 0xB3e9…EC21\n4 VENUES\n0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA\n0x7c5bee2a8091c3ef39072f64f18fac913060aeaf\n0x8b773D83bc66Be128c60e07E17C8901f7a64F000\n0xE3F3Caefdd7180F884c01E57f65Df979Af84f116\nWhat it may pull\nBack"
  },
  {
   "stem": "74-tokens",
@@ -673,7 +645,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Coverage\nPRICED AND TRADABLE\nA chart and an order.\nAAPLx\nAMZNx\nBTC\ntrades as XBTC\nCOINx\nGOOGLx\nMETAx\nMSFTx\nMSTRx\nNVDAx\nQQQx\nSPYx\nTSLAx\nUSDC\nUSDG\nUSDT0\nWOKB\nXBTC\nPRICED ONLY\nA chart, not an order. Not tradable here.\nAAVE\nDOGE\nETH\nHYPE\nLINK\nPAXG\nSOL\nTON\nWETH\nXAUT\nXRP"
+  "text": "Coverage\nPRICED AND TRADABLE\nA chart and an order.\nAAPLx\nAMZNx\nBTC\ntrades as XBTC\nCOINx\nGOOGLx\nMETAx\nMSFTx\nMSTRx\nNVDAx\nQQQx\nSPYx\nTSLAx\nUSDC\nUSDG\nUSDT0\nWOKB\nXBTC\nPRICED ONLY\nA chart, not an order. Not tradable here.\nAAVE\nDOGE\nETH\nHYPE\nLINK\nPAXG\nSOL\nTON\nWETH\nXAUT\nXRP\nBack"
  },
  {
   "stem": "76-movers",
@@ -682,7 +654,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Movers\nThe day’s biggest moves, both ways.\nUP\nSOL\nSolana · Spot · Perp\n$113.61\n+12.48%\nHYPE\nHyperliquid · Spot · Perp\n$91.72\n+10.58%\nLINK\nChainlink · Perp\n$12.39\n+9.30%\nAAVE\nAave · Spot · Perp\n$139.93\n+8.77%\nXRP\nXRP · Perp\n$1.40\n+8.43%\nDOGE\nDogecoin · Perp\n$0.0881\n+7.89%\nETH\nEthereum · Perp\n$2,633\n+7.49%\nBTC\nBitcoin · Perp\n$81,123\n+6.07%"
+  "text": "Movers\nThe day’s biggest moves, both ways.\nUP\nTON\nToncoin · Spot · Perp\n$1.38\n+0.88%\nLINK\nChainlink · Perp\n$12.40\n+0.22%\nETH\nEthereum · Perp\n$2,626\n+0.10%\nXAUT\nGold · Perp · spot feed\n$4,373\n+0.01%\nDOWN\nSOL\nSolana · Spot · Perp\n$110.89\n−2.41%\nAAVE\nAave · Spot · Perp\n$140.37\n−1.40%\nHYPE\nHyperliquid · Spot · Perp\n$92.22\n−0.98%\nBTC\nBitcoin · Perp\n$81,262\n−0.43%\nDOGE\nDogecoin · Perp\n$0.0875\n−0.39%\nXRP"
  },
  {
   "stem": "77-stocks",
@@ -691,18 +663,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Stocks\nPriced by what a real buy would cost.\nTSLAx\nTesla, Inc.\n$362.49\nQQQx\nInvesco QQQ Trust\n$721.15\nGOOGLx\nAlphabet Inc.\n$352.70\nCOINx\nCoinbase Global, Inc.\n$195.41\nSPYx\nSPDR S&P 500 ETF Trust\n$765.64\nNVDAx\nNVIDIA Corporation\n$220.17\nAAPLx\nApple Inc.\n$337.38\nMSFTx\nMicrosoft Corporation\n$498.86\nMETAx\nMeta Platforms, Inc.\n$673.89\nMSTRx\nStrategy Inc.\n$154.47\nAMZNx\nAmazon.com, Inc.\n$254.56"
+  "text": "Stocks\nPriced by what a real buy would cost.\nTSLAx\nTesla, Inc.\n$365.48\nQQQx\nInvesco QQQ Trust\n$723.44\nGOOGLx\nAlphabet Inc.\n$353.04\nCOINx\nCoinbase Global, Inc.\n$195.67\nSPYx\nSPDR S&P 500 ETF Trust\n$768.59\nNVDAx\nNVIDIA Corporation\n$222.72\nAAPLx\nApple Inc.\n$336.13\nMSFTx\nMicrosoft Corporation\n$498.35\nMETAx\nMeta Platforms, Inc.\n$674.93\nMSTRx\nStrategy Inc.\n$159.79\nAMZNx\nAmazon.com, Inc.\n$254.62\nBack"
  },
  {
   "stem": "78-earnings",
   "route": "/earnings",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /EDGAR/i"
-  ],
-  "text": "Earnings\nPast filings, and when the next is likely.\nNVDAx\nAAPLx\nTSLAx\nMETAx\nMSFTx\nAMZNx\nGOOGLx\nMSTRx\nPROJECTED NEXT\nNov 25, 2026\nProjected from past filings, give or take 7 days.\nUsually 91 days apart.\nFILED\nAug 26, 2026\n98 days\nMay 20, 2026\n84 days\nFeb 25, 2026\n98 days\nNov 19, 2025\n84 days\nAug 27, 2025\n91 days\nMay 28, 2025\n91 days\nFeb 26, 2025\n98 days\nNov 20, 2024"
+  "content": [],
+  "text": "Earnings\nPast SEC EDGAR filings, and when the next is likely.\nNVDAx\nAAPLx\nTSLAx\nMETAx\nMSFTx\nAMZNx\nGOOGLx\nMSTRx\nPROJECTED NEXT\nNov 25, 2026\nProjected from past filings, give or take 7 days.\nUsually 91 days apart.\nFILED\nAug 26, 2026\n98 days\nMay 20, 2026\n84 days\nFeb 25, 2026\n98 days\nNov 19, 2025\n84 days\nAug 27, 2025\n91 days\nMay 28, 2025\n91 days\nFeb 26, 2025\n98 days\nNov 20, 2024\nBack"
  },
  {
   "stem": "79-funding",
@@ -711,7 +681,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Funding\nPaid every hour. Positive means longs pay shorts.\nBTC\n$81,203\n+0.0013% / h\n+11.0% a year\nETH\n$2,636\n+0.0013% / h\n+11.0% a year\nHYPE\n$91.82\n+0.0013% / h\n+11.0% a year\nZEC\n$1,499\n+0.0013% / h\n+11.0% a year\nSOL\n$113.73\n+0.0013% / h\n+11.0% a year\nNEAR\n$3.69\n+0.0019% / h\n+17.0% a year\nUNI\n$9.08\n+0.0068% / h\n+59.6% a year\nXRP\n$1.41\n+0.0013% / h\n+11.0% a year\nARB\n$0.2263\n+0.0035% / h\n+30.4% a yea"
+  "text": "Funding\nPaid every hour. Positive means longs pay shorts.\nBTC\n$81,309\n+0.0013% / h\n+11.0% a year\nETH\n$2,625\n+0.0013% / h\n+11.0% a year\nZEC\n$1,478\n+0.0013% / h\n+11.0% a year\nHYPE\n$92.14\n+0.0013% / h\n+11.0% a year\nSOL\n$110.83\n+0.0013% / h\n+11.0% a year\nXRP\n$1.40\n+0.0013% / h\n+11.0% a year\nNEAR\n$3.57\n+0.0058% / h\n+51.0% a year\nENA\n$0.2078\n+0.0039% / h\n+33.9% a year\nUNI\n$8.76\n+0.0013% / h\n+11.0% a yea"
  },
  {
   "stem": "80-compare",
@@ -720,7 +690,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Compare\nChange over the past 30 days, side by side.\nFIRST\nBTC\nETH\nSOL\nXRP\nDOGE\nHYPE\nAAVE\nLINK\nTON\nXAUT\nPAXG\nWETH\nUSDC\nXBTC\nWOKB\nUSDG\nUSDT0\nWETH +25.5%\nSECOND\nBTC\nETH\nSOL\nXRP\nDOGE\nHYPE\nAAVE\nLINK\nTON\nXAUT\nPAXG\nWETH\nUSDC\nXBTC\nWOKB\nUSDG\nUSDT0\nNo history for CBBTC."
+  "text": "Compare\nChange over the past 30 days, side by side.\nFIRST\nBTC\nETH\nSOL\nXRP\nDOGE\nHYPE\nAAVE\nLINK\nTON\nXAUT\nPAXG\nWETH\nUSDC\nXBTC\nWOKB\nUSDG\nUSDT0\nWETH +13.1%\nSECOND\nBTC\nETH\nSOL\nXRP\nDOGE\nHYPE\nAAVE\nLINK\nTON\nXAUT\nPAXG\nWETH\nUSDC\nXBTC\nWOKB\nUSDG\nUSDT0\nNo history for CBBTC.\nBack\nChart, rising over its range"
  },
  {
   "stem": "81-roster-compare",
@@ -729,7 +699,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Compare agents\nMomentum Scout\nRides breakouts on liquid majors\n30d\n$0.00\nWon\n—\nTrades\n0\nEarnings Desk\nTrades tokenized equity earnings\n30d\n$0.00\nWon\n—\nTrades\n0\nYield Keeper\nMoves idle cash into the best rate\n30d\n$0.00\nWon\n—\nTrades\n0\nDrawdown Guard\nCuts risk when the book bleeds\n30d\n$0.00\nWon\n—\nTrades\n0\nPast performance of a strategy says nothing about tomorrow."
+  "text": "Compare agents\nMomentum Scout\nRides breakouts on liquid majors\n30d\n$0.00\nWon\n—\nTrades\n0\nEarnings Desk\nTrades tokenized equity earnings\n30d\n$0.00\nWon\n—\nTrades\n0\nYield Keeper\nMoves idle cash into the best rate\n30d\n$0.00\nWon\n—\nTrades\n0\nDrawdown Guard\nCuts risk when the book bleeds\n30d\n$0.00\nWon\n—\nTrades\n0\nPast performance of a strategy says nothing about tomorrow.\nBack\nMomentum Scout. Rides breakouts"
  },
  {
   "stem": "82-risk",
@@ -738,7 +708,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Risk limits\nEach agent's own limits, on top of your daily cap.\nNo agent has its own limits. Your daily cap still applies."
+  "text": "Risk limits\nEach agent's own limits, on top of your daily cap.\nNo agent has its own limits. Your daily cap still applies.\nBack"
  },
  {
   "stem": "83-policy",
@@ -747,7 +717,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Wallet policy\nPRIVY POLICY\nNot attached\nThe policy exists but is not attached to this wallet. Attaching it is authorised by the wallet owner, which is you — not us.\nxorr wallet policy (xlayer-fork)\nWOULD ALLOW\nGrant the permission to the xorr bot\n0xf50a…7819\nRevoke the permission\n0xf50a…7819\nApprove USDC for the delegation\n0xb6ce…3061\nApprove USDT0 for the delegation\n0x779d…3736\nApprove USDG for t"
+  "text": "Wallet policy\nPRIVY POLICY\nNot attached\nThe policy exists but is not attached to this wallet. Attaching it is authorised by the wallet owner, which is you — not us.\nxorr wallet policy (xlayer-fork)\nWOULD ALLOW\nGrant the permission to the xorr bot\n0xba23…c93a\nRevoke the permission\n0xba23…c93a\nApprove USDC for the delegation\n0xb6ce…3061\nApprove USDT0 for the delegation\n0x779d…3736\nApprove USDG for t"
  },
  {
   "stem": "84-profile",
@@ -756,7 +726,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nActivity\nPermissions\nApprovals\nSettings\nWallet made with your email"
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nActivity\nPermissions\nApprovals\nSettings\nWallet made with your email\nBack\nCopy address 0x95A0b368588713011a15f4b1041423f31B08e615"
  },
  {
   "stem": "85-notifications",
@@ -774,7 +744,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Since you looked\nFirst visit — this is everything from the last day.\n2\nrisk\nNo gas sent\n2:02 AM\nNot sent — refusing to send real OKB on xlayer-fork.\nWallet connected\n2:02 AM\nYour keys, held by you. xlayer-fork.\nMark all as seen"
+  "text": "Since you looked\nFirst visit — this is everything from the last day.\n12\nrisk\n12\ntrade\n1\nblock\nTrading permission granted\n6:20 AM\nUp to $100 a day, expiring Sun Sep 27 2026.\nAll agents stopped\n6:18 AM\nPermission revoked on-chain. Open positions are untouched.\nBought 0.1369 TSLAx\n6:16 AM\n$50 at $365.48. Placed by you.\nTrading permission granted\n6:12 AM\nUp to $100 a day, expiring Sun Sep 27 2026.\nAll"
  },
  {
   "stem": "87-export",
@@ -783,7 +753,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Export\nThe audit trail\nEverything the bot did and refused, in order.\nCSV\nJSON\nDisposals\nEach sale with the cost it was matched against.\nCSV\nA sale with no recorded cost is marked, and counts as no gain or loss."
+  "text": "Export\nThe audit trail\nEverything the bot did and refused, in order.\nCSV\nJSON\nDisposals\nEach sale with the cost it was matched against.\nCSV\nA sale with no recorded cost is marked, and counts as no gain or loss.\nBack"
  },
  {
   "stem": "89-backtest",
@@ -792,7 +762,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Backtest\nA weekly buy over real past prices. Nothing is bought.\nXBTC\nWOKB\n30d\n90d\n6m\n1y\n$25.00\n$50.00\n$100.00\n$250.00\nRun it"
+  "text": "Backtest\nA weekly buy over real past prices. Nothing is bought.\nXBTC\nWOKB\n30d\n90d\n6m\n1y\n$25.00\n$50.00\n$100.00\n$250.00\nRun it\nBack"
  },
  {
   "stem": "90-sell-everything",
@@ -801,7 +771,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "What would sell\nA preview. Nothing here sells anything.\nNothing is held above the dust threshold, so flattening would sell nothing."
+  "text": "What would sell\nA preview. Nothing here sells anything.\nTOTAL\n$100.04\nAcross one position.\nTSLAx\n0.2737\n$100.04\nPositions worth less than $1.00 are left where they are. Selling them would cost more in fees than they are worth.\nGo to the flatten screen\nBack"
  },
  {
   "stem": "91-voice",
@@ -810,7 +780,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Voice\nHow the bot writes to you.\nDry\nIn use\nUnderstated, with the odd dry aside.\nSharp\nOpinionated about markets, careful with your money.\nFlat\nJust what happened.\nTone never changes a number."
+  "text": "Voice\nHow the bot writes to you.\nDry\nIn use\nUnderstated, with the odd dry aside.\nSharp\nOpinionated about markets, careful with your money.\nFlat\nJust what happened.\nTone never changes a number.\nBack\nDry. Understated, with the odd dry aside.\nSharp. Opinionated about markets, careful with your money.\nFlat. Just what happened."
  },
  {
   "stem": "92-not-found",
@@ -819,7 +789,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Not found\nThere is nothing here\nNo screen is registered at /no-such-screen-exists. It may have been a stale link.\nGo to your wallet\nEverything this app can show you"
+  "text": "Not found\nThere is nothing here\nNo screen is registered at /no-such-screen-exists. It may have been a stale link.\nGo to your wallet\nEverything this app can show you\nBack"
  },
  {
   "stem": "93-oracle-equity",
@@ -828,7 +798,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "NVDAx\nEvery price we recorded for it.\n19 readings since Sep 19, 2026.\nSep 19, 2:17 AM\n$220.17\nSep 19, 2:16 AM\n$220.17\nSep 19, 2:15 AM\n$220.17\nSep 19, 2:13 AM\n$220.17\nSep 19, 2:10 AM\n$220.17\nSep 19, 2:08 AM\n$220.17\nSep 19, 2:07 AM\n$220.17\nSep 19, 2:06 AM\n$220.17\nSep 19, 2:05 AM\n$220.17\nSep 19, 2:04 AM\n$220.17\nSep 19, 2:03 AM\n$220.17\nSep 19, 2:00 AM\n$220.17\nSep 19, 1:55 AM\n$220.17\nSep 19, 1:54 AM\n$2"
+  "text": "NVDAx\nEvery price we recorded for it.\n1214 readings since Sep 19, 2026.\nSep 20, 6:34 AM\n$222.72\nSep 20, 6:34 AM\n$222.72\nSep 20, 6:32 AM\n$222.74\nSep 20, 6:31 AM\n$222.75\nSep 20, 6:29 AM\n$222.74\nSep 20, 6:29 AM\n$222.74\nSep 20, 6:28 AM\n$222.76\nSep 20, 6:27 AM\n$222.76\nSep 20, 6:26 AM\n$222.78\nSep 20, 6:26 AM\n$222.75\nSep 20, 6:25 AM\n$222.74\nSep 20, 6:25 AM\n$222.74\nSep 20, 6:24 AM\n$222.75\nSep 20, 6:24 AM\n"
  },
  {
   "stem": "94-crosscheck",
@@ -837,7 +807,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "BTC\nCROSS-CHECK\nThey agree\nTwo independent sources within 0.04%.\nOn-chain\n$81,189\nwhat a trade would pay\nReference\n$81,155\nthe market feed\nDIFFERENCE\n0.04%\nTrades fill at the on-chain price.\nOn-chain price from the Uniswap v3 pools. Reference from CoinGecko."
+  "text": "BTC\nCROSS-CHECK\nThey agree\nTwo independent sources within 0.04%.\nOn-chain\n$81,299\nwhat a trade would pay\nReference\n$81,264\nthe market feed\nDIFFERENCE\n0.04%\nTrades fill at the on-chain price.\nOn-chain price from the Uniswap v3 pools. Reference from CoinGecko.\nBack"
  },
  {
   "stem": "95-route",
@@ -846,7 +816,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Route\nUSDC into XBTC. Quote only.\n$100.00\n$500.00\n$2,500.00\n$10,000.00\nYOU WOULD RECEIVE\n0.0062 XBTC\nAt worst 0.0061, at 0.3% slippage.\nROUTE\nOne venue\nPRICE IMPACT\n0.04%\nSAME SIZE, EVERY WAY TO FILL\nPool swap\n0.0062 XBTC\nAggregator\nCan’t fill this size\nThis deployment has no OKX DEX API key.\nOnly Pool swap can fill this size.\nQuotes from Uniswap v3 and OKX DEX."
+  "text": "Route\nUSDC into XBTC. Quote only.\n$100.00\n$500.00\n$2,500.00\n$10,000.00\nYOU WOULD RECEIVE\n0.0062 XBTC\nAt worst 0.0061, at 0.3% slippage.\nROUTE\nOne venue\nPRICE IMPACT\n0.02%\nSAME SIZE, EVERY WAY TO FILL\nPool swap\n0.0062 XBTC\nAggregator\nCan’t fill this size\nThis deployment has no OKX DEX API key.\nOnly Pool swap can fill this size.\nQuotes from Uniswap v3 and OKX DEX.\nBack"
  },
  {
   "stem": "96-audit-anchor",
@@ -855,7 +825,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "On-chain anchor\nSTATE\nNOT YET ANCHORED\nNothing has been published for this wallet yet, so nothing here is committed to the chain.\nON THIS DEVICE\nCouldn’t check\nNothing is anchored yet.\nCHECK IT YOURSELF\nRead latest(0xB3e9…EC21, your address) on 0x9d22…cf12, on xlayer-fork. The signing key is the bot's key, the same one on the safety screen.\ncontract  0x9d22e2b3e1d31a6973b6395cbb6d369ef8b6cf12\nanch"
+  "text": "On-chain anchor\nSTATE\nCOMMITTED\nAll 27 entries are covered by the hash the chain is holding.\nON THIS DEVICE\nMatches the chain\nAnchored at block 71,094,895.\nWHAT THE CHAIN HOLDS\n0x77f5eaa5…3c499a9b\nentry 27 · block 71,094,895\nsince Sun, 20 Sep 2026 00:59:15 UTC\nCHECK IT YOURSELF\nRead latest(0xB3e9…EC21, your address) on 0x62d4…4140, on xlayer-fork. The signing key is the bot's key, the same one on "
  },
  {
   "stem": "97-portfolio",
@@ -864,18 +834,16 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Portfolio\nTOTAL BALANCE\n$\n0\n.\n0\n0\nSince Sep 19\n+$0.00 · +0.0%\nValue when recorded\nNet invested\nDeposit\nWithdraw\nPositions\n0 open\nNo open positions yet.\nStart a recurring buy\nProfit\nOpen\n+$0.00\nClosed\n+$0.00\nCASH\n$0.00\nEARNING\n$0.00"
+  "text": "Portfolio\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\n+$0.04 · +0.0% open\nSince Sep 19\n+$1,008.04 · +0.0%\nValue when recorded\nNet invested\nDeposit\nWithdraw\nAllocation\n$100.04\nIn positions\nMotor Vehicles & Passenger Car Bodies\nTSLAx\n100%\nPositions\n1 open\nTSLAx\nLONG\nIN PROFIT\n$365.48\n+$0.04 · +0.0%\nENTRY $365.35\nTP $401.88\nSL $347.08\nSIZE\n0.2737\nVALUE\n$100.04\nP&L\n+$0.04\n2 trades\nWhy this trade ▼\nProfit\nOpen\n+$0"
  },
  {
   "stem": "98-agent",
-  "route": "/agent/momentum-scout",
-  "ok": false,
+  "route": "/agent/drawdown-guard",
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Add strategy/"
-  ],
-  "text": "Momentum Scout\nRides breakouts on liquid majors\nNOT HIRED\nHire Momentum Scout\nAdd funds\nWithdraw\n$0.00\n30 days\n—\nWin rate\n0\nTrades\nStrategies\nSee all\nNothing running yet.\nNo strategy to add for Momentum Scout yet."
+  "content": [],
+  "text": "Drawdown Guard\nCuts risk when the book bleeds\nNOT HIRED\nHire Drawdown Guard\nAdd funds\nWithdraw\n$0.00\n30 days\n—\nWin rate\n0\nTrades\nStrategies\nSee all\nExit TSLAx at +10.0% / -5.0%\nTSLAx · $0.00 a day\nLive\nAdd strategy\nBack\nSee all strategies"
  },
  {
   "stem": "99a-deposit",
@@ -884,7 +852,7 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Deposit\nTest network\n0x95A0b368588713011a15f4b1041423f31B08e615\nCopy address\nA copy of X Layer. Test funds only.\nBALANCE\nUSDC\n0.00\nUSDT0\n0.00\nOKB\nFor gas\n0.0000\nNothing here yet. Send USDC or USDT0 to the address above.\nGet 1,000 test USDC"
+  "text": "Deposit\nTest network\n0x95A0b368588713011a15f4b1041423f31B08e615\nCopy address\nA copy of X Layer. Test funds only.\nBALANCE\nUSDC\n908.00\nUSDT0\n0.00\nOKB\nFor gas\n9.9973\nGet 1,000 test USDC\nAvailable again in 6 h\nBack\nTest network. See every network"
  },
  {
   "stem": "99b-withdraw-everything",
@@ -893,61 +861,51 @@
   "errors": [],
   "network": [],
   "content": [],
-  "text": "Withdraw everything\nSell everything, then send it all to one saved address.\nTO\nNo saved addresses yet.\nIN THIS ORDER\n1. Sell every position\nNothing to sell.\n2. Take your money out of savings\nNothing supplied.\n3. Send your USDC and USDT0\nAll of it, to the address you choose. You sign it.\nOKB stays, for network fees.\nManage allowlist\nChoose where it goes\nThe bot sells. Only you can send."
+  "text": "Withdraw everything\nSell everything, then send it all to one saved address.\nTO\nNo saved addresses yet.\nIN THIS ORDER\n1. Sell every position\n0.2737 TSLAx · about $100.04\n2. Take your money out of savings\nNothing supplied.\n3. Send your USDC and USDT0\nAll of it, to the address you choose. You sign it.\nOKB stays, for network fees.\nManage allowlist\nChoose where it goes\nThe bot sells. Only you can send."
  },
  {
   "stem": "99e-futures",
   "route": "/futures",
-  "ok": false,
+  "ok": true,
   "errors": [],
-  "network": [
-   "FAILED GET https://app.hyperliquid.xyz/coins/kPEPE.svg"
-  ],
+  "network": [],
   "content": [],
-  "text": "Futures\n178 contracts\nTop\nGainers\nLosers\nBTC\n40x · OI $3.47B\n$81,169\n+6.08%\nETH\n25x · OI $2.86B\n$2,637\n+7.54%\nHYPE\n10x · OI $1.98B\n$91.86\n+10.30%\nZEC\n10x · OI $907.0M\n$1,501\n+1.28%\nSOL\n20x · OI $657.6M\n$113.58\n+12.18%\nNEAR\n10x · OI $263.7M\n$3.69\n+22.58%\nUNI\n10x · OI $103.3M\n$9.06\n+18.68%\nXRP\n20x · OI $205.8M\n$1.40\n+8.23%\nARB\n10x · OI $36.8M\n$0.2255\n+25.98%\nLIT\n5x · OI $213.1M\n$4.89\n+4.78%\nPUMP\n10x"
+  "text": "Futures\n178 contracts\nTop\nGainers\nLosers\nBTC\n40x · OI $3.45B\n$81,290\n−0.05%\nETH\n25x · OI $2.83B\n$2,626\n+0.43%\nZEC\n10x · OI $796.7M\n$1,478\n−6.21%\nHYPE\n10x · OI $1.99B\n$92.14\n−1.12%\nSOL\n20x · OI $634.8M\n$110.78\n−2.33%\nXRP\n20x · OI $227.8M\n$1.40\n−0.08%\nNEAR\n10x · OI $262.6M\n$3.59\n−5.14%\nENA\n10x · OI $92.0M\n$0.2065\n+20.04%\nUNI\n10x · OI $89.9M\n$8.76\n−0.71%\nLIT\n5x · OI $210.5M\n$4.79\n+0.91%\nAVAX\n10x · OI"
  },
  {
   "stem": "46-dev-ui",
   "route": "/_dev/ui",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Design system|TOTAL VALUE/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nYour profile, test-8958@privy.io\nNotifications\nTotal balance. Opens your portfolio.\nBalance shown, $1,008.04\n$1,008.04\nNo agent is trading right now\nAg"
  },
  {
   "stem": "46b-dev-ui-edge",
   "route": "/_dev/ui-edge",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Edge cases|TOTAL VALUE/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nYour profile, test-8958@privy.io\nNotifications\nTotal balance. Opens your portfolio.\nBalance shown, $1,008.04\n$1,008.04\nNo agent is trading right now\nAg"
  },
  {
   "stem": "47-dev-fidelity",
   "route": "/_dev/fidelity",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Fidelity|fidelity|TOTAL VALUE/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nYour profile, test-8958@privy.io\nNotifications\nTotal balance. Opens your portfolio.\nBalance shown, $1,008.04\n$1,008.04\nNo agent is trading right now\nAg"
  },
  {
   "stem": "48-dev-boom",
   "route": "/_dev/boom",
-  "ok": false,
+  "ok": true,
   "errors": [],
   "network": [],
-  "content": [
-   "missing /Break this screen|TOTAL VALUE/"
-  ],
-  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n0\n.\n0\n0\nFund\nPermit\nFirst trade\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nNOT GRANTED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1"
+  "content": [],
+  "text": "T\ntest-8958@privy.io\n0x95A0…e615\nTOTAL BALANCE\n$\n1\n,\n0\n0\n8\n.\n0\n4\nNo agent is trading right now\nAgents\nGainers\nStocks\nFutures\nARMED\nMomentum Scout\nNot hired\nEarnings Desk\nNot hired\nYield Keeper\nNot hired\nDrawdown Guard\nNot hired\nNew agent\nMake one\n1\nYour profile, test-8958@privy.io\nNotifications\nTotal balance. Opens your portfolio.\nBalance shown, $1,008.04\n$1,008.04\nNo agent is trading right now\nAg"
  }
 ]
