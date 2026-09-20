@@ -49,7 +49,15 @@ async function signIn(page) {
   await page.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
   await page.fill('input[type=email]', email);
   await page.getByText(/email me a code/i).first().click();
-  await page.waitForSelector('input[placeholder*="6-digit"]', { timeout: 30_000 });
+  /*
+   * Privy's send can take its time, and a second press costs nothing: the code field is what says it arrived. Thirty
+   * seconds was enough until it was not, and a harness that fails on its own impatience teaches nothing.
+   */
+  const code = 'input[placeholder*="6-digit"]';
+  await page.waitForSelector(code, { timeout: 60_000 }).catch(async () => {
+    await page.getByText(/email me a code/i).first().click().catch(() => undefined);
+    await page.waitForSelector(code, { timeout: 60_000 });
+  });
   await page.fill('input[placeholder*="6-digit"]', otp);
   await page.getByText(/verify and create/i).first().click();
   await page.waitForTimeout(15_000);
@@ -173,12 +181,29 @@ async function main() {
     for (const digit of ['5', '0']) await page.getByRole('button', { name: new RegExp(`^${digit}$`) }).first().click();
     await page.waitForTimeout(7000);
     const cta = page.getByText(/^Buy \$50 of TSLAx$/).first();
-    check(await cta.isEnabled().catch(() => false), 'the ticket offers the buy for the amount keyed in');
+    /*
+     * Wait for the quote before judging the button. It is disabled while the route is being re-quoted for the amount
+     * just keyed in (`quotePending`), which is the ticket refusing to send an order against a floor nobody was shown
+     * — so "disabled right now" is a state to wait out, not a failure.
+     */
+    let offered = false;
+    for (let i = 0; i < 20 && !offered; i += 1) {
+      offered = await cta.isEnabled().catch(() => false);
+      if (!offered) await page.waitForTimeout(1500);
+    }
+    check(offered, 'the ticket offers the buy once the quote for that amount lands');
     await cta.click();
-    await page.waitForSelector('text=/Bought|Already bought|filled/i', { timeout: 180_000 }).catch(() => undefined);
-    await page.waitForTimeout(10_000);
-    const said = await body();
-    check(/Bought/i.test(said), 'the ticket confirms the fill in its own words', said.match(/Bought[^\n]*/)?.[0] ?? said.slice(0, 120));
+    /*
+     * Read the confirmation the moment it appears: the ticket says what it bought and then takes itself away after
+     * 1.2 seconds (`app/order/[symbol].tsx`), so a check that looks a few seconds later is reading the screen the
+     * app went back to, not the one it is judging.
+     */
+    const said = await page
+      .waitForSelector('text=/Bought/i', { timeout: 180_000 })
+      .then((el) => el.innerText())
+      .catch(() => '');
+    check(/Bought/i.test(said), 'the ticket confirms the fill in its own words', said.replace(/\n/g, ' '));
+    await page.waitForTimeout(8000);
     const after = await apiGet('/positions', bearer);
     const heldAfter = Number((after.find?.((p) => p.symbol === 'TSLAx') ?? {}).units ?? 0);
     check(heldAfter > heldBefore, 'the position grew on chain', `${heldBefore} → ${heldAfter} TSLAx`);
