@@ -21,7 +21,18 @@ const h = vi.hoisted(() => ({
 
 // Exactly what the route reads from the chain: the head, the contract's logs (through the real `getLogsPaged`), blocks.
 vi.mock('../evm/client.js', () => ({
-  publicClient: { getBlockNumber: h.getBlockNumber, getLogs: h.getLogs, getBlock: h.getBlock },
+  /*
+   * `getCode` is what `deploymentBlock` bisects on, and the answer decides where the scan starts. Here the contract
+   * has code at every height, so the search bottoms out at 0 and the window is the route's own lower bound — the
+   * 9,000 blocks these tests are about. Left off entirely, the search saw a client with no `getCode` at all, which
+   * once meant "the search failed, fall back to 9,000" and now means "head", and every one of these read nothing.
+   */
+  publicClient: {
+    getBlockNumber: h.getBlockNumber,
+    getLogs: h.getLogs,
+    getBlock: h.getBlock,
+    getCode: async () => '0x60',
+  },
 }));
 vi.mock('../evm/chains.js', () => ({
   get CHAIN_KEY() {
