@@ -198,6 +198,9 @@ ops.get('/metrics', async (c) => {
     if (/venuenotallowed/.test(t)) return 'venue_not_allowed';
     if (/notdelegate/.test(t)) return 'wrong_delegate';
     if (/venuecallfailed|\btf\b|no route/.test(t)) return 'venue_could_not_fill';
+    // The owner did not hold what the trade would spend. `placeOrder` refuses this before it is signed now, so a
+    // run with this cause is one that reached the contract another way — worth telling apart from "other".
+    if (/transfer amount exceeds balance|insufficient_funds|insufficient funds/.test(t)) return 'insufficient_funds';
     if (/timeout|timed out|fetch failed|econn|socket hang up/.test(t)) return 'upstream_unreachable';
     return 'other';
   };
