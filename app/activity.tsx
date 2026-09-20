@@ -12,7 +12,7 @@
  * into Trades so every row is reachable from a tab.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   BackButton,
@@ -27,6 +27,7 @@ import {
   Price,
   Screen,
   Text,
+  TransactionRef,
   colors,
   divider,
   noteDotColor,
@@ -100,38 +101,6 @@ const NONE_UNDER: Readonly<Record<number, string>> = {
   3: 'Nothing blocked.',
 };
 
-/**
- * "Check it on chain" — when there is a chain to check it on.
- *
- * `explorerTx` returns a real URL on a public network and a `fork:`/`local:` label
- * otherwise. Both are shown; only the first is tappable. Pretending a local transaction has
- * an explorer entry would be the sort of small dishonesty this whole screen exists to make
- * impossible.
- */
-function ExplorerLink({ explorer }: { explorer: string }) {
-  const isUrl = explorer.startsWith('http');
-  if (!isUrl) {
-    // The hash alone: which network it is on is not named off the money screens (PLAN.md O3).
-    const ref = explorer.split(':')[1];
-    return (
-      <Text variant="footnote" color={colors.ink55}>
-        {`${ref?.slice(0, 10) ?? ''}…`}
-      </Text>
-    );
-  }
-  return (
-    <Press
-      onPress={() => void Linking.openURL(explorer)}
-      accessibilityRole="link"
-      accessibilityLabel="View this transaction"
-      hitHeight={24}
-    >
-      <Text variant="footnote" color={colors.ink55}>
-        View transaction ›
-      </Text>
-    </Press>
-  );
-}
 
 export default function Activity() {
   const goBack = useGoBack();
@@ -346,7 +315,7 @@ export default function Activity() {
                       that has never seen the transaction reads as the transaction not being
                       real.
                     */}
-                    {r.explorer ? <ExplorerLink explorer={r.explorer} /> : null}
+                    {r.explorer ? <TransactionRef explorer={r.explorer} /> : null}
                   </View>
                   {r.amount ? (
                     // What moved, in dollars or in a token's units — "$1,234.56 USDC" — hides while balances are hidden.

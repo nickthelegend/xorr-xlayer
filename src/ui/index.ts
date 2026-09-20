@@ -93,6 +93,7 @@ export { Eyebrow, type EyebrowProps } from './Eyebrow';
 export { BackButton, CloseButton, IconButton, HeaderBar, type IconButtonProps } from './IconButton';
 export { Progress, type ProgressProps } from './Progress';
 export { Placeholder, LoadingRows, ErrorState, EmptyState, EmptyList, FailureNote } from './States';
+export { TransactionRef, transactionRef } from './TransactionRef';
 export { EMPTY_LISTS, emptyList, type EmptyListKey, type EmptyListCopy } from './emptyActions';
 export { SignInPrompt, SignInButton, signIn } from './SignIn';
 export { RadioCard, type RadioCardProps } from './RadioCard';

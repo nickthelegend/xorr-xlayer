@@ -29,6 +29,7 @@ import {
   SheetCard,
   Tag,
   Text,
+  TransactionRef,
   colors,
   divider,
   money,
@@ -324,9 +325,9 @@ function Outcome({ result }: { result: Result }) {
             {l.detail}
           </Text>
           {l.explorer ? (
-            <Text variant="footnote" color={colors.ink55} style={{ marginTop: space.s6 }} selectable>
-              {l.explorer}
-            </Text>
+            <View style={{ marginTop: space.s6 }}>
+              <TransactionRef explorer={l.explorer} />
+            </View>
           ) : null}
         </View>
       ))}

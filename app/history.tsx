@@ -14,7 +14,7 @@
  * at all. The Base build's index is gone; the chain is the only source.
  */
 import React from 'react';
-import { Linking, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import {
@@ -23,10 +23,10 @@ import {
   Fill,
   HeaderBar,
   LoadingRows,
-  Press,
   Price,
   Screen,
   Text,
+  TransactionRef,
   colors,
   divider,
   size,
@@ -55,33 +55,6 @@ function amountOf(item: HistoryItem): string {
   return `${quantity(units, digits)} ${item.token.symbol}`;
 }
 
-/**
- * The receipt: a tappable link on a public chain, a plain label on a fork or a local node — a link to an explorer that
- * has never seen the transaction reads as the transaction not being real. The same rule Activity follows.
- */
-function Receipt({ explorer }: { explorer: string }) {
-  if (!explorer.startsWith('http')) {
-    // The hash alone: which network it is on is not named off the money screens (PLAN.md O3).
-    const ref = explorer.split(':')[1];
-    return (
-      <Text variant="footnote" color={colors.ink55}>
-        {`${ref?.slice(0, 10) ?? ''}…`}
-      </Text>
-    );
-  }
-  return (
-    <Press
-      onPress={() => void Linking.openURL(explorer)}
-      accessibilityRole="link"
-      accessibilityLabel="View this transaction"
-      hitHeight={24}
-    >
-      <Text variant="footnote" color={colors.ink55}>
-        View transaction ›
-      </Text>
-    </Press>
-  );
-}
 
 function HistoryRow({ item }: { item: HistoryItem }) {
   /*
@@ -102,7 +75,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
         <Text variant="secondarySm" numberOfLines={1}>
           {context}
         </Text>
-        <Receipt explorer={item.explorer} />
+        <TransactionRef explorer={item.explorer} />
       </View>
       <View style={{ alignItems: 'flex-end', gap: space.s2 }}>
         {/* What moved, in its token's units, hides while balances are hidden (FEATURES.md #47); so does its worth. */}
