@@ -13,11 +13,18 @@ vi.hoisted(() => {
   process.env.PRIVY_APP_SECRET = 'test';
 });
 
+const asked: string[] = [];
 const rows = vi.fn(async (sql: string): Promise<unknown[]> => {
   if (/GROUP BY status/.test(sql)) return [{ status: 'filled', n: '11' }, { status: 'failed', n: '23' }];
+  // The cause breakdown, which must not be asked about the rebuilt-chain runs at all.
+  if (/GROUP BY error/.test(sql)) {
+    asked.push(sql);
+    return [{ error: 'ReturnAmountIsNotEnough', n: '2' }];
+  }
   if (/not_on_chain/.test(sql)) return [{ n: '21' }];
   return [];
 });
+
 vi.mock('../db/index.js', () => ({ query: (sql: string) => rows(sql), one: async () => null }));
 vi.mock('../db/chain-scope.js', () => ({ THIS_CHAIN: `'xlayer-fork'` }));
 
@@ -32,5 +39,13 @@ describe('/metrics', () => {
     expect(body.runs['not on chain']).toBe(21);
     // Two genuine failures against eleven fills, not twenty-three.
     expect(body.runFailureRate).toBeCloseTo(2 / 13, 6);
+  });
+
+  it('leaves the rebuilt-chain runs out of "why runs failed" as well', async () => {
+    await ops.request('/metrics');
+    expect(asked.join(' ')).toMatch(/NOT LIKE 'not_on_chain:%'/);
+    const res = await ops.request('/metrics');
+    const body = (await res.json()) as { failuresByCause: Record<string, number> };
+    expect(body.failuresByCause).toEqual({ price_moved: 2 });
   });
 });

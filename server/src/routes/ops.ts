@@ -186,6 +186,7 @@ ops.get('/metrics', async (c) => {
   const causes = await query<{ error: string | null; n: string }>(
     `SELECT error, count(*) AS n FROM strategy_runs
       WHERE status = 'failed' AND finished_at > now() - interval '7 days' AND chain = ${THIS_CHAIN}
+        AND (error IS NULL OR error NOT LIKE 'not_on_chain:%')
       GROUP BY error ORDER BY n DESC LIMIT 20`,
   ).catch(() => []);
   const bucket = (e: string | null): string => {
