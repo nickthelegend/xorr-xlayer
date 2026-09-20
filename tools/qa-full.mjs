@@ -2055,7 +2055,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200 {runs: {status: count}, runFailureRate = failed / (filled + failed) (0 when neither), failuresByCause: keys among price_moved, permission_revoked, permission_expired, daily_cap, venue_not_allowed, wrong_delegate, venue_could_not_fill, upstream_unreachable, other, totalling ≤ runs.failed, fillsByVenue summing to runs.filled (±1 for a fill landing between the reads), fillQuality: {venues, measured, unmeasurable, basis} | null, strategies: {state: count}, alertsEnabled ≥ 0, alertsFiredTotal ≥ 0, spentTodayUsd ≥ 0, gas: {eth (the delegate\'s OKB, under its historical name) > 0, enough = eth ≥ floor, floor 0.01, address = /delegation/params delegate}, uptimeSec}; fillsByVenue keys are among uniswap-v3, okx-dex, aave (or "unrecorded"); at most one run pending.',
+      'Public. 200 {runs: {status: count, plus "not on chain" for fills a rebuilt fork no longer has — counted apart from failed, and out of the rate}, runFailureRate = failed / (filled + failed) (0 when neither), failuresByCause: keys among price_moved, permission_revoked, permission_expired, daily_cap, venue_not_allowed, wrong_delegate, venue_could_not_fill, insufficient_funds, upstream_unreachable, other, totalling ≤ runs.failed, fillsByVenue summing to runs.filled (±1 for a fill landing between the reads), fillQuality: {venues, measured, unmeasurable, basis} | null, strategies: {state: count}, alertsEnabled ≥ 0, alertsFiredTotal ≥ 0, spentTodayUsd ≥ 0, gas: {eth (the delegate\'s OKB, under its historical name) > 0, enough = eth ≥ floor, floor 0.01, address = /delegation/params delegate}, uptimeSec}; fillsByVenue keys are among uniswap-v3, okx-dex, aave (or "unrecorded"); at most one run pending.',
   },
   async () => {
     const r = await get('/metrics', { auth: false });
@@ -2064,7 +2064,9 @@ check(
     const filled = m.runs.filled ?? 0;
     const failed = m.runs.failed ?? 0;
     must(near(m.runFailureRate, filled + failed > 0 ? failed / (filled + failed) : 0, 1e-12), `runFailureRate ${m.runFailureRate} for ${failed}/${filled + failed}`);
-    const causes = ['price_moved', 'permission_revoked', 'permission_expired', 'daily_cap', 'venue_not_allowed', 'wrong_delegate', 'venue_could_not_fill', 'upstream_unreachable', 'other'];
+    const outcomes = ['filled', 'failed', 'pending', 'running', 'refused', 'skipped', 'not on chain'];
+    must(Object.keys(m.runs).every((k) => outcomes.includes(k)), `unknown run outcome ${clip(Object.keys(m.runs))}`);
+    const causes = ['price_moved', 'permission_revoked', 'permission_expired', 'daily_cap', 'venue_not_allowed', 'wrong_delegate', 'venue_could_not_fill', 'insufficient_funds', 'upstream_unreachable', 'other'];
     must(Object.keys(m.failuresByCause).every((k) => causes.includes(k)), `unknown cause ${clip(Object.keys(m.failuresByCause))}`);
     must(Object.values(m.failuresByCause).reduce((a, b) => a + b, 0) <= failed, `causes ${clip(m.failuresByCause)} exceed ${failed} failed`);
     const venues = Object.values(m.fillsByVenue).reduce((a, b) => a + b, 0);
