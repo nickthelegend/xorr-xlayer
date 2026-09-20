@@ -21,7 +21,7 @@ vi.mock('./privy.js', () => ({
 
 const { agentFor } = await import('./agentKeys.js');
 const { verifyToken } = await import('./privy.js');
-const { authMiddleware } = await import('./middleware.js');
+const { authMiddleware, isPublicPath } = await import('./middleware.js');
 
 const app = new Hono();
 app.use('*', authMiddleware);
@@ -68,5 +68,25 @@ describe('an agent key', () => {
     const res = await call('/agent/whoami', KEY);
     expect(res.status).toBe(401);
     expect(verifyToken).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * The measured strategy book is public; a wallet's own strategies are not, and the two live one character
+ * apart. `/strategies/catalog` was first allowed as a bare prefix, which also matched
+ * `/strategies/catalogue-anything` — a path that reaches the wallet's routes.
+ */
+describe('the strategy book is public, and the wallet’s strategies are not', () => {
+  it('lets the book through', () => {
+    expect(isPublicPath('/strategies/catalog')).toBe(true);
+    expect(isPublicPath('/strategies/catalog/b100_vol_5')).toBe(true);
+  });
+
+  it('does not let anything else under /strategies through', () => {
+    expect(isPublicPath('/strategies')).toBe(false);
+    expect(isPublicPath('/strategies/abc123')).toBe(false);
+    // The one that got past a bare prefix.
+    expect(isPublicPath('/strategies/catalogue-of-mine')).toBe(false);
+    expect(isPublicPath('/strategies/catalogX')).toBe(false);
   });
 });

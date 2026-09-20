@@ -13,6 +13,12 @@
  */
 import { api, ApiError } from './api';
 import type { AnchorReport, RouteComparison } from './types';
+import type {
+  BookSort,
+  StrategyBook,
+  StrategyDetail,
+  StrategyTier,
+} from './strategyBook';
 import type { Keyed } from './intentKey';
 import type { TrailRow } from '@/audit/anchorCheck';
 
@@ -651,6 +657,26 @@ export const system = {
   crosscheck: (symbol: string) =>
     api.get<CrossCheck>(`/market/crosscheck?symbol=${encodeURIComponent(symbol)}`),
   tradable: () => api.get<TradableToken[]>('/market/tradable'),
+
+  /* the strategy book */
+  /**
+   * The measured strategy book. Public on the executor, so this answers for a signed-out visitor too.
+   *
+   * `sort` names a measured column, never a rank we assigned, and the executor seats the unmeasured last
+   * rather than sorting them as though a missing Sharpe were a zero.
+   */
+  strategyBook: (opts: { tier?: StrategyTier; trusted?: boolean; sort?: BookSort; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.tier) q.set('tier', opts.tier);
+    if (opts.trusted) q.set('trusted', 'true');
+    if (opts.sort) q.set('sort', opts.sort);
+    if (opts.limit) q.set('limit', String(opts.limit));
+    const qs = q.toString();
+    return api.get<StrategyBook>(`/strategies/catalog${qs ? `?${qs}` : ''}`);
+  },
+  /** One strategy in full: its curve, its distribution, its trades and the evidence behind its tier. */
+  strategyDetail: (slug: string) =>
+    api.get<StrategyDetail>(`/strategies/catalog/${encodeURIComponent(slug)}`),
   /** What a strategy can follow here, settleable or not — where nothing settles, a portfolio is watched over these. */
   watchable: () => api.get<TradableToken[]>('/market/watchable'),
   /**

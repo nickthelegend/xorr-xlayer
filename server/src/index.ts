@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { ZodError } from 'zod';
 import { routes } from './routes/index.js';
 import { strategyRoutes } from './routes/strategies.js';
+import { strategyCatalogRoutes } from './routes/strategy-catalog.js';
 import { extra } from './routes/extra.js';
 import { market, warmMarketCache } from './routes/market.js';
 import { agents } from './agents/routes.js';
@@ -152,6 +153,7 @@ guardRequests(app, authMiddleware);
 
 app.route('/', routes);
 app.route('/', strategyRoutes);
+app.route('/', strategyCatalogRoutes);
 app.route('/', agentSurface);
 app.route('/', extra);
 app.route('/', market);

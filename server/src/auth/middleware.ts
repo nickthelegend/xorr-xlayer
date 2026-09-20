@@ -57,10 +57,22 @@ const PUBLIC_PATHS = new Set([
   '/market/corporate-action',
   /** A futures venue's public market data — the Futures screens' list. */
   '/market/futures',
+  /**
+   * The measured strategy book's index. The detail path is a prefix below, WITH its trailing slash: without
+   * it, `/strategies/catalogue-anything` would match the prefix and walk straight past this middleware into
+   * the wallet's own strategy routes.
+   */
+  '/strategies/catalog',
 ]);
 
-/** Path prefixes that are public. `/perp/:symbol` is a mark price, not user data. */
-const PUBLIC_PREFIXES = ['/perp/'];
+/**
+ * Path prefixes that are public. `/perp/:symbol` is a mark price, not user data.
+ *
+ * `/strategies/catalog` is the measured strategy book — what 313 rules did over recorded candles, years
+ * before this wallet existed. It is the same kind of thing as a price: not about anyone, and gating it
+ * means a signed-out visitor opens the Strategies tab and sees a column of dashes.
+ */
+const PUBLIC_PREFIXES = ['/perp/', '/strategies/catalog/'];
 
 /**
  * The public surface, published.
@@ -75,6 +87,17 @@ export const publicSurface = {
   prefixes: [...PUBLIC_PREFIXES],
 };
 
+/**
+ * Is this path callable without a session?
+ *
+ * One predicate, used by the middleware and testable on its own. The boundary it draws is a character
+ * wide in one place — `/strategies/catalog` is the public strategy book and `/strategies/...` is the
+ * wallet's own — so it is worth being able to assert directly rather than through a request.
+ */
+export function isPublicPath(path: string): boolean {
+  return PUBLIC_PATHS.has(path) || PUBLIC_PREFIXES.some((p) => path.startsWith(p));
+}
+
 declare module 'hono' {
   interface ContextVariableMap {
     user: AuthedUser;
@@ -87,9 +110,7 @@ declare module 'hono' {
 const AGENT_PREFIX = '/agent/';
 
 export async function authMiddleware(c: Context, next: Next) {
-  const isPublic =
-    PUBLIC_PATHS.has(c.req.path) || PUBLIC_PREFIXES.some((p) => c.req.path.startsWith(p));
-  if (isPublic || c.req.method === 'OPTIONS') return next();
+  if (isPublicPath(c.req.path) || c.req.method === 'OPTIONS') return next();
 
   /*
    * Two kinds of caller, and they do not overlap.

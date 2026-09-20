@@ -77,14 +77,16 @@ import { killSwitchChip } from '@/state/killSwitch';
 import { KillSwitchChip } from '@/ui/KillSwitchChip';
 import { TradingTicker } from '@/ui/TradingTicker';
 import { usePoll } from '@/data/usePoll';
+import { ratio } from '@/format';
 
-type SheetTab = 'agents' | 'gainers' | 'stocks' | 'futures';
+type SheetTab = 'agents' | 'gainers' | 'stocks' | 'futures' | 'strategies';
 
 const TABS: readonly { key: SheetTab; label: string }[] = [
   { key: 'agents', label: 'Agents' },
   { key: 'gainers', label: 'Gainers' },
   { key: 'stocks', label: 'Stocks' },
   { key: 'futures', label: 'Futures' },
+  { key: 'strategies', label: 'Strategies' },
 ];
 
 const AVATAR = 40;
@@ -105,6 +107,13 @@ const AGENT_SLOTS = 4;
 const GAINERS = 8;
 /** How many futures contracts the sheet lists before handing over to Futures. */
 const FUTURES = 8;
+/**
+ * How many strategies the sheet lists before handing over to the book.
+ *
+ * Sorted by return on the half the rule never saw, and only the ones with enough trades for that number to
+ * mean something — the sheet is the shortlist, and the book behind it is all 313 including the failures.
+ */
+const STRATEGIES = 6;
 /** A sideways drag this far, or this fast, moves to the next tab; under the slop it is still a tap or a scroll. */
 const SWIPE_SLOP = 16;
 const SWIPE_AFTER = 56;
@@ -292,6 +301,11 @@ export default function Home() {
   const futuresOpened = opened.has('futures');
   const stocks = useAsync(async () => (stocksOpened ? system.stocks() : null), [stocksOpened]);
   const futures = useAsync(async () => (futuresOpened ? repos.perps.markets() : null), [futuresOpened]);
+  const strategiesOpened = opened.has('strategies');
+  const strategies = useAsync(
+    async () => (strategiesOpened ? system.strategyBook({ trusted: true, sort: 'return', limit: STRATEGIES }) : null),
+    [strategiesOpened],
+  );
   /* What this deployment trades and watches: nothing to trade beside things to watch is a chain that fills nothing. */
   const tradable = useAsync(() => system.tradable(), []);
   const watchable = useAsync(() => system.watchable(), []);
@@ -627,7 +641,7 @@ export default function Home() {
               borderBottomColor: colors.hairline,
             }}
           >
-            {/* Four tabs scroll sideways on a narrow phone rather than crowding the Live dot out. */}
+            {/* The tabs scroll sideways on a narrow phone rather than crowding the Live dot out — five of them since Strategies joined. */}
             <ScrollView
               ref={tabsRef}
               horizontal
@@ -841,7 +855,8 @@ export default function Home() {
                     </Rise>
                   ))
                 )
-              ) : !futures.data ? (
+              ) : tab === 'futures' ? (
+                !futures.data ? (
                 futures.error ? (
                   <TabFailed what="futures" error={futures.error} onRetry={futures.reload} />
                 ) : (
@@ -875,6 +890,54 @@ export default function Home() {
                     label="All futures"
                     variant="ghost"
                     onPress={() => router.push('/futures')}
+                    style={{ marginTop: space.s16 }}
+                  />
+                </>
+              )
+              ) : !strategies.data ? (
+                strategies.error ? (
+                  <TabFailed what="strategies" error={strategies.error} onRetry={strategies.reload} />
+                ) : (
+                  <LoadingRows count={4} height={size.rowLg} />
+                )
+              ) : strategies.data.rows.length === 0 ? (
+                <Text variant="body" color={colors.ink55} style={{ marginTop: space.s16 }}>
+                  No strategies with enough trades to rank yet.
+                </Text>
+              ) : (
+                <>
+                  {strategies.data.rows.map((r, i) => (
+                    <Rise key={r.slug} index={ROWS_FROM + i}>
+                      <Row
+                        height={size.rowLg}
+                        divider={i < strategies.data!.rows.length - 1}
+                        onPress={() => router.push(`/playbook/${r.slug}`)}
+                        title={r.slug.replace(/_/g, ' ')}
+                        /*
+                         * What the row is really saying: this is the return on data the rule never saw, over
+                         * this many trades. Without the trade count a 2% return over three trades reads the
+                         * same as one over three hundred.
+                         */
+                        secondary={`${r.trades} unseen trades${r.survives ? ' · passed all four' : ''}`}
+                        value={
+                          r.returnPct === null ? (
+                            <Text variant="rowPrimary" color={colors.ink55}>
+                              Not measured
+                            </Text>
+                          ) : (
+                            percent(r.returnPct, 2)
+                          )
+                        }
+                        figure="market"
+                        delta={r.sharpe === null || r.sharpe === undefined ? undefined : `Sharpe ${ratio(r.sharpe)}`}
+                        deltaTone="neutral"
+                      />
+                    </Rise>
+                  ))}
+                  <Button
+                    label={`All ${strategies.data.counts.total} strategies`}
+                    variant="ghost"
+                    onPress={() => router.push('/playbook')}
                     style={{ marginTop: space.s16 }}
                   />
                 </>

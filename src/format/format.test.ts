@@ -12,6 +12,7 @@ import {
   movePhrase,
   percent,
   price,
+  ratio,
   quantity,
   roundsToZero,
   signedMoney,
@@ -137,5 +138,28 @@ describe('movePhrase', () => {
   it('keeps a direction for the smallest change that still shows', () => {
     expect(movePhrase(0.05)).toBe('up 0.1%');
     expect(movePhrase(-0.05)).toBe('down 0.1%');
+  });
+});
+
+/*
+ * A ratio is not money and not a percentage — a Sharpe, a profit factor, an expectancy in R — and screens
+ * were reaching for `toFixed` to render one. `toFixed` emits an ASCII hyphen, so a Sharpe of −0.16 printed
+ * a different minus sign from every other negative on the same screen.
+ */
+describe('ratio', () => {
+  it('renders a dimensionless number at a fixed precision', () => {
+    expect(ratio(1.9876)).toBe('1.99');
+    expect(ratio(0.0543, 4)).toBe('0.0543');
+    expect(ratio(12, 1)).toBe('12.0');
+  });
+
+  it('uses the app’s minus sign, never a hyphen', () => {
+    expect(ratio(-0.158)).toBe('−0.16');
+    expect(ratio(-0.158)).not.toContain('-');
+  });
+
+  it('never claims a value it does not have', () => {
+    expect(ratio(Number.NaN)).toBe(MINUS);
+    expect(ratio(Number.POSITIVE_INFINITY)).toBe(MINUS);
   });
 });

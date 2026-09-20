@@ -78,6 +78,21 @@ export function movePhrase(pct: number): string {
   return Number.parseFloat(shown.replace(/,/g, '')) === 0 ? 'flat' : `${pct >= 0 ? 'up' : 'down'} ${shown}`;
 }
 
+/**
+ * A dimensionless ratio, at a fixed precision: a Sharpe, a profit factor, an expectancy in R.
+ *
+ * These are not money and not a percentage, and screens were reaching for `toFixed` to render them — which
+ * the formatting audit forbids for a good reason it happened to catch here by accident: `toFixed` emits an
+ * ASCII hyphen for a negative, and every other negative in this app is U+2212. A Sharpe of −0.16 beside a
+ * balance of −$4.00 printed two different minus signs on the same screen.
+ *
+ * So it goes through the same `sign` and `localise` as everything else, and no screen has to remember.
+ */
+export function ratio(n: number, digits = 2): string {
+  if (!Number.isFinite(n)) return MINUS;
+  return `${sign(n, false, digits)}${localise(n, digits, digits)}`;
+}
+
 /** Crypto quantity — 4dp by default (SOL), 2dp for display balances. */
 export function quantity(n: number, digits = 4): string {
   return `${sign(n, false, digits)}${localise(n, digits, digits)}`;

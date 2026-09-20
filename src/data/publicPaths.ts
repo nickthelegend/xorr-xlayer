@@ -31,9 +31,15 @@ export const PUBLIC_PATHS: readonly string[] = [
   '/market/corporate-action',
   '/market/futures',
   '/yield/supply',
+  /**
+   * The measured strategy book. Public on the server for the same reason as the rest of this list: what 313
+   * rules did over recorded candles is not about anyone. Missing here, the Strategies tab asked for a
+   * session first and a signed-out visitor was told to sign in to read a backtest.
+   */
+  '/strategies/catalog',
 ];
 
-export const PUBLIC_PREFIXES: readonly string[] = ['/perp/'];
+export const PUBLIC_PREFIXES: readonly string[] = ['/perp/', '/strategies/catalog/'];
 
 /** Does this path need a session? Query strings are ignored; the server routes on the path. */
 export function isPublicPath(path: string): boolean {
