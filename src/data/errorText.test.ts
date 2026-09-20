@@ -158,3 +158,19 @@ describe('apiReason prefers the sentence over the identifier', () => {
     expect(apiReason(err({ error: 'no_route', detail: '   ' }))).toBe('no_route');
   });
 });
+
+describe('errorText on a failure that did not come from the executor', () => {
+  it("speaks for a cancelled signature, instead of repeating the wallet's words about 'the user'", () => {
+    // What Privy's provider throws when the person closes its dialog.
+    expect(errorText(new Error('The user rejected the request'))).toBe('You cancelled the signature, so nothing changed.');
+  });
+
+  it('keeps the one useful line of a viem error, never the request body', () => {
+    const viem = new Error(
+      'Transaction creation failed.\nURL: https://rpc.example/?privyAppId=abc\nRequest body: {"method":"eth_sendRawTransaction"}\nDetails: insufficient funds for gas\nVersion: viem@2.56.3',
+    );
+    const said = errorText(viem);
+    expect(said).not.toMatch(/Request body|privyAppId|viem@/);
+    expect(said.length).toBeLessThan(160);
+  });
+});

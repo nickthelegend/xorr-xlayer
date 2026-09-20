@@ -6,6 +6,8 @@
  * `__DEV__` global. Importing that into a unit test fails before a single assertion runs, so the
  * one piece worth testing was the one piece that could not be.
  */
+import { humanWalletError } from '@/wallet/walletError';
+
 /**
  * An HTTP answer we did not want, with the body attached.
  *
@@ -151,7 +153,13 @@ export function errorText(e: unknown): string {
     // No prose in the body. A bare status is not a sentence either, so say what happened in one.
     return `The executor answered ${e.status}.`;
   }
-  return e instanceof Error && e.message ? e.message : 'Something went wrong.';
+  /*
+   * Anything that did not come from the executor came from the wallet or the chain, and those speak viem's language:
+   * backing out of a signature reached the grant screen as "The user rejected the request" — the provider's words,
+   * about "the user", on a screen that otherwise talks to the person. `humanWalletError` has the sentence for that
+   * and for the handful of other causes worth naming, and keeps the first line of anything it does not recognise.
+   */
+  return humanWalletError(e);
 }
 
 /**

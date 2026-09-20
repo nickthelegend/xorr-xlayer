@@ -26,7 +26,15 @@ function detailLine(message: string): string | undefined {
 }
 
 export function humanWalletError(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e);
+  /*
+   * Nothing useful to translate is its own answer.
+   *
+   * `String(undefined)` is the word "undefined", and a screen that prints that has told the person less than nothing.
+   * An Error with an empty message is the same case.
+   */
+  const message = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+  if (!message.trim()) return 'Something went wrong.';
+  const raw = message;
   const detail = detailLine(raw) ?? raw;
 
   // The user closed the sheet. Not a fault, and it must not read as one.
