@@ -92,6 +92,41 @@ Each is a Foundry test (`contracts/test/`) or an `eth_call`/transaction on a rea
 | F07 | Failure of an upstream | OKX not configured; X Layer RPC range limit | `/route/compare` names OKX as unavailable; `/history` answers inside its bound | qa-full E146, E074 |
 | F08 | Chain mismatch | app signs on one chain, server on another | full-screen "different chains" refusal, nothing signed | observed on simulator 2026-09-20 |
 
+## W — Money out (added 2026-09-20, run against the hosted fork on a wallet created that day)
+
+The guards that stand between an agent-held wallet and an address someone else chose. Every one was exercised over
+HTTP against the deployed executor; nothing here signs, because the executor has no transfer-out path at all.
+
+| ID | Target | Steps | Expected exact result | PASS |
+|---|---|---|---|---|
+| W1 | Unknown destination | `POST /withdrawal-addresses/check` for an address never added | 409 `not_allowlisted` | observed |
+| W2 | Cooling-off starts on add | add it, then check immediately | add 201; check 409 `cooling_off` | observed |
+| W3 | The clock cannot be nudged | add the same address again, check again | second add 409; `usableAt` unchanged | observed |
+| W4 | Prepare refuses a cooling address | `POST /withdrawals/prepare-all {to, token:'USDC'}` | 409 `cooling_off`, no calldata built | observed |
+| W5 | Prepare refuses an unknown address | same, for an address never added | 409 `not_allowlisted` | observed |
+| W6 | Removal is immediate | remove, then check | 200, then 409 `not_allowlisted` at once | observed |
+| W7 | Panic preview tells the truth without acting | `GET /panic/preview` | the legs it would sell, their USD, dust floor and slippage; nothing sold | observed |
+| W8 | None of it is public | the four money-out routes with no token | 401 each | 4/4 |
+
+## F2 — The fresh user, end to end (added 2026-09-20)
+
+Run on `test-4668@privy.io`, a Privy identity that had never had a wallet on this deployment, against the deployed web
+app and executor. Every effect was read back from the chain or the database, not from the response alone.
+
+| ID | Target | Expected exact result | PASS |
+|---|---|---|---|
+| F2.1 | `POST /wallet/create` | 200, an embedded address, `cluster: xlayer-fork`; the second call returns the identical row | observed |
+| F2.2 | Nothing granted yet | `/delegation` null, `/limits` `granted:false`; `POST /orders` → 409 `no_delegation` | observed |
+| F2.3 | Faucet | $1,000 USDC on chain, OKB raised to 0.05; the second ask 409 `claimed_recently` with `nextAt` | on-chain balance |
+| F2.4 | Grant, through the real app | 17 Privy signatures (16 approvals + the grant); executor reads back $100/day, 7 days | chain read |
+| F2.5 | First trade | `POST /orders {TSLAx, $20}` → filled; TSLAx lands in the OWNER's wallet; cap $100 → $80 | chain + `/limits` |
+| F2.6 | Idempotent replay | the same `Idempotency-Key` again returns the same signature; units unchanged | chain |
+| F2.7 | Position, activity, trail | position booked; "Bought 0.0547 TSLAx on Uniswap v3"; `/activity/verify` 0 link breaks | observed |
+| F2.8 | The cap holds | `POST /orders {TSLAx, $500}` → 409 `daily_cap` | observed |
+| F2.9 | Sell it back | `POST /positions/close {TSLAx, fraction:1}` → $19.98 back, units 0 on chain, cap still $80 | chain + `/limits` |
+| F2.10 | Hire an agent | before: every agent "No trades yet"; after: Momentum Scout hired and idle until a setup qualifies | observed |
+| F2.11 | `/judge` on that wallet | 20 pass, 0 fail, 0 skip | live |
+
 ## E — Executor endpoints (202)
 
 Every endpoint check in `tools/qa-full.mjs`, run against the hosted fork executor with a Privy test token. Each check's
