@@ -273,3 +273,22 @@ Everything re-run after the rebuild and after the last fix, against `4e3fab0` / 
 | Agent, hired wallet | GOOGLx $24, then AMZNx $18 — unprompted, inside the cap, never repeating a symbol it holds |
 | Agent, unhired wallet | no trade at all; its only fills read "Placed by you" |
 | Order beyond the wallet | "This wallet holds $908.00 of USDC, and the order needs $999999.00." — refused before signing |
+
+## Judged-in-the-browser pass, 2026-09-20 01:00–03:00 UTC
+
+Driven against the deployed build. Everything below was clicked, submitted, interrupted or backed out of — not read.
+
+| Flow | Result | What it proves |
+|---|---|---|
+| First run on an account that had never signed in | PASS | sign-in → wallet created → Deposit's "Get 1,000 test USDC" → "Added 1,000.00 USDC." with balances and the next claim time |
+| Backing out of a signature | FIXED → PASS | said "The user rejected the request" (viem's words); now "You cancelled the signature, so nothing changed." Nothing granted, modal closed, no console error |
+| Reload mid-order, then ask again | FIXED → PASS | two fills and $20 for one intent; now one fill, allowance falls once — the held key outlives the page |
+| An order bigger than the wallet | FIXED → PASS | reached the contract and came back as "ERC20: transfer amount exceeds balance"; now "This wallet holds $908.00 of USDC, and the order needs $999999.00." |
+| "Sell everything" | FIXED → PASS | closed the position for $29.97 and printed the server's own `fork:0x64c4…` label as the receipt; now shows `0x67dd5048…`, one shared rendering with Activity and History |
+| `/metrics` after a fork rebuild | FIXED → PASS | said "67.6% of attempts broke rather than filled" counting 21 fills a rebuilt chain no longer has; now filled 13, failed 2, "not on chain" 21, rate 13.3%, cause named `insufficient_funds` |
+| Allowlist: invalid address, then a real one, then removal | PASS | "Not a valid address: it starts with 0x and has 42 characters", Add disabled; added → "Usable from Mon 7:24 AM, in 24 h · Pending"; Remove asks to confirm; executor agrees at every step |
+| Recurring buy created from the composer | PASS | "NEXT THREE RUNS" dated, CTA "Buy $50 of XBTC, weekly", strategy live on the executor, paused afterwards |
+| Notification toggles | PASS | switch flips the stored preference and back |
+| Eighteen signed-in screens on a near-empty account | PASS | honest empty states ("Nothing has been sold yet, so nothing is realised.", "No addresses yet.", "Nothing running yet."), no undefined/NaN, no errors |
+| Ticket on a wallet with no money | PASS | "You have $0.00." with the button disabled |
+| Full plan re-run afterwards | PASS | 101/101 screens, 202/202 endpoints, all flows, 2,469 unit tests, typechecks, lint, CI |

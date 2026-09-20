@@ -150,7 +150,11 @@ async function main() {
    * The refusal belongs before the signature, in words (`src/markets/ticket.ts`), and the button must not be
    * pressable while it stands — a green button the chain would turn down is the thing this screen exists to avoid.
    */
-  const said = ticket.match(/Your permission[^.]*\./)?.[0] ?? '';
+  /*
+   * Whatever it refuses on, it says so: the permission's allowance, or the cash in the wallet. A brand-new wallet is
+   * refused for having no USDC ("You have $0.00.") long before its permission is the reason.
+   */
+  const said = ticket.match(/(Your permission[^.]*\.|You have \$[\d,.]+\.|You hold [^.]*\.)/)?.[0] ?? '';
   const pressable = await page
     .getByText(/^(Buy|Sell) \$/)
     .first()
@@ -226,7 +230,9 @@ async function main() {
    * answers with what it already did. Without that this bought twice: measured on 2026-09-20, two fills and $20 gone
    * for one thing asked for once.
    */
-  if (process.env.FLOWS_SIGN === '1' && (await apiGet('/limits', bearer)).remainingUsd >= 10) {
+  // Twenty, not ten: this step places a buy and then asks for the same one again, and the second ask needs room to
+  // be refused for the RIGHT reason — a ticket that will not send because the day is spent proves nothing about keys.
+  if (process.env.FLOWS_SIGN === '1' && (await apiGet('/limits', bearer)).remainingUsd >= 20) {
     console.log('\n1c. reload mid-order, then ask again');
     seen.clear();
     const filledBefore = ((await apiGet('/runs?limit=50', bearer)) ?? []).filter((r) => r.status === 'filled').length;
@@ -245,7 +251,10 @@ async function main() {
     await page.waitForTimeout(1200);
     await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => undefined);
     await page.waitForTimeout(20_000);
-    await (await keyIn()).click();
+    const retry = await keyIn();
+    const offered = await retry.isEnabled().catch(() => false);
+    check(offered, 'the ticket still offers the same buy after the reload', `enabled=${offered}`);
+    if (offered) await retry.click();
     await page.waitForTimeout(25_000);
     const filledAfter = ((await apiGet('/runs?limit=50', bearer)) ?? []).filter((r) => r.status === 'filled').length;
     const spentAfter = (await apiGet('/limits', bearer)).remainingUsd;
