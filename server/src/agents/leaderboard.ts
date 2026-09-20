@@ -9,7 +9,7 @@
 import { query } from '../db/index.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
 import { priceOf } from '../market/prices.js';
-import { personaForKind } from './attribution.js';
+import { personaByName, personaForKind } from './attribution.js';
 
 export type LeaderboardRow = {
   id: string;
@@ -36,7 +36,7 @@ const AGENTS = [
   { id: 'drawdown-guard', name: 'Drawdown Guard', role: 'Cuts risk when the book bleeds', c1: '#B58CFF', c2: '#7A45E0' },
 ];
 
-type RunRow = { kind: string; persona_id: string | null; symbol: string; usd: string; units: string; price: string };
+type RunRow = { kind: string; persona_id: string | null; placed_by: string | null; symbol: string; usd: string; units: string; price: string };
 
 /**
  * Every agent's record on this wallet, by persona id: the four always, and every agent a person made that has traded
@@ -53,7 +53,7 @@ export async function agentRecords(walletId: string): Promise<Map<string, AgentR
      * Buys only (PLAN.md 2.15). A sale's `usd` is what it paid, so valuing it as units at today's mark
      * minus that amount scored every profitable exit as a loss of roughly its own proceeds.
      */
-    `SELECT s.kind, ag.persona_id, s.symbol, r.usd, r.units, r.price
+    `SELECT s.kind, ag.persona_id, s.params->>'placedBy' AS placed_by, s.symbol, r.usd, r.units, r.price
      FROM strategy_runs r
      JOIN strategies s ON s.id = r.strategy_id
      LEFT JOIN agents ag ON ag.id = s.agent_id
@@ -80,8 +80,16 @@ export async function agentRecords(walletId: string): Promise<Map<string, AgentR
   for (const r of runs) {
     const mark = marks.get(r.symbol);
     if (mark === undefined) continue;
-    // A run no persona ran — a recurring buy, a rebalance — is on nobody's record.
-    const agent = r.persona_id ?? personaForKind(r.kind);
+    /*
+     * A run no persona ran — a recurring buy, a rebalance — is on nobody's record.
+     *
+     * `placedBy` comes second because an agent's own order is a one-shot `buy`, which no persona runs by kind: it is
+     * the name `autonomous.ts` wrote into the strategy's params as it placed the order, and the same name the audit
+     * row shows as "Placed by …". Without it this board read "No trades yet" for an agent whose 18 fills were sitting
+     * in the trail under its own name (2026-09-20). Newer orders also carry `agent_id`, which the join above prefers;
+     * this reads back what was recorded for the ones placed before that column was written.
+     */
+    const agent = r.persona_id ?? personaByName(r.placed_by) ?? personaForKind(r.kind);
     if (!agent) continue;
     const value = Number(r.units) * mark;
     const paid = Number(r.usd);

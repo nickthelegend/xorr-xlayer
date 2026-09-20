@@ -7,11 +7,11 @@ const queryMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown[]>>
  * rather than by each test's own `query` implementation — a test about sizing should not have to say who was hired.
  * The hiring tests below set this directly.
  */
-let hiredRoster: { persona_id: string; name: string }[] = [];
+let hiredRoster: { id: string; persona_id: string; name: string }[] = [];
 const ALL_HIRED = [
-  { persona_id: 'momentum-scout', name: 'Momentum Scout' },
-  { persona_id: 'earnings-desk', name: 'Earnings Desk' },
-  { persona_id: 'yield-keeper', name: 'Yield Keeper' },
+  { id: 'agent-momentum', persona_id: 'momentum-scout', name: 'Momentum Scout' },
+  { id: 'agent-earnings', persona_id: 'earnings-desk', name: 'Earnings Desk' },
+  { id: 'agent-yield', persona_id: 'yield-keeper', name: 'Yield Keeper' },
 ];
 const evaluateMock = vi.fn();
 const readPolicyMock = vi.fn();
@@ -83,7 +83,7 @@ vi.mock('../db/index.js', () => ({
   one: (sql: string, params?: unknown[]) => oneMock(sql, params),
   query: async (sql: string, params?: unknown[]) =>
     // The roster read specifically — not the sweep's `EXISTS (… FROM agents …)`, which is a wallet query.
-    /SELECT persona_id/i.test(sql) ? [...hiredRoster] : queryMock(sql, params),
+    /SELECT id, persona_id/i.test(sql) ? [...hiredRoster] : queryMock(sql, params),
 }));
 
 vi.mock('../rules/engine.js', () => ({ evaluate: (...a: unknown[]) => evaluateMock(...a) }));
@@ -659,7 +659,57 @@ describe('autonomous xStocks trading agent', () => {
         25,
         expect.any(String),
         expect.anything(),
+        // The agent row this setup belongs to, so the strategy the order creates carries it.
+        'agent-yield',
       );
+    });
+
+    /*
+     * The leaderboard credits a run through `strategies.agent_id`, and an agent's own order is a one-shot `buy` that
+     * no persona runs by kind. Without the agent on the row, an agent with eighteen filled buys in the trail read
+     * "No trades yet" on its own board (seen on the hosted fork, 2026-09-20).
+     */
+    it('tells the order path which hired agent it is buying for', async () => {
+      ready();
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      const call = placeOrderMock.mock.calls.at(-1)!;
+      const persona = (call[4] as { placedBy?: string }).placedBy;
+      const agentId = call[5] as string | null;
+      // Whoever the scan picked, the id handed over is that same persona's row — not a default and not null.
+      expect(agentId).toBe(hiredRoster.find((a) => a.name === persona)!.id);
+    });
+
+    it('hands over no agent when the persona that acted is not on the roster', async () => {
+      ready();
+      hiredRoster = [{ id: 'agent-yield', persona_id: 'yield-keeper', name: 'Yield Keeper' }];
+      const chosen = {
+        symbol: 'AAPLx',
+        stock: { ...STOCKS.AAPLx, address: STOCKS.AAPLx.address as `0x${string}`, raw: STOCKS.AAPLx.raw as `0x${string}`, sector: 'Technology' as const },
+        strategyKind: 'dca' as const,
+        persona: 'momentum-scout' as const,
+        personaName: 'Momentum Scout',
+        score: 72,
+        currentPrice: 190,
+        stopPrice: 174.8,
+        targetPrice: 209,
+        reason: 'Handed in by the caller.',
+        marketCondition: 'Lower band',
+        corporateAction: { multiplier: 1, pending: null, hoursUntil: null },
+        offHoursGuard: {
+          session: 'regular' as const,
+          spreadBps: 0,
+          spreadPct: 0,
+          action: 'normal' as const,
+          suggestedSlippageBps: 50,
+          reason: 'Nasdaq regular hours.',
+        },
+        suggestedSlippageBps: 50,
+      };
+
+      await runAutonomousCycle('wallet-1', { fixedUsd: 25, setup: chosen });
+      // Null, not another agent's id: crediting the wrong agent is worse than crediting none.
+      expect(placeOrderMock.mock.calls.at(-1)![5]).toBeNull();
     });
 
 
@@ -1040,9 +1090,9 @@ describe('autonomous xStocks trading agent', () => {
         sql.includes('price_observations') ? readings(200, 240, 238) : [],
       );
       // 238 in a 200-240 band is Momentum Scout's breakout, and nobody else's.
-      hiredRoster = [{ persona_id: 'yield-keeper', name: 'Yield Keeper' }];
+      hiredRoster = [{ id: 'agent-yield', persona_id: 'yield-keeper', name: 'Yield Keeper' }];
       expect(await evaluateBestSetup(settingsFor('balanced'), new Set(), new Set(['yield-keeper']))).toBeNull();
-      hiredRoster = [{ persona_id: 'momentum-scout', name: 'Momentum Scout' }];
+      hiredRoster = [{ id: 'agent-momentum', persona_id: 'momentum-scout', name: 'Momentum Scout' }];
       const mine = await evaluateBestSetup(settingsFor('balanced'), new Set(), new Set(['momentum-scout']));
       expect(mine?.persona).toBe('momentum-scout');
     });

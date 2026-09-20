@@ -10,8 +10,15 @@
  * quoted at a real $1,000 size. That second property is what makes it worth having rather than just being another API —
  * if the two disagree, the one that matters for a fill is the one built from the pools the fill will touch.
  *
- * A wrapped xStock has no second source: its market price IS its pool price (`venues/stocks.ts`), and comparing a number
- * with itself would report an agreement that never happened. It says so instead.
+ * A wrapped xStock is not priced by CoinGecko, and for a while this said it therefore had no second source at all —
+ * while `market/nasdaq.ts` was already computing one for the agent's off-hours guard, and the README was advertising
+ * it. Its second source is the issuer's own mark for the same token on Solana (Jupiter's price API) times the
+ * wrapper's `convertToAssets` multiplier: a number arrived at through a different venue, a different chain and a
+ * different oracle, which is exactly what makes a second opinion worth having. Measured on 2026-09-20: TSLAx at
+ * $364.18 against the X Layer pool's $363.85, 0.09% apart.
+ *
+ * Where that reference cannot be had — no Solana mint for the token, Jupiter unreachable, the multiplier unreadable —
+ * the answer is still "only one source answered", never a comparison of a number with itself.
  *
  * When they agree, this says so quietly. When they do not, the app says THAT rather than picking a
  * winner, because picking one silently is how a wrong price becomes an executed trade.
@@ -19,6 +26,7 @@
 import { SETTLEMENT_SYMBOL, canonicalSymbol, isRoutable, TOKENS } from '../venues/tokens.js';
 import { isStock } from '../venues/stocks.js';
 import { priceOf } from './prices.js';
+import { referencePriceUsd } from './nasdaq.js';
 
 /** The size the pool is asked about: large enough to be a real trade, small enough not to be all price impact. */
 const PROBE_USD = 1_000;
@@ -37,7 +45,14 @@ export const DISAGREEMENT_PCT = 0.75;
 
 export type CrossCheck = {
   symbol: string;
-  /** The feed the screens use. */
+  /**
+   * The independent price, whichever feed answered for this asset: CoinGecko for crypto, the issuer's own Solana mark
+   * for a wrapped xStock. `referenceSource` names it, so a screen can say where the number came from instead of
+   * assuming.
+   */
+  reference: number | null;
+  referenceSource: 'coingecko' | 'xstocks' | null;
+  /** The CoinGecko feed specifically — null for an asset CoinGecko does not price. Equal to `reference` when it is the source. */
   coingecko: number | null;
   /** Derived from the X Layer pools a fill would actually touch. */
   pool: number | null;
@@ -87,9 +102,12 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
   const key = canonicalSymbol(POOL_TOKEN[symbol.toUpperCase()] ?? symbol);
   const token = TOKENS[key];
   if (!token || !isRoutable(key)) {
+    const feed = await priceOf(symbol, 8_000).catch(() => null);
     return {
       symbol,
-      coingecko: await priceOf(symbol, 8_000).catch(() => null),
+      reference: feed,
+      referenceSource: feed === null ? null : 'coingecko',
+      coingecko: feed,
       pool: null,
       spreadPct: null,
       compared: false,
@@ -98,15 +116,40 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
     };
   }
   if (isStock(key)) {
-    const own = await priceOf(key, 8_000).catch(() => null);
+    const [own, issuer] = await Promise.all([
+      priceOf(key, 8_000).catch(() => null),
+      referencePriceUsd(key).catch(() => null),
+    ]);
+    if (own === null || issuer === null || !(issuer > 0)) {
+      return {
+        symbol,
+        reference: issuer,
+        referenceSource: issuer === null ? null : 'xstocks',
+        coingecko: null,
+        pool: own,
+        spreadPct: null,
+        compared: false,
+        agree: true,
+        note:
+          own === null && issuer === null
+            ? 'Neither price source answered.'
+            : `Only one source answered for ${key}, so there is nothing to compare.`,
+      };
+    }
+    const spread = (Math.abs(issuer - own) / ((issuer + own) / 2)) * 100;
+    const same = spread <= DISAGREEMENT_PCT;
     return {
       symbol,
+      reference: issuer,
+      referenceSource: 'xstocks',
       coingecko: null,
       pool: own,
-      spreadPct: null,
-      compared: false,
-      agree: true,
-      note: `${key} is priced by its own X Layer pool; there is no independent feed to compare it with.`,
+      spreadPct: spread,
+      compared: true,
+      agree: same,
+      note: same
+        ? `The X Layer pool and the issuer's own mark for ${key} are within ${spread.toFixed(2)}%.`
+        : `The X Layer pool and the issuer's own mark for ${key} disagree by ${spread.toFixed(2)}%. A fill would happen at the pool price, ${own.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}.`,
     };
   }
 
@@ -121,6 +164,8 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
   if (coingecko === null || pool === null) {
     return {
       symbol,
+      reference: coingecko,
+      referenceSource: coingecko === null ? null : 'coingecko',
       coingecko,
       pool,
       spreadPct: null,
@@ -137,6 +182,8 @@ export async function crossCheck(symbol: string): Promise<CrossCheck> {
   const agree = spreadPct <= DISAGREEMENT_PCT;
   return {
     symbol,
+    reference: coingecko,
+    referenceSource: 'coingecko',
     coingecko,
     pool,
     spreadPct,

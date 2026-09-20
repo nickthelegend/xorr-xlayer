@@ -94,23 +94,47 @@ const CLOSED_HOLD_PCT = 0.015;
  * without a share price, or when the wrapper's multiplier cannot be read — each a real answer, none papered over.
  */
 export async function referencePriceUsd(symbol: string): Promise<number | null> {
-  const key = stockKey(symbol);
-  const mint = key ? SOLANA_XSTOCK_MINTS[key] : undefined;
-  if (!key || !mint) return null;
-  const [share, reading] = await Promise.all([
-    getJson<Record<string, { stockData?: { price?: number } } | undefined>>(
-      `${JUPITER_PRICE_API}?ids=${mint}`,
-      60_000,
-      6_000,
-      {},
-      { attempts: 1 },
-    )
-      .then((r) => r[mint]?.stockData?.price)
-      .catch(() => undefined),
-    readMultiplierOrNull(key),
-  ]);
-  if (typeof share !== 'number' || !Number.isFinite(share) || share <= 0 || !reading) return null;
-  return share * reading.multiplier;
+  return (await referencePricesUsd([symbol])).get(stockKey(symbol) ?? symbol) ?? null;
+}
+
+/**
+ * The same second opinion for several tokens, in ONE request to Jupiter.
+ *
+ * The catalog asks for all eleven at once. Asked one at a time that is eleven round trips on a cold cache, for a
+ * screen — and Jupiter's `ids` parameter takes a list, so it is one. Multipliers are still a chain read apiece, in
+ * parallel, alongside the eleven pool quotes the catalog already makes.
+ *
+ * Keyed by the registry's spelling (`stockKey`), so a caller gets back what it can look up. A symbol with no Solana
+ * counterpart is absent, exactly as it is null from the single-symbol form.
+ */
+export async function referencePricesUsd(symbols: string[]): Promise<Map<string, number>> {
+  const wanted = new Map<string, string>();
+  for (const s of symbols) {
+    const key = stockKey(s);
+    const mint = key ? SOLANA_XSTOCK_MINTS[key] : undefined;
+    if (key && mint) wanted.set(key, mint);
+  }
+  const out = new Map<string, number>();
+  if (wanted.size === 0) return out;
+
+  const shares = await getJson<Record<string, { stockData?: { price?: number } } | undefined>>(
+    `${JUPITER_PRICE_API}?ids=${[...wanted.values()].join(',')}`,
+    60_000,
+    6_000,
+    {},
+    { attempts: 1 },
+  ).catch(() => ({}) as Record<string, { stockData?: { price?: number } } | undefined>);
+
+  await Promise.all(
+    [...wanted].map(async ([key, mint]) => {
+      const share = shares[mint]?.stockData?.price;
+      if (typeof share !== 'number' || !Number.isFinite(share) || share <= 0) return;
+      const reading = await readMultiplierOrNull(key).catch(() => null);
+      if (!reading) return;
+      out.set(key, share * reading.multiplier);
+    }),
+  );
+  return out;
 }
 
 /**

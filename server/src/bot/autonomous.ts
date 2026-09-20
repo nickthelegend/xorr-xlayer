@@ -647,11 +647,17 @@ export async function runAutonomousCycle(
    * The hired set also decides WHICH setups may be taken: a setup belongs to the agent that found it, so a wallet
    * that hired only Yield Keeper never takes Momentum Scout's breakout.
    */
-  const roster = await query<{ persona_id: string; name: string }>(
-    `SELECT persona_id, name FROM agents WHERE wallet_id = $1 AND hired = true AND fired_at IS NULL`,
+  const roster = await query<{ id: string; persona_id: string; name: string }>(
+    `SELECT id, persona_id, name FROM agents WHERE wallet_id = $1 AND hired = true AND fired_at IS NULL`,
     [walletId],
   );
   const hired = new Set(roster.map((a) => a.persona_id as PersonaId));
+  /*
+   * Which agent row to credit the order to. The trail already names the persona in `placedBy`; this puts the same
+   * agent on the strategy row, which is where the leaderboard reads it from (PLAN.md 2.2).
+   */
+  const agentIdFor = (persona: PersonaId): string | null =>
+    roster.find((a) => a.persona_id === persona)?.id ?? null;
   if (hired.size === 0) {
     return {
       executed: false,
@@ -779,6 +785,7 @@ export async function runAutonomousCycle(
     sizeUsd,
     `${bestSetup.personaName} · $${sizeUsd.toFixed(2)} of ${bestSetup.symbol}`,
     { slippagePct: bestSetup.suggestedSlippageBps / 100, placedBy: bestSetup.personaName },
+    agentIdFor(bestSetup.persona),
   ).catch((e: unknown): OrderResult => ({
     placed: false,
     refusal: {

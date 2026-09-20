@@ -200,7 +200,14 @@ export type Catchup = {
  */
 export type CrossCheck = {
   symbol: string;
-  /** The feed the screens use. Null when it could not be reached. Never zero — zero is a price. */
+  /**
+   * The independent price, and which feed gave it: CoinGecko for crypto, and for a wrapped xStock the issuer's own
+   * mark for the same token on Solana times the wrapper's multiplier. Null when it could not be reached. Never zero —
+   * zero is a price.
+   */
+  reference: number | null;
+  referenceSource: 'coingecko' | 'xstocks' | null;
+  /** CoinGecko specifically; null for an asset it does not price. Equal to `reference` when that is where it came from. */
   coingecko: number | null;
   /** Derived from the X Layer pools a fill would actually touch. Null when they could not be quoted. */
   pool: number | null;

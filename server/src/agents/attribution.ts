@@ -37,3 +37,18 @@ export function personaForKind(kind: string): PersonaId | undefined {
 export function agentForKind(kind: string): string {
   return PERSONA_FOR_KIND[kind]?.name ?? 'xorr';
 }
+
+/**
+ * The persona a recorded name refers to — the inverse of `agentForKind`, for reading back what was written.
+ *
+ * An agent's own order is a one-shot `buy`, and no persona runs a `buy`; what names the agent is `placedBy` in the
+ * strategy's params, written by `autonomous.ts` at the moment it placed the order and carried into the audit row the
+ * activity screen reads. Anything else — `xorr`, a name no persona has — is nobody's, and says so.
+ */
+export function personaByName(name: unknown): PersonaId | undefined {
+  if (typeof name !== 'string') return undefined;
+  for (const entry of Object.values(PERSONA_FOR_KIND)) {
+    if (entry && entry.name === name) return entry.id;
+  }
+  return undefined;
+}

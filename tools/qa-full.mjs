@@ -1586,7 +1586,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'Read-only rule check. With a live permission and the agents running: {usd:1} → 200 {allowed:true, spentTodayUsd ≥ 0, remainingUsd = dailyCapUsd − spentTodayUsd − 1}, and that remainder is never below /limits remainingUsd − 1; {usd:0} → 200 {allowed:false, reason:"invalid_amount"}; {usd:10000000} → 200 {allowed:false, reason:"daily_cap", detail}. {usd:"10"} → 400 invalid_request; malformed JSON → 400 invalid_json.',
+      'Read-only rule check. With a live permission, the agents running and room left today: {usd:1} → 200 {allowed:true, spentTodayUsd ≥ 0, remainingUsd = dailyCapUsd − spentTodayUsd − 1}, and that remainder is never below /limits remainingUsd − 1. With the day\'s cap already spent, that same $1 is refused with reason "daily_cap" — which is the rule holding, not the route failing. {usd:0} → 200 {allowed:false, reason:"invalid_amount"}; {usd:10000000} → 200 {allowed:false, reason:"daily_cap", detail}. {usd:"10"} → 400 invalid_request; malformed JSON → 400 invalid_json.',
   },
   async () => {
     expectRefusal(await post('/limits/check', { usd: '10' }), 400, 'invalid_request', '{usd:"10"}');
@@ -1600,6 +1600,18 @@ check(
       return `permission not live: ${one.json.reason}`;
     }
     const limits = (await get('/limits')).json;
+    /*
+     * A wallet that has spent today's cap refuses the next dollar, and that is the product working. This asserted
+     * `allowed: true` whenever a permission was live, so running the suite against a wallet late in its own day
+     * reported the cap doing its job as a failed endpoint (2026-09-20, test-8958 at $100 of $100).
+     */
+    if (one.json.allowed === false && one.json.reason === 'daily_cap') {
+      must(limits.remainingUsd < 1 + 0.01, `refused $1 as daily_cap, but /limits says $${limits.remainingUsd} is left`);
+      must(typeof one.json.detail === 'string' && one.json.detail.length > 0, `daily_cap with no detail: ${clip(one.text)}`);
+      const zeroToday = await post('/limits/check', { usd: 0 });
+      must(zeroToday.status === 200 && zeroToday.json.reason === 'invalid_amount', `{usd:0}: ${show(zeroToday)}`);
+      return `today's cap is spent ($${limits.remainingUsd} left), so $1 is refused: daily_cap`;
+    }
     must(one.json.allowed === true && one.json.spentTodayUsd >= 0, `{usd:1}: ${clip(one.text)}`);
     must(near(one.json.remainingUsd, d.dailyCapUsd - one.json.spentTodayUsd - 1, 0.01), `remainingUsd ${one.json.remainingUsd} ≠ ${d.dailyCapUsd} − ${one.json.spentTodayUsd} − 1`);
     must(one.json.remainingUsd >= limits.remainingUsd - 1 - 0.01, `remainder ${one.json.remainingUsd} below /limits ${limits.remainingUsd} − 1`);

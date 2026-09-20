@@ -23,6 +23,7 @@ const { leaderboard } = await import('./leaderboard.js');
 const run = (over: Record<string, unknown>) => ({
   kind: 'dca',
   persona_id: null,
+  placed_by: null,
   symbol: 'WETH',
   usd: '100',
   units: '0.05',
@@ -51,6 +52,35 @@ describe('credit', () => {
     expect(entry(board, 'earnings-desk')).toMatchObject({ trades: 1, pnl30d: 25, win: 100 });
     expect(entry(board, 'momentum-scout')).toMatchObject({ trades: 1, pnl30d: 25 });
     expect(entry(board, 'drawdown-guard')).toMatchObject({ trades: 1, pnl30d: -75, win: 0, metric: '0% win rate' });
+  });
+
+  /*
+   * An agent's own order is a one-shot `buy`, which no persona runs by kind, and before `agent_id` was written the
+   * only record of who placed it was `placedBy` in the strategy's params — the same name the activity row shows as
+   * "Placed by …". Reading the agent row first and that name second is how a board built from real fills credits the
+   * eighteen that were already there, instead of showing every agent "No trades yet" (2026-09-20).
+   */
+  it('goes to the agent the trail named when the strategy carries no agent row', async () => {
+    vi.mocked(priceOf).mockResolvedValue(2_500);
+    h.rows = [run({ kind: 'buy', placed_by: 'Momentum Scout' }), run({ kind: 'buy', placed_by: 'Earnings Desk', units: '0.01' })];
+    const board = await leaderboard('wallet-1');
+    expect(entry(board, 'momentum-scout')).toMatchObject({ trades: 1, pnl30d: 25, win: 100 });
+    expect(entry(board, 'earnings-desk')).toMatchObject({ trades: 1, pnl30d: -75, win: 0 });
+  });
+
+  it('prefers the agent row over the recorded name when both are there', async () => {
+    vi.mocked(priceOf).mockResolvedValue(2_500);
+    h.rows = [run({ kind: 'buy', persona_id: 'yield-keeper', placed_by: 'Momentum Scout' })];
+    const board = await leaderboard('wallet-1');
+    expect(entry(board, 'yield-keeper').trades).toBe(1);
+    expect(entry(board, 'momentum-scout').trades).toBe(0);
+  });
+
+  it('credits nobody for a name that is no persona', async () => {
+    vi.mocked(priceOf).mockResolvedValue(2_500);
+    h.rows = [run({ kind: 'buy', placed_by: 'xorr' }), run({ kind: 'buy', placed_by: 'Somebody Else' })];
+    const board = await leaderboard('wallet-1');
+    expect(board.every((b) => b.trades === 0)).toBe(true);
   });
 
   it('a run no persona ran is on nobody’s record — not Yield Keeper’s', async () => {

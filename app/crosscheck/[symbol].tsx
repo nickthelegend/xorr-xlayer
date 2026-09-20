@@ -77,7 +77,11 @@ export default function Crosscheck() {
 
             <View style={{ flexDirection: 'row', gap: space.s10 }}>
               <Source label="On-chain" note="what a trade would pay" value={data.pool} />
-              <Source label="Reference" note="the market feed" value={data.coingecko} />
+              <Source
+                label="Reference"
+                note={data.referenceSource === 'xstocks' ? "the issuer's own mark" : 'the market feed'}
+                value={data.reference}
+              />
             </View>
 
             {/*
@@ -99,8 +103,18 @@ export default function Crosscheck() {
               </SheetCard>
             ) : null}
 
+            {/*
+              Which feed answered, named. A wrapped xStock is not on CoinGecko — its second opinion is the issuer's
+              own mark for the same token on Solana, times the wrapper's multiplier — and a footnote that said
+              CoinGecko regardless was crediting the wrong source for the number above it.
+            */}
             <Text variant="footnote" color={colors.ink55}>
-              On-chain price from the Uniswap v3 pools. Reference from CoinGecko.
+              On-chain price from the Uniswap v3 pools.{' '}
+              {data.referenceSource === 'xstocks'
+                ? "Reference from the issuer's own mark for this token on Solana, times the wrapper's multiplier."
+                : data.referenceSource === 'coingecko'
+                  ? 'Reference from CoinGecko.'
+                  : 'No reference feed answered.'}
             </Text>
           </>
         )}

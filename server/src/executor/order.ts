@@ -45,6 +45,16 @@ export async function placeOrder(
   label?: string,
   /** Carried into the one-shot row's params: a swap's own slippage tolerance (PLAN.md 3.9). */
   extra: Record<string, unknown> = {},
+  /**
+   * The agent this order is placed FOR, when one placed it (`agents.id`).
+   *
+   * The trail has always named the persona — the activity row reads "Placed by Momentum Scout", from `placedBy` in
+   * `extra` — but the strategy row carried no agent, and the leaderboard credits a run through `strategies.agent_id`
+   * (or the persona that runs its kind, and no persona runs a `buy`). So on 2026-09-20 an agent with 18 filled buys
+   * in the trail showed "No trades yet" on its own leaderboard, and every other agent did too. One column, two
+   * screens disagreeing about the same fills.
+   */
+  agentId: string | null = null,
 ): Promise<OrderResult> {
   // Equities are `NVDAc`/`TSLAc`; uppercasing loses the suffix and the venue lookup misses.
   const symbol = canonicalSymbol(rawSymbol);
@@ -91,8 +101,8 @@ export async function placeOrder(
 
   // A one-shot `buy`: no cadence, so `advance()` never reschedules it.
   const row = await one<StrategyRow>(
-    `INSERT INTO strategies (id, wallet_id, kind, state, label, symbol, params, cadence, next_run_at, daily_allocation_usd)
-     VALUES ($1,$2,'buy','live',$3,$4,$5,NULL,NULL,$6) RETURNING *`,
+    `INSERT INTO strategies (id, wallet_id, kind, state, label, symbol, params, cadence, next_run_at, daily_allocation_usd, agent_id)
+     VALUES ($1,$2,'buy','live',$3,$4,$5,NULL,NULL,$6,$7) RETURNING *`,
     [
       randomUUID(),
       w.id,
@@ -100,6 +110,7 @@ export async function placeOrder(
       symbol,
       JSON.stringify({ ...extra, usd, manual: true }),
       usd,
+      agentId,
     ],
   );
 

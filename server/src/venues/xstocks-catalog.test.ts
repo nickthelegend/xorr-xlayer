@@ -2,15 +2,17 @@
  * The catalog, with the pool price stood in for.
  *
  * What is pinned here is the thing the whole feature turns on: a token nothing will price produces a
- * ROW with `price: null` and `feed: 'unavailable'`, never a number and never a hole in the list. And
- * the fields X Layer has no source for — the exchange mark, the 24h change, the pool depth — are
- * null on every row, not a borrowed or invented figure.
+ * ROW with `price: null` and `feed: 'unavailable'`, never a number and never a hole in the list. The
+ * fields X Layer still has no source for — the 24h change, the pool depth — are null on every row,
+ * not a borrowed or invented figure. The exchange mark is no longer one of them: it is the issuer's
+ * own mark for the same token on Solana times the wrapper's multiplier, asked for once for the whole
+ * catalog, and null only when that feed cannot be had.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => {
   process.env.XORR_CHAIN = 'xlayer-testnet';
-  return { xStockPriceUsd: vi.fn() };
+  return { xStockPriceUsd: vi.fn(), referencePricesUsd: vi.fn() };
 });
 
 vi.mock('./xstocks.js', async (orig) => ({
@@ -18,17 +20,22 @@ vi.mock('./xstocks.js', async (orig) => ({
   xStockPriceUsd: h.xStockPriceUsd,
 }));
 vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
+// Unmocked this reaches Jupiter and the chain; what matters here is what the catalog does with the answer.
+vi.mock('../market/nasdaq.js', () => ({ referencePricesUsd: h.referencePricesUsd }));
 
 const LIVE: Record<string, number> = { NVDAx: 181.62, TSLAx: 362.9 };
+/** The issuer's mark, a hair off the pool — as the two really are (NVDAx measured 0.1% apart on 2026-09-20). */
+const MARKS = new Map<string, number>([['NVDAx', 181.8]]);
 
 beforeEach(() => {
   h.xStockPriceUsd.mockReset().mockImplementation(async (s: string) => LIVE[s] ?? null);
+  h.referencePricesUsd.mockReset().mockResolvedValue(MARKS);
 });
 
 afterEach(() => vi.resetModules());
 
 describe('a priced token', () => {
-  it('carries the pool price, and no mark X Layer does not publish', async () => {
+  it('carries the pool price and the issuer\u2019s own mark, as two separate claims', async () => {
     const { xStockCatalog } = await import('./xstocks-catalog.js');
     const nvda = (await xStockCatalog()).find((r) => r.symbol === 'NVDAx')!;
 
@@ -36,11 +43,40 @@ describe('a priced token', () => {
     expect(nvda.feed).toBe('live');
     expect(nvda.ticker).toBe('NVDA');
     expect(nvda.address).toBe('0xa8ddb5cd96b5222afe198316e9a57caa642850d5');
-    // Null, not the pool price copied across: the two would be different claims.
-    expect(nvda.underlyingPrice).toBeNull();
-    expect(nvda.underlyingAt).toBeNull();
+    // The mark is its own reading, never the pool price copied across: the two are different claims.
+    expect(nvda.underlyingPrice).toBe(181.8);
+    expect(nvda.underlyingPrice).not.toBe(nvda.price);
+    expect(typeof nvda.underlyingAt).toBe('string');
     expect(nvda.change24hPct).toBeNull();
     expect(nvda.liquidityUsd).toBeNull();
+  });
+
+  it('asks for every mark in one request, not one per token', async () => {
+    const { xStockCatalog } = await import('./xstocks-catalog.js');
+    const { XSTOCKS } = await import('./xstocks.js');
+
+    await xStockCatalog();
+    expect(h.referencePricesUsd).toHaveBeenCalledTimes(1);
+    expect([...(h.referencePricesUsd.mock.calls[0]![0] as string[])].sort()).toEqual(Object.keys(XSTOCKS).sort());
+  });
+
+  it('leaves the mark null for a token the reference feed did not answer for', async () => {
+    const { xStockCatalog } = await import('./xstocks-catalog.js');
+    const tsla = (await xStockCatalog()).find((r) => r.symbol === 'TSLAx')!;
+
+    // Priced by the pool, unmarked by the issuer: a row that says both, rather than borrowing one for the other.
+    expect(tsla.price).toBe(362.9);
+    expect(tsla.underlyingPrice).toBeNull();
+    expect(tsla.underlyingAt).toBeNull();
+  });
+
+  it('is still a catalog when the reference feed is down', async () => {
+    h.referencePricesUsd.mockRejectedValue(new Error('ETIMEDOUT'));
+    const { xStockCatalog } = await import('./xstocks-catalog.js');
+    const nvda = (await xStockCatalog()).find((r) => r.symbol === 'NVDAx')!;
+
+    expect(nvda.price).toBe(181.62);
+    expect(nvda.underlyingPrice).toBeNull();
   });
 
   it('prices every token in the catalog, one quote each', async () => {
