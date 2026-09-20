@@ -15,6 +15,7 @@
  *
  * Pure, and apart from the screens and the transport, so the lifecycle is testable on Node.
  */
+import { dropHeldKey, loadHeldKey, saveHeldKey } from './heldKeys';
 import { ApiError, NotSignedIn, TimedOut } from './apiError';
 
 /** The executor refuses a longer key with a 400 (`idempotency_key_too_long`). */
@@ -100,14 +101,36 @@ export function intentKeys(mint: () => string = newIdempotencyKey) {
   let held: HeldKey | undefined;
   return {
     async send<T>(ask: unknown, request: (idempotencyKey: string) => Promise<T>): Promise<T> {
-      const attempt = keyForAsk(held, intentOf(ask), mint);
+      const intent = intentOf(ask);
+      /*
+       * A key held by an earlier page counts too.
+       *
+       * This screen's own memory is gone after a reload, and a reload is what someone does when a request looks
+       * stuck — so without this the same ask came back with a new key and the executor filled it a second time
+       * (`heldKeys.ts` has the measurement). Whatever this page already holds wins; storage only answers when it
+       * holds nothing for this intent.
+       */
+      const remembered = held?.intent === intent ? undefined : loadHeldKey(intent);
+      const attempt = keyForAsk(held ?? (remembered ? { intent, key: remembered } : undefined), intent, mint);
       held = attempt;
+      /*
+       * Written down BEFORE it is sent, not after it fails.
+       *
+       * The case this exists for is a page that never sees an answer at all — somebody reloads while the request is
+       * in flight — so there is no catch to run and nothing later to save. An entry left behind by an attempt that
+       * did finish is dropped below, and one left by a page that vanished expires on its own.
+       */
+      saveHeldKey(intent, attempt.key);
       try {
         const answer = await request(attempt.key);
         held = heldAfter(held, attempt, true);
+        if (held === undefined) dropHeldKey(intent);
         return answer;
       } catch (e) {
-        held = heldAfter(held, attempt, outcomeKnown(e));
+        const known = outcomeKnown(e);
+        held = heldAfter(held, attempt, known);
+        // Unknown means the executor may be working on it, so the key stays written down.
+        if (known) dropHeldKey(intent);
         throw e;
       }
     },
