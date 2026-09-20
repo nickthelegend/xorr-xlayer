@@ -134,7 +134,7 @@ the worst outcome available.
 | | |
 |---|---|
 | xStock prices | A live Uniswap v3 quote at a real $1,000 size — what you would actually pay, not the Nasdaq print |
-| Second opinion | Crypto: CoinGecko vs the X Layer pool. xStocks: xStocks' own share price for the same token on Solana (Jupiter's price API) × the wrapper's `convertToAssets` multiplier — measured within 0.1% of the X Layer pools on SPYx, NVDAx, TSLAx and QQQx |
+| Second opinion | Crypto: CoinGecko vs the X Layer pool. xStocks: xStocks' own share price for the same token on Solana (Jupiter's price API) × the wrapper's `convertToAssets` multiplier. `/market/crosscheck` compares the two and names which feed answered; `/market/xstocks` carries both prices per row. All eleven measured within 0.5% of the pools on 2026-09-20 |
 | Off-hours guard | Outside Nasdaq hours the agent measures the pool against that reference and holds past 1.2–1.5% drift, or when there is no reference at all — "could not measure" is not "fine" |
 | Corporate actions | The wrapper's multiplier and the raw token's scheduled `newMultiplier`/activation time, read on chain; holders are warned ahead of a split or dividend reinvestment |
 | Backing | Backed's contracts read directly: owner and pauser are 2-of-3 Safes, the minter an ordinary wallet, and the burner **cannot** seize balances — plus Backed's proof-of-reserves feed |

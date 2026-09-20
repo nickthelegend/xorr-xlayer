@@ -12,6 +12,12 @@
  *   3. the DELEGATE's `spend` to a venue the owner never allowed is refused by the contract (`eth_call`, nothing sent);
  *   4. the owner revokes, and `policyOf` says revoked.
  *
+ * `PROVE_KEEP=1` stops after step 3 and LEAVES the permission standing, which is the only way this public chain has
+ * something live to read: every other run revokes at the end, so `/verify?owner=…` on the testnet deployment skipped
+ * "the permission is read from the chain" for want of any wallet that held one (2026-09-20). Run it once that way and
+ * put the owner address in the submission, so a judge can check the claim against a chain with an explorer. The
+ * permission expires on its own in seven days, which is the point of having an expiry.
+ *
  * Run: cd server && set -a && . ./.env.deployer && set +a && npx tsx src/prove-testnet.ts
  * Reads the testnet delegate's address from the deployed executor's `/delegation/params` (or TESTNET_DELEGATE).
  */
@@ -184,6 +190,21 @@ async function main() {
     }),
   );
   check(stranger === 'NotDelegate', 'anyone but the delegate is refused outright', stranger);
+
+  if (process.env.PROVE_KEEP === '1') {
+    console.log(
+      [
+        '',
+        '  PROVE_KEEP=1 — the permission is left STANDING, and revoke is not proven on this run.',
+        `  owner   ${owner.address}`,
+        `  verify  ${(process.env.TESTNET_EXECUTOR ?? 'https://executor-testnet-production.up.railway.app').replace(/\/+$/, '')}/verify?owner=${owner.address}`,
+        '  It expires on its own; nothing holds funds, and the owner key was never written down.',
+        '',
+      ].join('\n'),
+    );
+    console.log(failures === 0 ? 'ALL CHECKS PASSED\n' : `${failures} CHECK(S) FAILED\n`);
+    process.exit(failures === 0 ? 0 : 1);
+  }
 
   await send('owner revokes — one signature, no server', await ownerWallet.writeContract({ address: DELEGATION, abi: ABI, functionName: 'revoke' }));
   const after = await settled(

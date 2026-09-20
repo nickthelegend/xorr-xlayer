@@ -61,6 +61,16 @@ custody (hand over the funds) or a blank-cheque approval. Neither survives a bad
   state (TSLAx direct, NVDAx via USDG, cap, foreign venue, close, revoke).
 - `cd server && npm run prove:testnet` — the permission on X Layer testnet: grant, read back, `VenueNotAllowed`,
   `NotDelegate`, revoke, `PolicyRevoked`, each an OKLink transaction.
+- **A permission standing on the public chain, to check without running anything.** Owner
+  `0xd747284963556832e22C6d63bAB0B82Da7d54d11`, granted 2026-09-20 ([the grant on
+  OKLink](https://www.oklink.com/xlayer-test/tx/0x8b2586abfaa2bab08097d092b81cfccec26a94c7b66fefc962650bd32f4f438b)),
+  $100/day to the delegate for 7 days. Paste it into `/judge` on the testnet deployment, or read it straight off the
+  contract:
+  [`/verify?owner=0xd747…4d11`](https://executor-testnet-production.up.railway.app/verify?owner=0xd747284963556832e22C6d63bAB0B82Da7d54d11)
+  — 15 pass, 0 fail, 5 skip. The five skips are the things that genuinely are not on this chain: no xStock wrappers
+  (they are X Layer mainnet contracts), and no wallet, strategies or audit trail, because nobody has signed in on the
+  testnet deployment. It was left standing by `PROVE_KEEP=1`, expires on its own, holds no funds, and its owner key
+  was never written down.
 - `cd server && npm run setup:fork && npm run prove:fork` — the executor's own order path on a fork: $50 of TSLAx
   into the owner's wallet, a $60 NVDAx buy refused by the on-chain cap, the position sold back for $49.95, revoke
   refusing the next order. Both run in CI on every push.

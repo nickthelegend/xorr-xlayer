@@ -107,19 +107,36 @@ export async function getLogsPaged<const TEvent extends AbiEvent>(params: {
 const deployedAt = new Map<string, Promise<bigint>>();
 
 /**
- * The first block at which `address` has code, by binary search on `eth_getCode` — about 27 reads on X Layer, once
- * per address per process. No event of a contract can come before this block, so a log scan that starts earlier only
- * asks the provider for windows that are empty by construction. A failed search is not cached: the caller falls back
- * to its own lower bound and the next call tries again.
+ * The earliest block a log scan of `address` should start from, by binary search on `eth_getCode` — about 27 reads,
+ * once per address per process. No event of a contract can come before the block it got its code, so a scan that
+ * starts earlier only asks the provider for windows that are empty by construction.
+ *
+ * A probe that ERRORS is treated the same as one that finds no code, because for this question it means the same
+ * thing: the provider will not let us look there, so there is nothing we could read below it either. That is not a
+ * detail. The hosted fork answers `eth_getCode` for the blocks it mined itself and forwards anything older to X
+ * Layer's public RPC, which is not an archive node and refuses with "Invalid parameters were provided to the RPC
+ * method" — one such probe rejected the whole search, the caller fell back to its own lower bound of head − 9,000,
+ * and `GET /history` then paged nine thousand blocks of pre-fork range through that same upstream, a hundred at a
+ * time. Measured on 2026-09-20: 64 seconds, against an app that gives a read 45. With the probe absorbed the search
+ * converges on the first block that has code AND can be read, which here is the deployment itself — 584 blocks, and
+ * the scan is two queries.
+ *
+ * A search that fails outright is still not cached: the caller falls back to its own lower bound and the next call
+ * tries again.
  */
 export function deploymentBlock(address: Address, head: bigint): Promise<bigint> {
   const key = address.toLowerCase();
   const hit = deployedAt.get(key);
   if (hit) return hit;
   const run = (async () => {
+    /** `true` only when the provider answered AND there is code: an unreadable height is not a place to scan from. */
     const hasCode = async (block: bigint) => {
-      const code = await publicClient.getCode({ address, blockNumber: block });
-      return !!code && code !== '0x';
+      try {
+        const code = await publicClient.getCode({ address, blockNumber: block });
+        return !!code && code !== '0x';
+      } catch {
+        return false;
+      }
     };
     if (!(await hasCode(head))) return head;
     let lo = 0n;

@@ -170,4 +170,36 @@ describe('X Layer', () => {
     expect(await deploymentBlock(addr, 71_000_000n)).toBe(70_990_941n);
     expect(getCode.mock.calls.length).toBe(calls);
   });
+
+  /*
+   * The hosted fork answers for the blocks it mined and forwards anything older to X Layer's public RPC, which is not
+   * an archive node and refuses outright. One probe landing there used to reject the whole search, and `GET /history`
+   * fell back to head − 9,000 and paged nine thousand blocks of pre-fork range through that same upstream a hundred
+   * at a time: 64 seconds, measured 2026-09-20, against an app that gives a read 45.
+   */
+  it('keeps searching when a height the provider will not serve rejects', async () => {
+    const PRUNED = 70_900_000n;
+    getCode.mockImplementation(async ({ blockNumber }: { blockNumber: bigint }) => {
+      if (blockNumber > PRUNED && blockNumber < 70_990_941n) throw new Error('Invalid parameters were provided to the RPC method.');
+      return blockNumber >= 70_990_941n ? '0x60' : '0x';
+    });
+    const addr = '0x00000000000000000000000000000000000000B3' as const;
+    // The first block that has code AND can be read — which is what a scan can actually start from.
+    expect(await deploymentBlock(addr, 71_000_000n)).toBe(70_990_941n);
+  });
+
+  it('answers head when the address has no code there, without searching', async () => {
+    getCode.mockResolvedValue('0x');
+    const addr = '0x00000000000000000000000000000000000000B4' as const;
+    const before = getCode.mock.calls.length;
+    expect(await deploymentBlock(addr, 71_000_000n)).toBe(71_000_000n);
+    // One probe: no code at head means no code anywhere, and there is nothing to bisect.
+    expect(getCode.mock.calls.length - before).toBe(1);
+  });
+
+  it('answers head when even head cannot be read, rather than scanning from zero', async () => {
+    getCode.mockRejectedValue(new Error('Invalid parameters were provided to the RPC method.'));
+    const addr = '0x00000000000000000000000000000000000000B5' as const;
+    expect(await deploymentBlock(addr, 71_000_000n)).toBe(71_000_000n);
+  });
 });
