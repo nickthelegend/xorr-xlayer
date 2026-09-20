@@ -189,3 +189,5 @@ excepted by name (Coinbase chain support, injected-provider detection).
 | B28 | Welcome hero | `/welcome` | this product's own coin art — no other chain's mark on the first screen | no foreign mark |
 | B29 | Agent gate | a wallet that hired nobody, with a live permission and allowance | no autonomous trade is placed for it, ever | no trade |
 | B30 | Agent, hired | a wallet that hired an agent | its sweep may place ONE entry per symbol it does not already hold, attributed to that agent | ≤1 per symbol |
+| B31 | An order bigger than the wallet | signed in, order for more USDC than is held | refused before anything is signed, naming both figures — never ERC20's own words through the contract | named refusal |
+| B32 | The fork's clock | leave the fork untouched across a UTC midnight | blocks keep being mined, so `remainingToday(owner)` rolls over on its own | cap resets unattended |
