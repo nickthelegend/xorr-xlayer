@@ -9,11 +9,17 @@ external dependency is BLOCKED, never PASS.
 Decisions this plan rests on: `PLAN.md` §6.1 (D1–D20), D21 (phone clip on the iOS simulator), D22 (one autonomous entry
 per symbol). Nothing below is open.
 
+**The hosted fork was rebuilt on 2026-09-20 00:22 UTC.** Giving the fork node a block time (so its clock keeps up with
+the real one) restarted it onto an empty volume, and anvil forked X Layer afresh: the old chain, its contracts and every
+balance on it were gone. Rebuilt in the documented order — `fork-bootstrap` for the contracts, `fork-grant` for the
+permissions, `reconcile:orphans` to take the fills the new chain does not have back out of the book, and the web build
+re-pinned. The addresses below are the ones now live.
+
 **Deployments under test**
 
 | | |
 |---|---|
-| Web | `https://xorr-xlayer.vercel.app` (pins delegation `0xf50a…7819`, names its commit) |
+| Web | `https://xorr-xlayer.vercel.app` (pins delegation `0xba23…c93a`, names its commit) |
 | Executor, fork | `https://executor-fork-production-2db8.up.railway.app` (`XORR_CHAIN=xlayer-fork`) |
 | Fork node | `https://xlayer-fork-production.up.railway.app` (anvil, chain 196) |
 | Executor, testnet | `https://executor-testnet-production.up.railway.app` (`XORR_CHAIN=xlayer-testnet`) |

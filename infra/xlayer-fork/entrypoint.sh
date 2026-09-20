@@ -40,8 +40,15 @@ else
   echo "fork: forking X Layer at block $BLOCK"
 fi
 
+# A block every few seconds, so the chain's clock moves like a real one.
+#
+# anvil mines only when something is sent, so an idle fork's `block.timestamp` stands still — and every time-based
+# rule in the contract reads that clock. Measured at 00:00 UTC on 2026-09-20: the day rolled over, the executor's own
+# tally reset, and `remainingToday(owner)` still answered $4 because the last block was from the previous day. A
+# judge opening the live link after midnight would have seen yesterday's spend until somebody traded.
 exec anvil \
   --host 0.0.0.0 --port "${PORT:-8545}" \
   --fork-url "$XLAYER_RPC" --fork-block-number "$BLOCK" \
   --chain-id 196 --accounts 10 --balance 10000 --no-rate-limit --silent \
+  --block-time "${BLOCK_TIME_SEC:-12}" \
   --state "$STATE" --state-interval "${STATE_INTERVAL_SEC:-30}"
