@@ -157,7 +157,21 @@ ops.get('/metrics', async (c) => {
 
   const byStatus = Object.fromEntries(runs.map((r) => [r.status, Number(r.n)]));
   const filled = byStatus.filled ?? 0;
-  const failed = byStatus.failed ?? 0;
+
+  /*
+   * A run whose transaction the chain no longer has is not an attempt that broke.
+   *
+   * `reconcile:orphans` marks a fill `failed` with `not_on_chain:` when a fork is rebuilt underneath it — the trade
+   * did happen, on a chain that stopped existing. Counted with the genuine failures it said "67.6% of attempts broke
+   * rather than filled" about an executor whose attempts were nearly all fine, which is the opposite of what this
+   * number is for. It is reported on its own, and kept out of the rate.
+   */
+  const [withdrawn] = await query<{ n: string }>(
+    `SELECT count(*) AS n FROM strategy_runs
+      WHERE status = 'failed' AND chain = ${THIS_CHAIN} AND error LIKE 'not_on_chain:%'`,
+  ).catch(() => [{ n: '0' }]);
+  const notOnChain = Number(withdrawn?.n ?? 0);
+  const failed = Math.max(0, (byStatus.failed ?? 0) - notOnChain);
 
   /*
    * WHY runs failed, not just how many.
@@ -205,7 +219,7 @@ ops.get('/metrics', async (c) => {
   ).catch(() => []);
 
   return c.json({
-    runs: byStatus,
+    runs: { ...byStatus, ...(byStatus.failed ? { failed, ...(notOnChain ? { 'not on chain': notOnChain } : {}) } : {}) },
     /** The number worth alerting on: fills that did not happen because something broke. */
     runFailureRate: filled + failed > 0 ? failed / (filled + failed) : 0,
     /** The number worth acting on: what broke. Last 7 days. */
