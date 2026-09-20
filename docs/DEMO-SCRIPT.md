@@ -35,6 +35,13 @@ simulator** (D13, D21). Fills are real EVM execution against X Layer mainnet sta
 7. **iOS clip (2:50–3:00).** The native app on the simulator: Home (balance, Permit ✓, ARMED), a stock ticket, and the
    order screen refusing a buy past today's allowance ("Your permission allows $100.00 more today").
 
+## What was actually recorded
+
+`docs/demo/xorr-demo.mp4` (2:43, 2026-09-20) covers beats 1–5 and closes on 6's screen — the Safety page with "Stop all
+trading" — without pressing it, because pressing it revokes the demo wallet's permission and re-granting is 17
+signatures. Beat 7, the iOS-simulator clip, is not in it: the native app on the simulator is a dev build that needs
+Metro and its own sign-in, and that is a separate recording. `tools/record-demo.mjs` is the script that made it.
+
 ## If something is off
 
 Do not cut around a failure silently — re-record. Every number on screen must be one the app actually produced.
