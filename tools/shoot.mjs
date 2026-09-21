@@ -108,6 +108,13 @@ const ROUTES = [
   ['54-approvals', '/approvals'],
   ['55-verify', '/verify'],
   ['56-metrics', '/metrics'],
+  /*
+   * The strategy book. Three routes because the interesting cases are not the happy one: a strategy with a
+   * full report, and one that took no trades at all — which is where a screen is tempted to draw a zero.
+   */
+  ['57-playbook', '/playbook'],
+  ['58-playbook-report', '/playbook/b200_sess_8'],
+  ['59-playbook-untraded', '/playbook/adaptive_p99_momentum_perp'],
   ['57-system', '/system'],
   ['58-network', '/network'],
   ['59-rates', '/rates'],
@@ -347,6 +354,17 @@ const EXPECT = {
    */
   '55-verify': { must: [/Passed/, /Failed/, /Not asked/, /\d+ Passed/] },
   '56-metrics': { must: [/RUNS BY OUTCOME|STRATEGIES BY STATE/, /\d+/] },
+  // The book is public: these must render for a signed-out visitor, which is what a judge is.
+  '57-playbook': { must: [/\d+ rules measured/, /Showing \d+ of \d+/, /passed all four/] },
+  '58-playbook-report': { must: [/RETURN ON UNSEEN DATA/, /WINS AND LOSSES/, /WHAT IT WAS PUT THROUGH/, /TRADES/] },
+  /*
+   * The one that has to say nothing rather than zero. `+0.00%` here was a measured-looking flat result for a
+   * strategy that never opened a position, and 99 of the 313 were drawing it.
+   */
+  '59-playbook-untraded': {
+    must: [/It took no trades on the unseen half/, /—/],
+    never: [/\+0\.00%/, /UNDER 30 TRADES/],
+  },
   // A dependency's timestamp is an age now; the raw ISO stamp from the database probe must not be back.
   '57-system': {
     must: [/EXECUTOR/, /xlayer-fork|xlayer-testnet|xlayer|localnet/, /postgres/],

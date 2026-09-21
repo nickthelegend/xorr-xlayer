@@ -90,15 +90,31 @@ export default function Playbook() {
               ))}
             </PillRow>
             <PillRow>
-              {SORTS.map((o) => (
-                <Pill key={o.key} label={o.label} selected={sort === o.key} onPress={() => setSort(o.key)} />
-              ))}
+              {/*
+                The sample toggle comes FIRST, before the sorts.
+                
+                It defaults to on, which means the screen opens already hiding two thirds of the book — and at
+                the end of a scrolling row it was off the right edge of a phone, so the control explaining that
+                was the one control you could not see. The caption below says the same thing in words, because a
+                pill that is scrolled past still has to be accounted for.
+              */}
               <Pill
                 label={trustedOnly ? '30+ trades' : 'Any sample'}
                 selected={trustedOnly}
                 onPress={() => setTrustedOnly((v) => !v)}
               />
+              {SORTS.map((o) => (
+                <Pill key={o.key} label={o.label} selected={sort === o.key} onPress={() => setSort(o.key)} />
+              ))}
             </PillRow>
+
+            {counts ? (
+              <Text variant="footnote" color={colors.ink55}>
+                Showing {rows.length} of {counts.total}
+                {trustedOnly ? ' — the ones with at least 30 trades on the unseen half' : ''}
+                {filter === 'all' ? '' : `, tier ${filter}`}.
+              </Text>
+            ) : null}
           </View>
 
           <View style={{ paddingHorizontal: space.gutter, marginTop: space.s12 }}>

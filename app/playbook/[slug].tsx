@@ -22,10 +22,11 @@
  */
 import React from 'react';
 import { ScrollView, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import {
   AreaChart,
+  EmptyState,
   ErrorState,
   Ring,
   Fill,
@@ -43,6 +44,7 @@ import {
 } from '@/ui';
 import { money, percent, ratio } from '@/format';
 import { useAsync } from '@/data/useAsync';
+import { ApiError } from '@/data/apiError';
 import { system } from '@/data/system';
 import { TIER_MEANS, type StrategyDetail, type StrategyTier } from '@/data/strategyBook';
 
@@ -221,6 +223,7 @@ function Distribution({ bins }: { bins: StrategyDetail['distribution'] }) {
 
 export default function StrategyReport() {
   const goBack = useGoBack();
+  const router = useRouter();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { data, loading, error, reload } = useAsync(() => system.strategyDetail(slug!), [slug]);
 
@@ -232,7 +235,18 @@ export default function StrategyReport() {
     <Screen>
       <HeaderBar onBack={goBack} title={<Text variant="screenTitle">{slug}</Text>} />
       <Fill>
-        {error ? (
+        {error instanceof ApiError && error.status === 404 ? (
+          /*
+             A slug the book does not have is not a failure to load, and offering Retry on one is offering a
+             button that cannot ever work — "That did not load" with a retry, forever, for a thing that was
+             never there. The way out is the book.
+          */
+          <EmptyState
+            text={`There is no strategy called ${slug} in the book.`}
+            actionLabel="Browse the book"
+            onAction={() => router.replace('/playbook')}
+          />
+        ) : error ? (
           <ErrorState error={error} onRetry={reload} />
         ) : loading && !data ? (
           <View style={{ paddingHorizontal: space.gutter, gap: space.s12 }}>

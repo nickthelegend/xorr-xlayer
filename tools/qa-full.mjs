@@ -1435,10 +1435,28 @@ function appList(relative, pattern) {
   }
 }
 
+/**
+ * How far a pooled rate may sit from CoinGecko's spot before it is a bug rather than the clock.
+ *
+ * On live X Layer the two track each other and 3% is a real check: a wider gap is an arbitrage nobody took,
+ * or a units error. On a FORK it measures something else entirely — the pools are pinned at the block the
+ * fork was made from while spot keeps moving, so the gap grows every hour the fork is left running, and the
+ * check fails for the one thing the README already names as a known limitation. BTC had moved 6% two days
+ * after the fork was pinned, and both quote checks went red for a venue that was working perfectly.
+ *
+ * What the assertion is actually guarding against is a decimals or units mistake, and that shows up as a
+ * factor of a thousand, not six percent. So a fork keeps the guard and loses the precision.
+ */
+function rateTolerance() {
+  return ctx.fork ? 0.5 : 0.03;
+}
+
 const SERVER_PUBLIC_PATHS = [
   '/health', '/market/quotes', '/market/sparklines', '/market/ohlc', '/market/symbols', '/market/logos', '/market/tradable',
   '/market/watchable', '/market/stocks', '/market/xstocks', '/market/stocks/history', '/yield/supply', '/verify', '/metrics',
   '/market/crosscheck', '/market/corporate-action', '/market/futures',
+  // The measured strategy book: what 313 rules did over recorded candles is not user data.
+  '/strategies/catalog',
 ];
 
 check(
@@ -1448,7 +1466,7 @@ check(
     auth: 'public',
     kind: 'contract',
     correct:
-      'Public. 200 (503 only when a critical dependency is down) {ok = status ≠ "down", status ∈ up|degraded|down = the worst dependency, chain (= QA_EXPECT_CHAIN), version: a commit sha (= QA_EXPECT_VERSION when set), delegation, uptimeSec ≥ 0, dependencies: postgres, rpc, delegation (critical) and gas (the delegate\'s OKB), upstreams (not critical) — no subgraph on X Layer — each {status, ms ≥ 0, detail}, breakers: [{host, failures, openUntil, open}], db, publicSurface: {paths = the server\'s 17 public paths = src/data/publicPaths.ts, prefixes ["/perp/"]}, voice: {configured: boolean}}; headers x-request-id and access-control-allow-origin; status not "down".',
+      'Public. 200 (503 only when a critical dependency is down) {ok = status ≠ "down", status ∈ up|degraded|down = the worst dependency, chain (= QA_EXPECT_CHAIN), version: a commit sha (= QA_EXPECT_VERSION when set), delegation, uptimeSec ≥ 0, dependencies: postgres, rpc, delegation (critical) and gas (the delegate\'s OKB), upstreams (not critical) — no subgraph on X Layer — each {status, ms ≥ 0, detail}, breakers: [{host, failures, openUntil, open}], db, publicSurface: {paths = the server\'s 18 public paths = src/data/publicPaths.ts, prefixes ["/perp/", "/strategies/catalog/"] — the book\'s detail prefix carries its trailing slash, without which /strategies/catalogue-anything would also be public}, voice: {configured: boolean}}; headers x-request-id and access-control-allow-origin; status not "down".',
   },
   async () => {
     const r = await get('/health', { auth: false, retry: false });
@@ -1479,7 +1497,10 @@ check(
     const served = [...h.publicSurface.paths].sort();
     must(JSON.stringify(served) === JSON.stringify([...SERVER_PUBLIC_PATHS].sort()), `publicSurface.paths ${clip(served)}`);
     if (appPaths) must(JSON.stringify([...appPaths].sort()) === JSON.stringify(served), `app mirror ${clip([...appPaths].sort())} ≠ server ${clip(served)}`);
-    must(JSON.stringify(h.publicSurface.prefixes) === '["/perp/"]', `prefixes ${clip(h.publicSurface.prefixes)}`);
+    must(
+      JSON.stringify(h.publicSurface.prefixes) === '["/perp/","/strategies/catalog/"]',
+      `prefixes ${clip(h.publicSurface.prefixes)}`,
+    );
     must(typeof h.voice?.configured === 'boolean', `voice ${clip(h.voice)}`);
     must(r.headers.get('x-request-id') && r.headers.get('access-control-allow-origin'), 'missing x-request-id or access-control-allow-origin');
     ctx.version = h.version;
@@ -2055,6 +2076,118 @@ check(
     expectStatus(r, 200, 'GET /market/watchable');
     watchableRows(r.json, 'watchable');
     return r.json.map((t) => `${t.symbol} ${t.address.slice(0, 8)}…`).join(', ');
+  },
+);
+
+/* ───────────────────────────────────────────────────────────── the strategy book */
+
+check(
+  {
+    method: 'GET',
+    path: '/strategies/catalog',
+    auth: 'public',
+    kind: 'contract',
+    correct:
+      'Public — no bearer token. 200 {window, counts, rows}. `window` names what every number was measured over: bars, barsUnseen, interval, symbols, feeBpsPerSide, startEquity. `counts` tallies the whole book and the tiers sum to the total. Every row carries slug, tier, trusted, trades. HONESTY: a row with trades 0 publishes no returnPct, winRate or profitFactor — absent, never zero; `trusted` is exactly trades >= 30; `tier: verified` implies `survives`.',
+  },
+  async () => {
+    const r = await get('/strategies/catalog', { auth: false });
+    expectStatus(r, 200, 'GET /strategies/catalog');
+    const { window: w, counts: c, rows } = r.json;
+    must(w && w.bars > 1000 && w.barsUnseen > 0, `window ${clip(w)}`);
+    must(Array.isArray(w?.symbols) && w.symbols.length > 1, `symbols ${clip(w?.symbols)}`);
+    // A return quoted without its costs is a different claim.
+    must(typeof w?.feeBpsPerSide === 'number' && w.feeBpsPerSide > 0, `feeBpsPerSide ${w?.feeBpsPerSide}`);
+    must(Array.isArray(rows) && rows.length > 100, `rows ${rows?.length}`);
+    must(c.verified + c.measured + c.archive === c.total, `tiers ${c.verified}+${c.measured}+${c.archive} != ${c.total}`);
+    must(c.archive > 0, 'a book with no failures in it is not the whole book');
+
+    for (const row of rows) {
+      if (row.trades === 0) {
+        // A zero asserts a result. An absent key says "not measured".
+        must(row.returnPct === null || row.returnPct === undefined, `${row.slug}: a return without trading (${row.returnPct})`);
+        must(row.winRate === null || row.winRate === undefined, `${row.slug}: a win rate without trading`);
+      }
+      must(row.trusted === row.trades >= 30, `${row.slug}: trusted ${row.trusted} at ${row.trades} trades`);
+      if (row.tier === 'verified') must(row.survives === true, `${row.slug}: verified without surviving the gauntlet`);
+    }
+    return `${rows.length} rows; ${c.verified} verified, ${c.measured} measured, ${c.archive} archive; ${c.trusted} with 30+ trades`;
+  },
+);
+
+check(
+  {
+    method: 'GET',
+    path: '/strategies/catalog',
+    auth: 'public',
+    kind: 'refusal',
+    correct:
+      '?tier= filters and every row matches; ?trusted=true leaves only rows with 30+ trades; ?limit= caps the list; ?sort=sharpe orders by the measured column and seats the UNMEASURED last, never as a zero. An unknown tier is 400 bad_tier, an unknown sort 400 bad_sort, a limit of 0 or a word 400 bad_limit.',
+  },
+  async () => {
+    const tiered = await get('/strategies/catalog?tier=verified', { auth: false });
+    expectStatus(tiered, 200, '?tier=verified');
+    must(tiered.json.rows.every((x) => x.tier === 'verified'), 'tier filter let another tier through');
+
+    const trusted = await get('/strategies/catalog?trusted=true', { auth: false });
+    must(trusted.json.rows.every((x) => x.trades >= 30), 'trusted filter let a thin sample through');
+
+    const capped = await get('/strategies/catalog?limit=5', { auth: false });
+    must(capped.json.rows.length === 5, `limit=5 gave ${capped.json.rows.length}`);
+
+    /*
+     * The unmeasured sort LAST. A strategy with no Sharpe does not have the worst Sharpe in the book — it has
+     * none — and ordering it as though it were zero seats it mid-list as if it had been measured there.
+     */
+    const bySharpe = await get('/strategies/catalog?sort=sharpe', { auth: false });
+    const rows = bySharpe.json.rows;
+    const lastMeasured = rows.map((x) => typeof x.sharpe === 'number').lastIndexOf(true);
+    must(
+      rows.slice(lastMeasured + 1).every((x) => typeof x.sharpe !== 'number'),
+      'an unmeasured Sharpe was sorted in among the measured ones',
+    );
+
+    expectRefusal(await get('/strategies/catalog?tier=wishful', { auth: false }), 400, 'bad_tier', 'unknown tier');
+    expectRefusal(await get('/strategies/catalog?sort=vibes', { auth: false }), 400, 'bad_sort', 'unknown sort');
+    expectRefusal(await get('/strategies/catalog?limit=0', { auth: false }), 400, 'bad_limit', 'limit 0');
+    expectRefusal(await get('/strategies/catalog?limit=many', { auth: false }), 400, 'bad_limit', 'limit not a number');
+    return 'filters, cap and sort hold; four refusals named';
+  },
+);
+
+check(
+  {
+    method: 'GET',
+    path: '/strategies/catalog/:slug',
+    auth: 'public',
+    kind: 'contract',
+    correct:
+      "200 with the strategy's own report: equityCurve indexed to 100 and ending where the summary says, distribution, structure, evidence, and trades capped at 150 with the true total beside it. Gross + loss + commission EQUALS the net, and the net equals the account's own change. An unknown slug is 404 not_found; a slug that could name a file elsewhere is 400 bad_slug.",
+  },
+  async () => {
+    const list = (await get('/strategies/catalog?trusted=true&sort=trades&limit=1', { auth: false })).json.rows;
+    const slug = list[0]?.slug;
+    must(typeof slug === 'string', 'no trusted strategy to open');
+
+    const r = await get(`/strategies/catalog/${slug}`, { auth: false });
+    expectStatus(r, 200, `GET /strategies/catalog/${slug}`);
+    const d = r.json;
+    must(d.slug === slug, `slug ${d.slug}`);
+    must(Array.isArray(d.equityCurve) && d.equityCurve[0] === 100, `curve starts at ${d.equityCurve?.[0]}`);
+    must(near(d.equityCurve.at(-1), d.unseen.finalEquity, 0.5), `curve ends ${d.equityCurve.at(-1)}, summary says ${d.unseen.finalEquity}`);
+    must(d.trades.length === Math.min(d.tradesTotal, 150), `${d.trades.length} trades shown of ${d.tradesTotal}`);
+
+    /*
+     * One equation, asserted. The research engine's per-trade `pnl_usd` is net of the EXIT fee only — the entry
+     * fee is charged to cash at open — so a structure built from it reported a profit beside a losing curve.
+     */
+    const st = d.structure;
+    must(near(st.grossProfitUsd + st.grossLossUsd + st.commissionUsd, st.netPnlUsd, 0.02), `structure does not sum: ${clip(st)}`);
+    must(near(st.netPnlUsd, d.unseen.finalEquity - d.window.startEquity, 0.02), `net ${st.netPnlUsd} is not the account's change`);
+
+    expectRefusal(await get('/strategies/catalog/no_such_strategy_here', { auth: false }), 404, 'not_found', 'unknown slug');
+    expectRefusal(await get('/strategies/catalog/..%2F..%2Findex', { auth: false }), 400, 'bad_slug', 'a slug that could name another file');
+    return `${slug}: curve ${d.equityCurve.length} pts, ${d.tradesTotal} trades, structure sums to ${st.netPnlUsd}`;
   },
 );
 
@@ -2712,7 +2845,7 @@ check(
     auth: 'user',
     kind: 'contract',
     correct:
-      'As the route screen asks (?in=USDC&out=XBTC&amount=500, app/route/[symbol].tsx SIZES[1]): 200 {inSymbol "USDC", outSymbol "XBTC", amount 500, venues: "Uniswap v3" then "OKX DEX" in that order, each {venue, outAmount: number > 0 | null, unavailable: null | a reason} with outAmount null ⇔ unavailable set; best = the venue with the most out (null when none priced); edgeBps = round((best − runner-up) / runner-up × 10^4) when two price, null otherwise}; Uniswap v3 prices on mainnet state, at a rate within 3% of /market/quotes BTC; OKX DEX says why when this deployment has no key.',
+      'As the route screen asks (?in=USDC&out=XBTC&amount=500, app/route/[symbol].tsx SIZES[1]): 200 {inSymbol "USDC", outSymbol "XBTC", amount 500, venues: "Uniswap v3" then "OKX DEX" in that order, each {venue, outAmount: number > 0 | null, unavailable: null | a reason} with outAmount null ⇔ unavailable set; best = the venue with the most out (null when none priced); edgeBps = round((best − runner-up) / runner-up × 10^4) when two price, null otherwise}; Uniswap v3 prices on mainnet state, at a rate within 3% of /market/quotes BTC on a live chain — on a fork the pools are pinned at their block while spot moves, so the band there is only wide enough to catch a units error; OKX DEX says why when this deployment has no key.',
   },
   async () => {
     const r = await get('/route/compare?in=USDC&out=XBTC&amount=500');
@@ -2731,7 +2864,10 @@ check(
     if (ctx.mainnetState) {
       must(uni.outAmount > 0, `Uniswap v3 did not price: ${uni.unavailable}`);
       const q = await quotes('BTC');
-      must(Math.abs(500 / uni.outAmount / q.BTC.price - 1) < 0.03, `Uniswap v3 rate ${(500 / uni.outAmount).toFixed(2)} vs BTC spot ${q.BTC.price}`);
+      must(
+        Math.abs(500 / uni.outAmount / q.BTC.price - 1) < rateTolerance(),
+        `Uniswap v3 rate ${(500 / uni.outAmount).toFixed(2)} vs BTC spot ${q.BTC.price}${ctx.fork ? ' (a fork is pinned; this only catches a units error)' : ''}`,
+      );
     }
     return c.venues.map((x) => `${x.venue}:${x.outAmount === null ? 'no' : x.outAmount.toFixed(6)}`).join(', ') + `; best ${c.best}`;
   },
@@ -3079,7 +3215,10 @@ check(
     must(q.priceImpactPct === null || (q.priceImpactPct >= 0 && q.priceImpactPct < 5), `priceImpactPct ${q.priceImpactPct}`);
     must(q.gas === null || q.gas?.paidBy === 'executor', `gas ${clip(q.gas)}`);
     const spot = (await quotes('BTC')).BTC.price;
-    must(Math.abs(20 / q.outAmount / spot - 1) < 0.03, `implied ${(20 / q.outAmount).toFixed(2)} vs BTC spot ${spot}`);
+    must(
+      Math.abs(20 / q.outAmount / spot - 1) < rateTolerance(),
+      `implied ${(20 / q.outAmount).toFixed(2)} vs BTC spot ${spot}${ctx.fork ? ' (a fork is pinned; this only catches a units error)' : ''}`,
+    );
     const dflt = await get('/swap/quote?in=USDC&out=XBTC&amount=20');
     must(dflt.status === 200 && dflt.json.slippagePct === 0.3, `default slippage ${dflt.json?.slippagePct}`);
     const equity = await get('/swap/quote?in=USDC&out=nvdax&amount=100');
