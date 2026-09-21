@@ -412,8 +412,56 @@ async function main() {
     seen.quiet('grant');
   }
 
-  // ── 4. A screen behind the session, after the session is cleared ──────────────────────────────
-  console.log('\n4. signed out mid-session');
+  // ── 4. The strategy book, from the home sheet, the way a person reaches it ────────────────────
+  /*
+   * The route sweep opens `/playbook` directly; nobody arrives that way. The path that matters is the tab on
+   * the home sheet — which is fifth of five and scrolls in from the right on a phone — and the row that opens
+   * a report. A tab nobody can reach is a feature nobody has.
+   */
+  console.log('\n4. the strategy book, from home');
+  seen.clear();
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(4000);
+
+  const tab = page.getByText('Strategies', { exact: true }).first();
+  await tab.scrollIntoViewIfNeeded().catch(() => undefined);
+  await tab.click({ timeout: 10_000 });
+  await page.waitForTimeout(5000);
+  const sheet = await body();
+  check(/unseen trades/.test(sheet), 'the Strategies tab lists measured strategies', sheet.match(/[\w ]+\n?\d+ unseen trades/)?.[0]?.slice(0, 60) ?? '');
+  // The book leads with what a rule did on data it never saw, so the row has to carry the trade count with it.
+  check(!/\+0\.00%/.test(sheet), 'no strategy claims a return it did not trade for');
+
+  await page.getByText(/^All \d+ strategies$/).first().click({ timeout: 10_000 });
+  await page.waitForTimeout(5000);
+  const book = await body();
+  check(/Showing \d+ of \d+/.test(book), 'the book says how much of itself it is showing', book.match(/Showing \d+ of \d+[^.]*/)?.[0] ?? '');
+
+  /*
+   * The row's TITLE, not its secondary line. `getByText(/unseen trades/)` resolves to the caption `<div>`
+   * inside the row, which is not the pressable and reports itself as not visible — the click then retried
+   * against a thing that can never take one. The title is the row's own label.
+   */
+  const firstTitle = (book.match(/^([a-z0-9 ]+)\n\d+ unseen trades/m) ?? [])[1];
+  check(Boolean(firstTitle), 'the book has a row to open', firstTitle ?? '');
+  /*
+   * By ROLE, not by text. On react-native-web a `Row`'s title is a `<div>` inside the pressable, and
+   * Playwright reports that inner node as not visible — the click retried for ten seconds against something
+   * that could never take one. The row itself is the button, and its accessible name is the title.
+   */
+  await page
+    .getByRole('button', { name: new RegExp(firstTitle ?? 'b200 sess 8', 'i') })
+    .first()
+    .click({ timeout: 10_000 });
+  await page.waitForTimeout(6000);
+  const report = await body();
+  check(/RETURN ON UNSEEN DATA/.test(report), 'a row opens its report');
+  check(/WINS AND LOSSES|It took no trades/.test(report), 'the report shows its record, or says there is none');
+  check(/MEASURED OVER/.test(report), 'and it says what window every number came from');
+  seen.quiet('the strategy book');
+
+  // ── 5. A screen behind the session, after the session is cleared ──────────────────────────────
+  console.log('\n5. signed out mid-session');
   seen.clear();
   await page.evaluate(() => {
     try {
