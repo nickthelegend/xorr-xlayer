@@ -19,7 +19,6 @@ import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import {
-  Button,
   ErrorState,
   Fill,
   HeaderBar,
@@ -164,12 +163,7 @@ export default function Playbook() {
                 rule never saw — after {book.data.window.feeBpsPerSide} bps a side. Past behaviour over recorded
                 candles, not a forecast.
               </Text>
-              <Button
-                label="How the book was measured"
-                variant="ghost"
-                onPress={() => router.push('/sources')}
-                style={{ marginTop: space.s12 }}
-              />
+
             </View>
           ) : null}
         </ScrollView>
