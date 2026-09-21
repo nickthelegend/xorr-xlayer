@@ -394,3 +394,47 @@ describe('the dev surfaces are developer-only', () => {
     expect(fs.existsSync(path.join(APP, '_dev/ui-edge.tsx'))).toBe(true);
   });
 });
+
+/*
+ * The strategy book renders the research engine's own notes. `failed_on` is shorthand it wrote to itself —
+ * `Sens`, `comm2x`, `Multi`, `OOS` — and the report screen printed it raw under "Verdict", which was the
+ * first thing a reader saw about why a strategy is in the archive.
+ */
+describe('the strategy book speaks English', () => {
+  it('maps every failure code the book actually contains', () => {
+    const dir = path.join(ROOT, 'server/data/strategies/detail');
+    if (!fs.existsSync(dir)) return;
+    const screen = fs.readFileSync(path.join(ROOT, 'app/playbook/[slug].tsx'), 'utf8');
+
+    const seen = new Set<string>();
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.json')) continue;
+      const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as {
+        evidence?: { failedOn?: string[] | null } | null;
+      };
+      for (const r of d.evidence?.failedOn ?? []) seen.add(r);
+    }
+
+    // The per-strategy ones carry a number; the screen rewrites them with a regexp rather than a table.
+    const unmapped = [...seen].filter(
+      (r) => !/^BTC-only n=\d+ \(judged on portfolio\)$/.test(r) && !screen.includes(`'${r}'`) && !screen.includes(`${r}:`),
+    );
+    expect(unmapped, `failure codes with no words:\n${unmapped.join('\n')}`).toEqual([]);
+  });
+
+  it('never publishes a return for a strategy that took no trades', () => {
+    const dir = path.join(ROOT, 'server/data/strategies/detail');
+    if (!fs.existsSync(dir)) return;
+    const offenders: string[] = [];
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.json')) continue;
+      const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as {
+        slug: string;
+        unseen: { trades: number; returnPct: number | null };
+      };
+      // 0.00% is arithmetically true and reads as a measured flat result rather than as no result.
+      if (d.unseen.trades === 0 && d.unseen.returnPct !== null) offenders.push(d.slug);
+    }
+    expect(offenders.length, `asserting a return without trading:\n${offenders.slice(0, 8).join('\n')}`).toBe(0);
+  });
+});

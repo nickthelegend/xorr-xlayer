@@ -21,6 +21,14 @@ vi.mock('../venues/xstocks.js', async (orig) => ({
   xStockPriceUsd: h.xStockPriceUsd,
 }));
 vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
+/*
+ * The issuer's mark for each token, which `xStockCatalog` now asks for.
+ *
+ * Unmocked it reaches Jupiter and the chain, and whether this file passed came down to how fast the network
+ * was that minute — three of its tests timed out at five seconds on a slow one. A unit test that can fail
+ * because an external API is busy is not measuring what it claims to.
+ */
+vi.mock('../market/nasdaq.js', () => ({ referencePricesUsd: vi.fn(async () => new Map<string, number>()) }));
 vi.mock('../db/index.js', () => ({ query: vi.fn(async () => []) }));
 // The catalog is public; the quote beside it is not. Authentication itself is `auth`'s to prove.
 vi.mock('../auth/middleware.js', () => ({ requireUser: h.requireUser, WrongPrincipalError: class extends Error {} }));

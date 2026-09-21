@@ -71,6 +71,33 @@ function describe(doc: string, slug: string): string | null {
   return null;
 }
 
+/**
+ * Why the gauntlet turned a strategy down, in words.
+ *
+ * `failed_on` is the research engine's own shorthand — `Sens`, `comm2x`, `Multi`, `OOS` — and the screen was
+ * printing it raw: "Verdict: comm2x, unseen return <= 0". That is a note the engine wrote to itself, and it
+ * was the first thing a reader saw about why a strategy is in the archive.
+ *
+ * Anything unrecognised passes through unchanged. A reason nobody has mapped yet is still a reason, and
+ * dropping it would turn "we could not phrase this" into "there was nothing wrong".
+ */
+const FAILURE_WORDS: Record<string, string> = {
+  OOS: 'lost money on data it had not seen',
+  'unseen return <= 0': 'made nothing on data it had not seen',
+  Sens: 'a small change to its settings broke it',
+  comm2x: 'the edge disappears at double the cost',
+  Multi: 'it did not hold on a second set of coins',
+  'too few trades anywhere': 'it traded too rarely to judge',
+};
+
+function failureWords(reasons: readonly string[]): string {
+  const said = reasons
+    .map((r) => FAILURE_WORDS[r] ?? r.replace(/^BTC-only n=(\d+) \(judged on portfolio\)$/, 'it took only $1 trades on BTC alone, so it was judged across the portfolio'))
+    .filter((r, i, all) => all.indexOf(r) === i);
+  if (said.length === 0) return 'It did not pass.';
+  return `${said[0]!.charAt(0).toUpperCase()}${said[0]!.slice(1)}${said.length > 1 ? `, and ${said.slice(1).join(', and ')}` : ''}.`;
+}
+
 /** A measured number, or a dash. `null` and `undefined` both mean "not measured" and read the same. */
 function fig(v: number | null | undefined, render: (n: number) => string): string {
   return typeof v === 'number' && Number.isFinite(v) ? render(v) : '—';
@@ -218,7 +245,8 @@ export default function StrategyReport() {
             <SheetCard bordered borderRadius={radius.panel} padding={space.s16}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s8, flexWrap: 'wrap' }}>
                 <Tag tone={TIER_TONE[data.tier]} label={data.tier.toUpperCase()} />
-                {data.trusted ? null : (
+                {/* Only when it traded at all: beside "it took no trades", a thin-sample warning is the same news twice. */}
+                {data.trusted || u.trades === 0 ? null : (
                   <Tag tone="warn" label={`UNDER ${data.trustedMinTrades} TRADES`} />
                 )}
               </View>
@@ -429,12 +457,18 @@ export default function StrategyReport() {
                 {Object.entries(data.evidence.crossAsset ?? {}).map(([sym, v]) => (
                   <Line key={sym} label={`Held up on ${sym}`} value={`${ratio(v, 4)} R`} tone={pnlTone(v)} />
                 ))}
-                <Line
-                  label="Verdict"
-                  value={data.evidence.survives ? 'Passed all four' : (data.evidence.failedOn ?? []).join(', ') || 'Did not pass'}
-                  tone={data.evidence.survives ? 'up' : 'down'}
-                  last
-                />
+                <View style={{ paddingTop: space.s10 }}>
+                  <Text variant="secondary" color={colors.ink65}>
+                    Verdict
+                  </Text>
+                  <Price
+                    variant="secondary"
+                    tone={data.evidence.survives ? 'up' : 'down'}
+                    style={{ marginTop: space.s4 }}
+                  >
+                    {data.evidence.survives ? 'Passed all four.' : failureWords(data.evidence.failedOn ?? [])}
+                  </Price>
+                </View>
               </SheetCard>
             ) : null}
 
