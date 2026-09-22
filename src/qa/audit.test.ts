@@ -438,3 +438,29 @@ describe('the strategy book speaks English', () => {
     expect(offenders.length, `asserting a return without trading:\n${offenders.slice(0, 8).join('\n')}`).toBe(0);
   });
 });
+
+describe('web touch pass-through', () => {
+  /*
+   * react-native-web honours `pointerEvents: 'box-none'` only in a style compiled by `StyleSheet.create`: an inline
+   * style goes out as plain CSS, where `box-none` is not a value, and the browser drops it without a word. The
+   * connection banner shipped that way and sat over the order ticket's Buy button, answering every tap on it while
+   * its own comment said it blocked nothing.
+   */
+  it('every box-none lives in a StyleSheet.create, where the web can honour it', () => {
+    const offenders: string[] = [];
+    for (const f of [...walk(APP), ...walk(path.join(ROOT, 'src'))]) {
+      const src = stripComments(fs.readFileSync(f, 'utf8'));
+      const re = /pointerEvents\s*:\s*['"]box-none['"]/g;
+      for (let m = re.exec(src); m; m = re.exec(src)) {
+        const before = src.slice(0, m.index);
+        const opened = before.lastIndexOf('StyleSheet.create(');
+        // Inside a create() call: its parentheses are still open at this point.
+        const inside =
+          opened >= 0 &&
+          [...before.slice(opened)].reduce((d, c) => d + (c === '(' ? 1 : c === ')' ? -1 : 0), 0) > 0;
+        if (!inside) offenders.push(`${path.relative(ROOT, f)}:${before.split('\n').length}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

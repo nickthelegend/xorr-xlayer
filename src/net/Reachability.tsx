@@ -16,7 +16,7 @@
  * down, and covering the app with a dialog would take that away at the moment it matters most.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Press, Text, colors, radius, signIn, size, space } from '@/ui';
 import { useNow } from '@/state/useNow';
 import { executorHealth } from '@/data/health';
@@ -42,19 +42,29 @@ import { ChainMismatchScreen } from './ChainMismatch';
  * through the panel to whatever is underneath, and the sentences opt out entirely, so the only thing on the
  * banner that answers a tap is the control that is meant to.
  */
-const PASS_THROUGH_PANEL = {
-  pointerEvents: 'box-none',
-  position: 'absolute',
-  left: space.s16,
-  right: space.s16,
-  bottom: space.s26,
-  backgroundColor: colors.surfaceAlt,
-  borderRadius: radius.card,
-  paddingHorizontal: space.s16,
-  paddingVertical: space.s12,
-  gap: space.s4,
-} as const;
-const SENTENCES = { pointerEvents: 'none', gap: space.s4 } as const;
+/*
+ * Through `StyleSheet.create`, not an inline object — and that is load-bearing on the web. react-native-web compiles
+ * `box-none` into a pair of rules (`pointer-events: none` on the panel, `auto` on its children); an inline style goes
+ * out as plain CSS, where `box-none` is not a value, and is dropped without a word. The first version of this fix was
+ * inline, and the panel still answered every tap over Buy.
+ */
+const banner = StyleSheet.create({
+  panel: {
+    pointerEvents: 'box-none',
+    position: 'absolute',
+    left: space.s16,
+    right: space.s16,
+    bottom: space.s26,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.card,
+    paddingHorizontal: space.s16,
+    paddingVertical: space.s12,
+    gap: space.s4,
+  },
+  sentences: { pointerEvents: 'none', gap: space.s4 },
+});
+const PASS_THROUGH_PANEL = banner.panel;
+const SENTENCES = banner.sentences;
 
 /** While up — a heartbeat, not a poll. While down, `retryDelayMs` backs off from two seconds. */
 const HEARTBEAT_MS = 30_000;

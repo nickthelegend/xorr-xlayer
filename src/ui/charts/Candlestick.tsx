@@ -386,7 +386,7 @@ export function Candlestick({
           </Svg>
 
           {onSelect && box.width > 0 && hasData && !pending ? (
-            <View style={[StyleSheet.absoluteFill, { pointerEvents: 'box-none' }]}>
+            <View style={[StyleSheet.absoluteFill, hitLayer.passThrough]}>
               {series.map((_, i) => (
                 <Press
                   key={`hit-${i}`}
@@ -460,3 +460,9 @@ export function Candlestick({
     </View>
   );
 }
+
+/**
+ * `box-none` through `StyleSheet.create`: react-native-web only honours it compiled. Inline, it is emitted as CSS,
+ * where `box-none` is not a value, and silently dropped — the layer then took every touch between the candles.
+ */
+const hitLayer = StyleSheet.create({ passThrough: { pointerEvents: 'box-none' } });
