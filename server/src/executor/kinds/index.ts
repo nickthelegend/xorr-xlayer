@@ -20,8 +20,9 @@ import { supplyCalldata } from '../../venues/aave.js';
 import { publicClient } from '../../evm/client.js';
 import { usdToUnits } from '../../evm/delegation.js';
 import { restingLevels, type MultiplierBasis } from '../resting.js';
-import { AAVE_V3_POOL } from '../../evm/chains.js';
+import { AAVE_V3_POOL, CHAIN_KEY, IS_MAINNET_STATE } from '../../evm/chains.js';
 import { erc20Abi, type Address, type Hex } from 'viem';
+import { SETTLEMENT_SYMBOL } from '../../venues/tokens.js';
 
 /**
  * One leg.
@@ -178,6 +179,30 @@ export async function planRebalance(ctx: PlanContext): Promise<TradeIntent | nul
  * strategy that can only reduce risk is easy to hand over, and one that can open positions is not.
  * There is no branch here that buys.
  */
+/**
+ * The price an exit would actually be paid at: what selling `units` returns on the chain this executor settles on.
+ *
+ * On X Layer mainnet that is exactly `priceOf` — the same pools — and on the testnet nothing settles at all. They part
+ * on a fork of mainnet. The fork carries mainnet's pools as they stood at the fork block and moves them only when we
+ * trade, while prices and the agent's signals read the live market (`venues/uniswap.ts`, `quoter`). An exit judged on
+ * the market fires on a move the position cannot realise: on the hosted fork a "+10% take profit" fired on METAx at
+ * $745.63 against an entry of $672.95 and sold for $9.99 what had cost $10 — a take profit that locked in a loss.
+ *
+ * The entry price is a fill on the settling chain, so the mark it is compared with has to be one too. Null when the
+ * sale has no route, so a level never fires on a price nobody would pay.
+ */
+async function exitMark(symbol: string, units: number | (() => Promise<number>)): Promise<number | null> {
+  const marketIsElsewhere = IS_MAINNET_STATE && CHAIN_KEY !== 'xlayer';
+  if (!marketIsElsewhere) return priceOf(symbol).catch(() => null);
+  const amount = typeof units === 'number' ? units : await units().catch(() => 0);
+  if (!(amount > 0)) return null;
+  const { quote } = await import('../../venues/uniswap.js');
+  const q = await quote({ inSymbol: symbol, outSymbol: SETTLEMENT_SYMBOL, amount, skipPriceImpact: true }).catch(
+    () => null,
+  );
+  return q && q.outAmount > 0 ? q.outAmount / amount : null;
+}
+
 export async function planExitRules(ctx: PlanContext): Promise<TradeIntent | null> {
   const takeProfitPct = Number(ctx.params.takeProfitPct ?? 0);
   const stopLossPct = Number(ctx.params.stopLossPct ?? 0);
@@ -226,7 +251,8 @@ export async function planExitRules(ctx: PlanContext): Promise<TradeIntent | nul
   const sellUsd = held.units > 0 ? held.usd * (sellable / held.units) : 0;
   if (sellUsd < MIN_TRADE_USD) return null;
 
-  const mark = await priceOf(ctx.symbol);
+  const mark = await exitMark(ctx.symbol, sellable);
+  if (!(mark !== null && mark > 0)) return null;
   const movePct = ((mark - entry) / entry) * 100;
 
   const hitTP = takeProfitPct > 0 && movePct >= takeProfitPct;
@@ -575,7 +601,9 @@ export async function observationFor(
   if (kind === 'exit-rules') {
     const trailPct = Number(ctx.params.trailPct ?? NaN);
     if (!Number.isFinite(trailPct) || trailPct <= 0) return null;
-    const price = await priceOf(ctx.symbol).catch(() => 0);
+    // The peak in the same terms the stop is judged in (`exitMark`): what the held units would sell for here.
+    const heldUnits = async () => (await holdings(ctx.owner)).find((h) => h.symbol === ctx.symbol)?.units ?? 0;
+    const price = (await exitMark(ctx.symbol, heldUnits)) ?? 0;
     if (!(price > 0)) return null;
     /*
      * The high-water mark only ever goes up.
