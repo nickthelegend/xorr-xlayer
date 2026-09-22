@@ -46,9 +46,42 @@ fi
 # rule in the contract reads that clock. Measured at 00:00 UTC on 2026-09-20: the day rolled over, the executor's own
 # tally reset, and `remainingToday(owner)` still answered $4 because the last block was from the previous day. A
 # judge opening the live link after midnight would have seen yesterday's spend until somebody traded.
-exec anvil \
+anvil \
   --host 0.0.0.0 --port "${PORT:-8545}" \
   --fork-url "$XLAYER_RPC" --fork-block-number "$BLOCK" \
   --chain-id 196 --accounts 10 --balance 10000 --no-rate-limit --silent \
   --block-time "${BLOCK_TIME_SEC:-12}" \
-  --state "$STATE" --state-interval "${STATE_INTERVAL_SEC:-30}"
+  --state "$STATE" --state-interval "${STATE_INTERVAL_SEC:-30}" &
+ANVIL=$!
+
+# anvil saves the chain on shutdown, so the signal Railway sends has to reach it rather than stop at this shell.
+trap 'kill -TERM "$ANVIL" 2>/dev/null; wait "$ANVIL"; exit 0' TERM INT
+
+# And the clock has to be the real one — mined blocks are not enough on their own.
+#
+# A forked anvil stamps each interval block exactly BLOCK_TIME_SEC after the last, not with the time it is mined, so
+# every minute the node spends restarting (and any interval it mines late) is lost for good. On 2026-09-22 the hosted
+# fork read 20:40 UTC at 23:28 UTC — 2h48m behind, after two and a half days of redeploys — so the contract's day rolled
+# over three hours late: `remainingToday` answered yesterday's spend after midnight, and a fill at 01:08 UTC counted
+# toward the previous day. Reproduced locally: a fork resumed after 30s down reads 42s behind, and one
+# `evm_setNextBlockTimestamp` puts it back. So: align once the RPC answers, then keep checking. Only ever forwards:
+# a block's time cannot go backwards, so a chain that runs ahead is left where it is.
+RPC="http://127.0.0.1:${PORT:-8545}"
+align() {
+  CHAIN_NOW="$(cast block latest -f timestamp --rpc-url "$RPC" 2>/dev/null)" || return 0
+  WALL_NOW="$(date +%s)"
+  if [ "$((WALL_NOW - CHAIN_NOW))" -gt "${CLOCK_SLACK_SEC:-15}" ]; then
+    cast rpc evm_setNextBlockTimestamp "$WALL_NOW" --rpc-url "$RPC" >/dev/null 2>&1 &&
+      echo "fork: clock was $((WALL_NOW - CHAIN_NOW))s behind, set the next block to $WALL_NOW"
+  fi
+}
+until cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; do
+  kill -0 "$ANVIL" 2>/dev/null || { wait "$ANVIL"; exit $?; }
+  sleep 1
+done
+align
+while kill -0 "$ANVIL" 2>/dev/null; do
+  sleep "${CLOCK_CHECK_SEC:-60}" & wait $!
+  align
+done
+wait "$ANVIL"
