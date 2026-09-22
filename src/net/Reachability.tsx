@@ -33,6 +33,29 @@ import {
 import { useThrottle } from './throttleStore';
 import { ChainMismatchScreen } from './ChainMismatch';
 
+/*
+ * The two banners that carry a control, and why they need saying twice.
+ *
+ * Both were drawn as a plain panel, which takes every touch that lands on it — so the promise in their
+ * comments, "the banner blocks nothing", was not true: in the browser the "Back online" notice sat over the
+ * order ticket's Buy button for its eight seconds, and a tap there did nothing at all. `box-none` lets touches
+ * through the panel to whatever is underneath, and the sentences opt out entirely, so the only thing on the
+ * banner that answers a tap is the control that is meant to.
+ */
+const PASS_THROUGH_PANEL = {
+  pointerEvents: 'box-none',
+  position: 'absolute',
+  left: space.s16,
+  right: space.s16,
+  bottom: space.s26,
+  backgroundColor: colors.surfaceAlt,
+  borderRadius: radius.card,
+  paddingHorizontal: space.s16,
+  paddingVertical: space.s12,
+  gap: space.s4,
+} as const;
+const SENTENCES = { pointerEvents: 'none', gap: space.s4 } as const;
+
 /** While up — a heartbeat, not a poll. While down, `retryDelayMs` backs off from two seconds. */
 const HEARTBEAT_MS = 30_000;
 
@@ -209,26 +232,15 @@ function BottomBanner({
   if (!banner) return <ThrottleBanner />;
 
   return (
-    <View
-      style={{
-        position: 'absolute',
-        left: space.s16,
-        right: space.s16,
-        bottom: space.s26,
-        backgroundColor: colors.surfaceAlt,
-        borderRadius: radius.card,
-        paddingHorizontal: space.s16,
-        paddingVertical: space.s12,
-        gap: space.s4,
-      }}
-      accessibilityLiveRegion="polite"
-    >
-      <Text variant="rowPrimary" color={banner.tone === 'down' ? colors.down : colors.ink}>
-        {banner.title}
-      </Text>
-      <Text variant="footnote" color={colors.ink40}>
-        {banner.detail}
-      </Text>
+    <View style={PASS_THROUGH_PANEL} accessibilityLiveRegion="polite">
+      <View style={SENTENCES}>
+        <Text variant="rowPrimary" color={banner.tone === 'down' ? colors.down : colors.ink}>
+          {banner.title}
+        </Text>
+        <Text variant="footnote" color={colors.ink40}>
+          {banner.detail}
+        </Text>
+      </View>
       {/*
         The only touchable part. The panel itself takes no touches, so nothing underneath becomes
         unreachable — the banner blocks nothing, which is the whole reason it is not a modal.
@@ -330,26 +342,15 @@ function LiveThrottleBanner({
  */
 function SessionEndedBanner() {
   return (
-    <View
-      style={{
-        position: 'absolute',
-        left: space.s16,
-        right: space.s16,
-        bottom: space.s26,
-        backgroundColor: colors.surfaceAlt,
-        borderRadius: radius.card,
-        paddingHorizontal: space.s16,
-        paddingVertical: space.s12,
-        gap: space.s4,
-      }}
-      accessibilityLiveRegion="polite"
-    >
-      <Text variant="rowPrimary" color={colors.ink}>
-        {SESSION_ENDED_TITLE}
-      </Text>
-      <Text variant="footnote" color={colors.ink40}>
-        {SESSION_ENDED_DETAIL}
-      </Text>
+    <View style={PASS_THROUGH_PANEL} accessibilityLiveRegion="polite">
+      <View style={SENTENCES}>
+        <Text variant="rowPrimary" color={colors.ink}>
+          {SESSION_ENDED_TITLE}
+        </Text>
+        <Text variant="footnote" color={colors.ink40}>
+          {SESSION_ENDED_DETAIL}
+        </Text>
+      </View>
       <Press
         onPress={signIn}
         accessibilityRole="button"

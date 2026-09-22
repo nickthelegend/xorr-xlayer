@@ -117,17 +117,18 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <AppPrivyProvider>
       <SafeAreaProvider>
+        {/*
+          The frame outside everything that draws, so the tab bar, the chat sheet AND the connection
+          banner are constrained with the content — all three position themselves against their parent.
+          The banner belongs to `ReachabilityProvider`, which used to wrap the frame: on a desktop browser
+          it spanned the whole window and sat over the Buy button in the column's bottom corner.
+        */}
+        <PhoneFrame>
         <ReachabilityProvider>
         <WalletHydration />
         <DeviceRegistration />
         {/* The app is true-black by design; the OS theme never gets to change it. */}
         <StatusBar style="light" />
-        {/*
-          Inside the frame, so the tab bar and the chat sheet are constrained with the content —
-          both position themselves against their parent, and a per-screen fix would have left them
-          spanning the whole window.
-        */}
-        <PhoneFrame>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -164,8 +165,8 @@ export default function RootLayout() {
         {/* After the Stack, so `useRouter` resolves against a mounted navigator. */}
         <NotificationRouting />
         <ChatDrawer />
-        </PhoneFrame>
         </ReachabilityProvider>
+        </PhoneFrame>
       </SafeAreaProvider>
       </AppPrivyProvider>
     </GestureHandlerRootView>
