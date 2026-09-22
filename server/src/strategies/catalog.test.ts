@@ -51,6 +51,28 @@ describe('the book', () => {
       if (r.tier === 'verified') expect(r.survives, r.slug).toBe(true);
     }
   });
+
+  /*
+   * The replay and the gauntlet measure the same rule on the same candles, so they must agree on whether it
+   * traded at all. They did not: the export ran without the instrument universe, every `_perp` strategy's
+   * listing check refused every symbol, and 44 strategies the gauntlet had traded hundreds of times reached
+   * the app as "took no trades on the unseen half" — one of them under a VERIFIED badge.
+   */
+  it('agrees with the gauntlet about whether a strategy traded at all', async () => {
+    for (const r of index.strategies) {
+      const detail = (await catalogDetail(r.slug)) as {
+        evidence?: { portfolioUnseen?: { trades?: number } | null } | null;
+      };
+      const gauntletTrades = detail?.evidence?.portfolioUnseen?.trades ?? 0;
+      if (gauntletTrades > 0) expect(r.trades, r.slug).toBeGreaterThan(0);
+    }
+  });
+
+  it('never calls a strategy verified on a replay that took no trades', () => {
+    for (const r of index.strategies) {
+      if (r.tier === 'verified') expect(r.trades, r.slug).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('ordering', () => {

@@ -27,14 +27,19 @@ the reason both halves are on screen together.
 
 - **verified** — passed the four-way gauntlet: out-of-sample, a ±30% parameter sweep, doubled commission,
   and a second universe. 10 of 313.
-- **measured** — measured positive on unseen data, without the full four-way evidence. 60 of 313.
-- **archive** — measured, and it did not hold. 243 of 313, kept in the book on purpose.
+- **measured** — measured positive on unseen data, without the full four-way evidence. 65 of 313.
+- **archive** — measured, and it did not hold. 238 of 313, kept in the book on purpose.
 
 ## Rules this data follows
 
 - Nothing is invented to fill a field. A strategy that took no trades on the unseen half has no win rate
   and no profit factor: the key is absent, never zero.
 - Under 30 unseen trades a row is `trusted: false`. The return is real; the interval around it is wide.
+- The export loads the instrument universe before it replays anything, as the gauntlet does. Every `_perp`
+  strategy asks whether a symbol is listed before it will trade it, and an export run without the universe
+  replayed all 44 of them to zero trades — the book said each "took no trades on the unseen half" while the
+  gauntlet had traded them hundreds of times on the same candles. The export now refuses to run without it.
+  258 of 313 took at least one trade on the unseen half; 150 took 30 or more.
 - Gross, costs and net reconcile. The research engine's per-trade `pnl_usd` is net of the exit fee only —
   the entry fee is charged to cash when the position opens — so the export builds the structure from the
   trade log's own `gross_usd` and `fees_usd`, and `catalog.test.ts` asserts the three sum to the account's
