@@ -140,7 +140,8 @@ describe('a stop that sells', () => {
 
     expect(out.status).toBe('filled');
     // run, signature, units, price, usd, quoted_units, venue, side, quoted_usd, asset_class
-    expect(filledUpdate().params.slice(2)).toEqual([0.04, 2_500, 98.7, 0.04, '1inch', 'sell', 100, 'crypto']);
+    // The price is what the sale was paid — 98.7 USDC for 0.04 — not the $2,500 mark it was sized at.
+    expect(filledUpdate().params.slice(2)).toEqual([0.04, 98.7 / 0.04, 98.7, 0.04, '1inch', 'sell', 100, 'crypto']);
     expect(vi.mocked(applyFill).mock.calls[0]![1]).toMatchObject({ symbol: 'WETH', units: -0.04, usd: -98.7 });
     // Closing is not spending.
     expect(recordSpend).not.toHaveBeenCalled();
@@ -177,7 +178,8 @@ describe('a buy', () => {
     await runStrategy(strategy({ kind: 'dca', label: 'Weekly WETH', params: { usd: 100 } as never }), at);
 
     const params = filledUpdate().params;
-    expect(params.slice(2, 5)).toEqual([0.0398, 2_500, 100]);
+    // $100 for the 0.0398 the chain delivered: the fill's own price, which is what its exits are armed from.
+    expect(params.slice(2, 5)).toEqual([0.0398, 100 / 0.0398, 100]);
     expect(params.slice(7)).toEqual(['buy', null, 'crypto']);
     expect(usdcRawOf).not.toHaveBeenCalled();
     expect(recordSpend).toHaveBeenCalledTimes(1);

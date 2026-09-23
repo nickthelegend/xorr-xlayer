@@ -765,6 +765,18 @@ async function runStrategyInner(
     const tradedSymbol = intent.outSymbol === 'USDC' ? intent.inSymbol : intent.outSymbol;
 
     /*
+     * The price this fill was actually made at: what moved in USDC over the units the chain says moved.
+     *
+     * `price` above is the market's mark, taken to size the order. On X Layer mainnet it is the pool the order fills
+     * in, and the two agree to the fee. On a fork they do not — the mark reads the live market, the fill lands in the
+     * fork's pools as they stood at the fork block — and a $20 TSLAx order reported "price 379.22" for units that cost
+     * $365.41 each. That figure is what the fill's exits are armed from (`armExits`, "measured from the FILL price"),
+     * so an entry recorded at the market's price put a fresh buy 3.7% under water before it had moved, and a METAx buy
+     * — the market 10% above the fork — past its own 5% stop. A supply leg has no units to divide and keeps its own.
+     */
+    const fillPrice = !intent.direct && filledUnits > 0 && recordedUsd > 0 ? recordedUsd / filledUnits : price;
+
+    /*
      * Record what just happened.
      *
      * This was missing entirely: the trade settled on chain and the app learned nothing from it —
@@ -806,7 +818,7 @@ async function runStrategyInner(
           runId,
           signature,
           filledUnits,
-          price,
+          fillPrice,
           recordedUsd,
           units,
           venue,
@@ -875,7 +887,7 @@ async function runStrategyInner(
           action: describeLeg(intent, filledUnits, venue),
           detail: intent.direct
             ? `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} moved. ${intent.because}`
-            : `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} at $${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}. ${intent.because}`,
+            : `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} at $${fillPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}. ${intent.because}`,
           // Putting cash to work is not a trade, and the audit schema has had a 'yield' category
           // from the start that nothing ever wrote. Filing a supply as a trade makes the activity
           // filter lie about what the bot has been doing.
@@ -885,7 +897,7 @@ async function runStrategyInner(
             runId,
             strategyId: strategy.id,
             units: filledUnits,
-            price,
+            price: fillPrice,
             usd,
             ...(isClose ? { proceedsUsd: recordedUsd, proceedsMeasured: proceeds !== undefined } : {}),
             explorer: explorerTx(signature),
@@ -938,7 +950,7 @@ async function runStrategyInner(
       title: describeLeg(intent, filledUnits),
       body: intent.direct
         ? intent.because
-        : `${filledUnits.toFixed(4)} at $${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}. ${intent.because}`,
+        : `${filledUnits.toFixed(4)} at $${fillPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}. ${intent.because}`,
       route: '/activity',
       kind: 'dca-executed',
       /*
@@ -953,7 +965,7 @@ async function runStrategyInner(
       },
     }).catch(() => undefined);
 
-    return { status: 'filled', runId, signature, units: filledUnits, price };
+    return { status: 'filled', runId, signature, units: filledUnits, price: fillPrice };
   } catch (e) {
     return failRun({ runId, walletId, strategy, error: messageOf(e), sent, at });
   }
