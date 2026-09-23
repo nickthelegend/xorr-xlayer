@@ -44,9 +44,22 @@ async function credential() {
   return account;
 }
 
+/**
+ * Open a screen and let it settle — without making "settled" mean "silent".
+ *
+ * Every page used to wait for `networkidle`, which Playwright defines as half a second with no request in flight.
+ * This app polls prices and a heartbeat on purpose, so on a busy minute a screen can be fully drawn and never go
+ * quiet: `/alerts` sat there for the whole 30s and failed a run on a page that had rendered. Load is required; a
+ * quiet network is waited for when it comes, and not demanded when it does not.
+ */
+async function open(page, path) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'load' });
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
+}
+
 async function signIn(page) {
   const { email, otp_code: otp } = await credential();
-  await page.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
+  await open(page, `/wallet`);
   await page.fill('input[type=email]', email);
   await page.getByText(/email me a code/i).first().click();
   /*
@@ -119,7 +132,7 @@ async function main() {
   // ── 1. The order ticket quotes, and says what it will not do ──────────────────────────────────
   console.log('1. the order ticket');
   seen.clear();
-  await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
+  await open(page, `/order/TSLAx?side=buy`);
   await page.waitForTimeout(6000);
   const body = () => page.innerText('body');
   const limits = await apiGet('/limits', bearer);
@@ -136,8 +149,17 @@ async function main() {
    * settles the fill. On a fork of mainnet those are two different prices, so the ticket guaranteed more than it
    * expected — 0.6877 TSLAx against 0.6844. Both numbers now come from the same quote.
    */
-  const estimate = Number(ticket.match(/\n([\d.]+) TSLAx\n/)?.[1] ?? NaN);
-  const floor = Number(ticket.match(/Minimum received\s*\n([\d.]+)/)?.[1] ?? NaN);
+  /*
+   * Compared once the route has answered. Until then the market's estimate stands in and the floor reads "…" — by
+   * design (`app/order/[symbol].tsx`) — so a comparison taken at a fixed moment could catch the two halves of that
+   * wait and report NaN for a ticket that was simply still quoting.
+   */
+  await page
+    .waitForFunction(() => /Minimum received\s*\n[\d.]+/.test(document.body.innerText), undefined, { timeout: 45_000 })
+    .catch(() => undefined);
+  const quotedTicket = await body();
+  const estimate = Number(quotedTicket.match(/\n([\d.]+) TSLAx\n/)?.[1] ?? NaN);
+  const floor = Number(quotedTicket.match(/Minimum received\s*\n([\d.]+)/)?.[1] ?? NaN);
   check(
     Number.isFinite(estimate) && Number.isFinite(floor) && floor <= estimate,
     'the minimum received is at or below the estimate above it',
@@ -178,7 +200,7 @@ async function main() {
     seen.clear();
     const before = await apiGet('/positions', bearer);
     const heldBefore = Number((before.find?.((p) => p.symbol === 'TSLAx') ?? {}).units ?? 0);
-    await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
+    await open(page, `/order/TSLAx?side=buy`);
     await page.waitForTimeout(6000);
     // Clear the default and key in 50, the way a finger does.
     for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: /Delete|Backspace/i }).first().click().catch(() => undefined);
@@ -238,7 +260,7 @@ async function main() {
     const filledBefore = ((await apiGet('/runs?limit=50', bearer)) ?? []).filter((r) => r.status === 'filled').length;
     const spentBefore = (await apiGet('/limits', bearer)).remainingUsd;
     const keyIn = async () => {
-      await page.goto(`${BASE}/order/TSLAx?side=buy`, { waitUntil: 'networkidle' });
+      await open(page, `/order/TSLAx?side=buy`);
       await page.waitForTimeout(6000);
       for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: /Delete|Backspace/i }).first().click().catch(() => undefined);
       for (const digit of ['1', '0']) await page.getByRole('button', { name: new RegExp(`^${digit}$`) }).first().click();
@@ -267,7 +289,7 @@ async function main() {
   console.log('\n2. alerts — double submit, reload, delete');
   seen.clear();
   const before = await apiGet('/alerts', bearer);
-  await page.goto(`${BASE}/alerts/new`, { waitUntil: 'networkidle' });
+  await open(page, `/alerts/new`);
   await page.waitForTimeout(5000);
   const submit = page.getByText(/^Alert me when/i).first();
   await submit.click();
@@ -279,7 +301,7 @@ async function main() {
   seen.quiet('alert creation');
 
   // Reload the list mid-flow: what was created is still there, once.
-  await page.goto(`${BASE}/alerts`, { waitUntil: 'networkidle' });
+  await open(page, `/alerts`);
   await page.waitForTimeout(5000);
   const listed = await body();
   check(/XBTC|BTC/i.test(listed), 'the new alert is listed after a reload');
@@ -293,7 +315,7 @@ async function main() {
   // ── 3. Deposit: the balances are read from the chain, and USDT0 offers a conversion ───────────
   console.log('\n3. deposit');
   seen.clear();
-  await page.goto(`${BASE}/deposit`, { waitUntil: 'networkidle' });
+  await open(page, `/deposit`);
   await page.waitForTimeout(8000);
   const deposit = await body();
   check(/0x[0-9a-fA-F]{6}/.test(deposit), 'the deposit address is shown');
@@ -361,7 +383,7 @@ async function main() {
     seen.clear();
     // Only where there is something to stop: the button names the state, so a revoked wallet has no "Stop all".
     const live = await apiGet('/limits', bearer);
-    await page.goto(`${BASE}/safety`, { waitUntil: 'networkidle' });
+    await open(page, `/safety`);
     await page.waitForTimeout(6000);
     const stop = page.getByText(/^Stop all trading$/).first();
     const box = live.revoked === false ? await stop.boundingBox().catch(() => null) : null;
@@ -389,7 +411,7 @@ async function main() {
     console.log('\n3d. granting again, signed in the app');
     seen.clear();
     let signatures = 0;
-    await page.goto(`${BASE}/delegate`, { waitUntil: 'networkidle' });
+    await open(page, `/delegate`);
     await page.waitForTimeout(6000);
     await page.getByText(/^Sign this permission$/).first().click();
     /*
@@ -420,7 +442,7 @@ async function main() {
    */
   console.log('\n4. the strategy book, from home');
   seen.clear();
-  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await open(page, `/`);
   await page.waitForTimeout(4000);
 
   const tab = page.getByText('Strategies', { exact: true }).first();
@@ -470,10 +492,24 @@ async function main() {
       /* private mode */
     }
   });
-  await page.goto(`${BASE}/safety`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(5000);
+  await open(page, `/safety`);
+  /*
+   * Waited for, not read at a fixed moment. The prompt appears once Privy has looked for a session and found none,
+   * and how long that takes depends on Privy — one run in three read the screen at five seconds, before the answer,
+   * and failed on a page that was still asking. Twenty seconds is the patience a person has; past it, what the screen
+   * showed instead is printed, so a real failure says what it was.
+   */
+  const askedAt = Date.now();
+  const asked = await page
+    .waitForFunction(() => /Sign in/i.test(document.body.innerText), undefined, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
   const signedOut = await body();
-  check(/Sign in/i.test(signedOut), 'it asks for a sign-in rather than showing an empty screen');
+  check(
+    asked,
+    'it asks for a sign-in rather than showing an empty screen',
+    asked ? `after ${((Date.now() - askedAt) / 1000).toFixed(1)}s` : signedOut.replace(/\n+/g, ' | ').slice(0, 240),
+  );
   check(!/undefined|NaN|\[object/.test(signedOut), 'nothing leaks a placeholder value');
   /*
    * A 401 here is the app finding out, which is the only way it can: the session was cleared underneath it, and the
