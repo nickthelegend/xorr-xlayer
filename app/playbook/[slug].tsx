@@ -46,7 +46,7 @@ import { money, percent, ratio } from '@/format';
 import { useAsync } from '@/data/useAsync';
 import { ApiError } from '@/data/apiError';
 import { system } from '@/data/system';
-import { TIER_MEANS, type StrategyDetail, type StrategyTier } from '@/data/strategyBook';
+import { TIER_MEANS, gauntletTraded, type StrategyDetail, type StrategyTier } from '@/data/strategyBook';
 
 const CHART_H = 168;
 const DIST_H = 96;
@@ -459,30 +459,45 @@ export default function StrategyReport() {
                 <Text variant="footnote" color={colors.ink55} style={{ marginBottom: space.s4 }}>
                   WHAT IT WAS PUT THROUGH
                 </Text>
-                <Line
-                  label="Parameters moved ±30%"
-                  value={data.evidence.sensitivityPassed ? `${data.evidence.sensitivityPassed} stayed positive` : '—'}
-                />
-                <Line
-                  label="Commission doubled"
-                  value={fig(data.evidence.doubleCostReturnPct, (n) => percent(n, { digits: 2 }))}
-                  tone={pnlTone(data.evidence.doubleCostReturnPct ?? 0)}
-                />
-                {Object.entries(data.evidence.crossAsset ?? {}).map(([sym, v]) => (
-                  <Line key={sym} label={`Held up on ${sym}`} value={`${ratio(v, 4)} R`} tone={pnlTone(v)} />
-                ))}
-                <View style={{ paddingTop: space.s10 }}>
-                  <Text variant="secondary" color={colors.ink65}>
-                    Verdict
+                {/*
+                  Only a trade makes these four tests mean anything. A strategy the gauntlet never saw trade comes back
+                  with every figure at the zero the engine starts from, and printing them — "+0.00%", "0.0000 R", "0/5" —
+                  reads as a measured failure of each test. It gets the one sentence that is true instead.
+                */}
+                {gauntletTraded(data.evidence) ? (
+                  <>
+                    <Line
+                      label="Parameters moved ±30%"
+                      value={data.evidence.sensitivityPassed ? `${data.evidence.sensitivityPassed} stayed positive` : '—'}
+                    />
+                    <Line
+                      label="Commission doubled"
+                      value={fig(data.evidence.doubleCostReturnPct, (n) => percent(n, { digits: 2 }))}
+                      tone={pnlTone(data.evidence.doubleCostReturnPct ?? 0)}
+                    />
+                    {Object.entries(data.evidence.crossAsset ?? {}).map(([sym, v]) => (
+                      <Line key={sym} label={`Held up on ${sym}`} value={`${ratio(v, 4)} R`} tone={pnlTone(v)} />
+                    ))}
+                    <View style={{ paddingTop: space.s10 }}>
+                      <Text variant="secondary" color={colors.ink65}>
+                        Verdict
+                      </Text>
+                      <Price
+                        variant="secondary"
+                        tone={data.evidence.survives ? 'up' : 'down'}
+                        style={{ marginTop: space.s4 }}
+                      >
+                        {data.evidence.survives ? 'Passed all four.' : failureWords(data.evidence.failedOn ?? [])}
+                      </Price>
+                    </View>
+                  </>
+                ) : (
+                  <Text variant="secondary" color={colors.ink65} style={{ marginTop: space.s4 }}>
+                    It took no trades in the gauntlet either — not on BTC, not across the portfolio, on neither half — so
+                    none of the four tests had anything to measure. It is in the archive because it traded too rarely to
+                    judge.
                   </Text>
-                  <Price
-                    variant="secondary"
-                    tone={data.evidence.survives ? 'up' : 'down'}
-                    style={{ marginTop: space.s4 }}
-                  >
-                    {data.evidence.survives ? 'Passed all four.' : failureWords(data.evidence.failedOn ?? [])}
-                  </Price>
-                </View>
+                )}
               </SheetCard>
             ) : null}
 

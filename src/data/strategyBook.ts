@@ -150,3 +150,18 @@ export const TIER_MEANS: Record<StrategyTier, string> = {
   measured: 'Measured positive on data it had never seen — without the full four-way evidence behind it.',
   archive: 'Measured, and it did not hold up. Kept so the book is the whole book.',
 };
+
+/**
+ * Whether the gauntlet measured anything at all.
+ *
+ * A strategy the gauntlet never saw trade still comes back with a full set of numbers — every one of them the zero the
+ * engine starts from: "Commission doubled +0.00%", "Held up on ETH 0.0000 R", "0/5 stayed positive", and a verdict
+ * built from them ("a small change to its settings broke it, and the edge disappears at double the cost"). None of that
+ * was measured; there was nothing to measure. Only a trade makes the four tests mean something, so a strategy with none,
+ * on either half, on BTC or across the portfolio, reports none of them.
+ */
+export function gauntletTraded(evidence: Evidence | null | undefined): boolean {
+  if (!evidence) return false;
+  const legs = [evidence.btcKnown, evidence.btcUnseen, evidence.portfolioKnown, evidence.portfolioUnseen];
+  return legs.some((leg) => Number(leg?.trades ?? 0) > 0);
+}

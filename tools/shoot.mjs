@@ -114,7 +114,12 @@ const ROUTES = [
    */
   ['57-playbook', '/playbook'],
   ['58-playbook-report', '/playbook/b200_sess_8'],
-  ['59-playbook-untraded', '/playbook/adaptive_p99_momentum_perp'],
+  /*
+   * Untraded by the gauntlet AND by the book's replay. It was `adaptive_p99_momentum_perp` — which turned out to be
+   * one of the 44 perp strategies the export replayed to zero only because it never loaded the universe; it has 394
+   * unseen trades.
+   */
+  ['59-playbook-untraded', '/playbook/b100_mtf_1'],
   ['57-system', '/system'],
   ['58-network', '/network'],
   ['59-rates', '/rates'],
