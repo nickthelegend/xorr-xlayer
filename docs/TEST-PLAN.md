@@ -226,3 +226,28 @@ excepted by name (Coinbase chain support, injected-provider detection).
 | B30 | Agent, hired | a wallet that hired an agent | its sweep may place ONE entry per symbol it does not already hold, attributed to that agent | ≤1 per symbol |
 | B31 | An order bigger than the wallet | signed in, order for more USDC than is held | refused before anything is signed, naming both figures — never ERC20's own words through the contract | named refusal |
 | B32 | The fork's clock | leave the fork untouched across a UTC midnight | blocks keep being mined, so `remainingToday(owner)` rolls over on its own | cap resets unattended |
+
+## P — The strategy book (added 2026-09-23)
+
+Added after the plan was written (`/playbook`, `/playbook/:slug`, the home sheet's Strategies tab). Correct means:
+
+| ID | Target | Steps | Expected exact result | PASS |
+|---|---|---|---|---|
+| P01 | Reached the way a person reaches it | signed in: home → Strategies tab → a row → its report | the tab lists measured strategies; a row opens a report that names its window | `flows.mjs` §4 |
+| P02 | Header counts | `/playbook` | the four counts in the header equal `/strategies/catalog` (`counts`), and "Showing N of 313" equals the rows with ≥30 unseen trades | exact equality |
+| P03 | A strategy with no trades | any row with `trades: 0` | no return, no win rate, no verdict claimed as a result; never under a VERIFIED badge | 0 such rows claim a return; 0 verified with 0 trades |
+| P04 | The replay agrees with the gauntlet | every row with gauntlet evidence | a strategy the gauntlet traded has trades in the book | `catalog.test.ts` |
+| P05 | Unknown strategy | `/playbook/anything` | "There is no strategy called anything in the book." and a link to the book; no Retry | exact sentence |
+| P06 | Money reconciles | any report | gross profit + gross loss + commission = net, to the cent | equality |
+
+## R — Found and closed 2026-09-22/23 (each is now a standing check)
+
+| ID | Target | Expected exact result | PASS |
+|---|---|---|---|
+| R01 | Banners never block the screen | executor cut off, then restored, on `/asset/:symbol` | "Can't reach xorr" / "Back online" are drawn inside the app column, and `elementFromPoint` at Buy's and Sell's centres returns the buttons; a real click on Buy opens the ticket | both, observed |
+| R02 | `box-none` works on the web | source | every `pointerEvents: 'box-none'` is inside a `StyleSheet.create` | `audit.test.ts` |
+| R03 | A fill records what it paid | `POST /orders` on the fork | response `price` = USDC spent ÷ units received, as read on chain | equal to 4 decimals |
+| R04 | Exits judged on the settling chain | fork: market +10.8%, sale −0.1% | no take profit fires; one fires when the sale itself clears the level | `exit-mark.test.ts` |
+| R05 | Live exits measured from their fill | every live `exit-rules` entry | within 0.5% of the opening fill's USDC ÷ units | migration `20260923T001500`, read back |
+| R06 | The fork keeps real time | hosted fork node | newest block within one block time + 15s of UTC, across a restart; the contract's day rolls at 00:00 UTC | lag measured; `/limits` chain = executor at 00:00 |
+| R07 | The deployed web build names its commit | `deploy:web` from a clean tree | the bundle contains HEAD's full SHA and says whether the executor runs the same server code | SHA in the served bundle |

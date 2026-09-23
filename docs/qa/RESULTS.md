@@ -292,3 +292,52 @@ Driven against the deployed build. Everything below was clicked, submitted, inte
 | Eighteen signed-in screens on a near-empty account | PASS | honest empty states ("Nothing has been sold yet, so nothing is realised.", "No addresses yet.", "Nothing running yet."), no undefined/NaN, no errors |
 | Ticket on a wallet with no money | PASS | "You have $0.00." with the button disabled |
 | Full plan re-run afterwards | PASS | 101/101 screens, 202/202 endpoints, all flows, 2,469 unit tests, typechecks, lint, CI |
+
+## Full pass, 2026-09-22/23 — every item, fixes included
+
+Run 2026-09-22 22:30 UTC → 2026-09-23 05:30 UTC against the live deployments, driven through Claude in Chrome for
+everything reachable without a credential, `tools/flows.mjs` (Playwright, Privy test credential) for the signed-in
+journeys, `tools/qa-full.mjs` for the endpoints, `tools/shoot.mjs` for the screens, and a local anvil fork of X Layer
+mainnet for J01–J03. Final state: web `eb4a874`, both executors `94b9464` (server code identical to HEAD), fork node
+with the clock-keeping entrypoint, CI green on `eb4a874`. Console and network were read on every browser item.
+
+### Found and fixed in this pass
+
+| # | Found (how) | Root cause | Fix | Re-verified |
+|---|---|---|---|---|
+| 1 | `/playbook/liq_squeeze_break_perp`: VERIFIED over "took no trades", 0 trades both halves (Chrome) | the book's export never loaded the instrument universe; every `_perp` strategy's listing check refused every symbol — 44 strategies replayed to 0 trades while the gauntlet traded them | export loads the universe (research repo `export_catalog.py`); book regenerated — 269 unchanged, the 44 now carry their trades; `catalog.test.ts` guards both ways (`a1a82b0`) | report shows +2.48% over 107 trades; header 10/65/238, "Showing 150 of 313" = catalog |
+| 2 | METAx "+10% take profit" sold $10 for $9.99 (runs API) | exits compared a settling-chain entry with the market's mark; on a fork they differ by the market's move since the fork block | exits judged on what the sale would be paid on the settling chain; mainnet/testnet unchanged (`768b780`) | `exit-mark.test.ts` 5/5; all 5 fail on the old planner |
+| 3 | `POST /orders` answered `price 379.22` for units that cost $365.41 (API + chain) | `run.ts` recorded the sizing mark as the fill price, and exits are armed from it — with fix 2 a new METAx buy would have sat past its own stop | a fill records USDC ÷ units read on chain; migration re-based the 3 live exits armed from a mark (METAx 745.63→673.02, MSTRx 163.89→158.51, COINx 199.24→194.79), 9 untouched (`94b9464`) | $10 buy: reported 365.4130 = chain 365.4130; exits read back |
+| 4 | Fork 2h48m behind UTC; `/limits` chain $0 vs executor $10 (RPC) | forked anvil stamps interval blocks from the last block, so restarts lost their downtime | entrypoint aligns the clock at start and every minute, forwards SIGTERM so state is saved (`80d77a3`) | lag 10,122s → 13–23s; at 00:00:46 UTC the fork read 00:00:35 and chain = executor |
+| 5 | "Back online" covered Buy; a tap on Buy did nothing; banner spanned the desktop window (Chrome) | the panel took touches; the banner rendered outside `PhoneFrame`; and inline `box-none` is silently dropped by react-native-web | banner inside the frame; panels compiled with `StyleSheet.create` `box-none`; candlestick hit layer too; audit forbids inline `box-none` (`92254fc`, `a841df5`) | `elementFromPoint` at Buy/Sell = the buttons under both banners; a real click on Buy opened `/order/TSLAx` |
+| 6 | Live bundle named no commit | built from a dirty tree | redeployed from clean trees; bundle names `eb4a874` and matches the executor's server code | SHA in the served bundle |
+| 7 | flows: NaN floor, `/alerts` 30s timeout, one silent sign-in failure | harness read at fixed moments and demanded a silent network from a polling app | waits for the floor, the prompt, and load + optional idle (`eb4a874`) | 3 consecutive runs 28/28 |
+| 8 | `/playbook/b100_mtf_1` (never traded, even in the gauntlet): "Commission doubled +0.00%", "0.0000 R", "0/5", and a verdict built from those zeros (screen sweep `never +0.00%`) | the four tests' figures are the engine's starting zeros when nothing traded, and the report printed them as results | "What it was put through" says in one sentence that nothing traded, and prints none of them; `gauntletTraded` tested against the committed book (`0020eb0`) | Chrome: no `+0.00%`, no `0.0000 R`; a traded strategy still shows its four tests |
+
+### Every item, final status
+
+Legend: PASS = observed matching the plan's definition in this pass. UNTESTED = not exercised in this pass, with the reason;
+the date of its last PASS is given where there is one. BLOCKED = needs a credential or device that does not exist here.
+
+| Family | Result |
+|---|---|
+| G gates | G01 PASS (app `tsc` 0) · G02 PASS (executor `tsc` 0) · G03 PASS (lint clean) · G04 PASS (2,515 app + 1,212 executor tests) · G05 PASS (forge 51/51, incl. the X Layer fork suite) · G06 PASS (CI `checks`, `contracts`, `fork-e2e` green on `0020eb0`) · G07 UNTESTED — no iOS simulator session this pass (last PASS 2026-09-20) |
+| C contract | C01–C12 PASS (forge 51/51; `prove:testnet` and `prove:fork` on chain) · C13 PASS (both testnet contracts Sourcify `exact_match`) |
+| J journeys | J01 PASS (`prove:fork`, local fork, new code) · J02 PASS (`prove-yield`) · J03 PASS (`prove-withdrawal`, $699.95 to cold storage) · J04 PASS (`prove:testnet`, 6 OKLink txs) · J05 PASS on the web (grant signed in the app, 17 signatures, chain reads the cap) · J06 PASS on the web (held → `revoked: true`, owner-signed) · J07 PASS via `POST /positions/close` ($129.882038 = USDC that arrived; cap untouched) — the tapped *sell* on the native ticket UNTESTED (no simulator) · J08 PASS (tapped $50 buy in the web ticket, position grew on chain, cap −$50) · J09 PASS (Momentum Scout's 12 fills, attributed) · J10 PASS (METAx re-entry only after its exit sold the whole position) · J11 PARTIAL — the allowance guard PASS (B10); the "more than you have" and "more than you hold" sentences UNTESTED in the UI this pass (unit-tested in `src/markets/ticket.ts`; last observed 2026-09-20) · J12 PASS ($20 then $10 TSLAx via `/orders`, chain-checked) · J13 PASS for the address and balances (flows §3); the faucet send UNTESTED this pass (endpoint contract E069/E071 PASS) |
+| F edges | F01–F03 UNTESTED — they need a Privy identity with no wallet on this deployment; creating one is an account creation this run does not do (last PASS 2026-09-20 on test-4668) · F04 PASS (every route 401 unsigned and forged, qa-full) · F05 PASS (named 400/404s, qa-full) · F06 PASS (idempotent replay, API + flows §1c) · F07 PASS (qa-full E146, E074) · F08 UNTESTED — native-only (last PASS 2026-09-20 on the simulator) |
+| W money out | W1–W8 PASS (qa-full E188–E199; `prove-withdrawal` §4) |
+| F2 fresh user | F2.2, F2.5, F2.6, F2.8, F2.9, F2.11 re-run PASS on test-8958 (not fresh) · F2.1, F2.3, F2.4 (on a fresh identity) UNTESTED this pass, as F01–F03 · F2.7, F2.10 PASS (trail 0 link breaks; agents listed) |
+| E endpoints | **205 / 205 PASS** against `94b9464` (`docs/qa/endpoints-xlayer.json`) |
+| S screens | **104 / 104 PASS** against `0020eb0`, console and network clean (`docs/screens/qa-report.json`) |
+| V self-verification | V01 PASS (20/20 with the owner) · V02 PASS (testnet: 0 fail, every skip named) · V03 PASS (`/judge` 20/20 in Chrome) |
+| A agent | A01 PASS (fork prices track live pools: TSLAx $379.03 hero = chart = latest reading) · A02 PASS ($24/$18/$14/$10 = min(25, 25% of remaining)) · A03 PASS (unit suite) · A04 PASS (`/activity/587/explain` → `explained`, decision record) · A05 BLOCKED (no `OPENROUTER_API_KEY`) |
+| I infrastructure | I01–I06 PASS · I07 PASS (every commit of this pass scanned: no key material, no env/key files) · I08 PASS (policy owned by the quorum; Privy refuses out-of-policy) |
+| H hackathon | H01, H02, H05, H06 PASS · H07 PASS (repo public, pushed) · H03 BLOCKED (no OKX DEX API key) · H04 BLOCKED (OKX Wallet extension) · H08 owner (video exists, 2:43, no iOS clip) · H09 owner (the form) |
+| B browser | B01–B15 PASS · B16, B17 PASS (5.000986 USDT0 converted, two signatures, 0 left on chain) · B18, B19 PASS · B20–B30 PASS · B31 UNTESTED this pass — needs a granted wallet holding less USDC than its allowance (unit-tested, `4e3fab0`; last PASS 2026-09-20) · B32 PASS (00:00:46 UTC: fork 00:00:35, chain = executor) |
+| P strategy book | P01–P06 PASS |
+| R found this pass | R01–R07 PASS |
+
+**No mocks, stubs or fallback data were added anywhere in the product.** Every fix changes what the product computes or
+shows; the tests added are unit tests beside the code (mocks there are test doubles, as the suites already use) and
+checks against the committed data. **Console and network:** zero errors on every item driven in Chrome, the 104
+screens and every flow step — the only console line seen was Privy's own `DEBUG` "Detected injected providers".
