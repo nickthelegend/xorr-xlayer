@@ -15,6 +15,8 @@ const ALL_HIRED = [
 ];
 const evaluateMock = vi.fn();
 const readPolicyMock = vi.fn();
+/** Each agent's budget on chain, in dollars. Larger than any trade here unless a test sets it. */
+const readAgentBudgetMock = vi.fn<(...a: unknown[]) => Promise<number>>(async () => 1_000_000);
 const placeOrderMock = vi.fn();
 const armExitsMock = vi.fn();
 const notifyEntryMock = vi.fn();
@@ -89,6 +91,7 @@ vi.mock('../db/index.js', () => ({
 vi.mock('../rules/engine.js', () => ({ evaluate: (...a: unknown[]) => evaluateMock(...a) }));
 vi.mock('../evm/delegation.js', () => ({
   readPolicy: (...a: unknown[]) => readPolicyMock(...a),
+  readAgentBudget: (...a: unknown[]) => readAgentBudgetMock(...a),
 }));
 vi.mock('../executor/order.js', () => ({
   armExits: (...a: unknown[]) => armExitsMock(...a),
@@ -186,6 +189,7 @@ describe('autonomous xStocks trading agent', () => {
     vi.setSystemTime(REGULAR_HOURS);
 
     hiredRoster = [...ALL_HIRED];
+    readAgentBudgetMock.mockResolvedValue(1_000_000);
     queryMock.mockResolvedValue([]);
     oneMock.mockResolvedValue(null);
     earningsCalendarMock.mockResolvedValue(null);
@@ -678,6 +682,51 @@ describe('autonomous xStocks trading agent', () => {
       const agentId = call[5] as string | null;
       // Whoever the scan picked, the id handed over is that same persona's row — not a default and not null.
       expect(agentId).toBe(hiredRoster.find((a) => a.name === persona)!.id);
+    });
+
+    /*
+     * Each agent's own budget, on chain (2026-09-25). The contract charges an agent's trade to it and refuses past it,
+     * so the agent sizes to it — and an agent the owner never budgeted does not trade, and says why.
+     */
+    it("sizes the entry to what the agent's on-chain budget holds", async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(12.5);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      expect(placeOrderMock.mock.calls.at(-1)![2]).toBe(12.5);
+    });
+
+    it('an agent with no budget on chain places nothing, and says so', async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(0);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
+      expect((result as { detail: string }).detail).toMatch(/no budget on chain yet/);
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('a budget under the smallest trade places nothing', async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(4);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('a budget that cannot be read places nothing: an unchecked budget is not a budget', async () => {
+      ready();
+      readAgentBudgetMock.mockRejectedValue(new Error('rpc down'));
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget_unread' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it("arms the entry's exits as the agent's, so its sale credits the agent's budget", async () => {
+      ready();
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      const agentId = placeOrderMock.mock.calls.at(-1)![5] as string;
+      expect(armExitsMock.mock.calls.at(-1)![1]).toMatchObject({ agentId });
     });
 
     it('hands over no agent when the persona that acted is not on the roster', async () => {

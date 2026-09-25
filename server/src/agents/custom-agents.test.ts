@@ -8,6 +8,7 @@
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentKey } from '../evm/agentKey.js';
 
 vi.mock('../auth/privy.js', () => ({
   UnauthorizedError: class extends Error {
@@ -17,6 +18,11 @@ vi.mock('../auth/privy.js', () => ({
 }));
 vi.mock('../db/index.js', () => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn(), pool: {} }));
 vi.mock('../audit/log.js', () => ({ append: vi.fn(async () => undefined) }));
+// Each agent's budget, as the chain would answer it (2026-09-25).
+vi.mock('../evm/delegation.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../evm/delegation.js')>()),
+  readAgentBudget: vi.fn(async () => 25),
+}));
 vi.mock('../routes/wallet-context.js', () => ({
   currentWallet: vi.fn(),
   requireWallet: vi.fn(),
@@ -61,7 +67,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(currentWallet).mockResolvedValue({ id: 'wallet-1' } as never);
   vi.mocked(query).mockResolvedValue([]);
-  vi.mocked(one).mockImplementation(async (text: string, params?: unknown[]) => inserted(text, params) as never);
+  vi.mocked(one).mockImplementation(async (text: string, params?: unknown[]) =>
+    /SELECT address FROM wallets/.test(text)
+      ? ({ address: '0x5c702B0E062850551E10F4827018e2670E9183d7' } as never)
+      : (inserted(text, params) as never),
+  );
 });
 
 describe('making an agent', () => {
@@ -157,6 +167,13 @@ describe('the roster', () => {
     expect(rows.map((r) => r.name)).toEqual(['Momentum Scout', 'Earnings Desk', 'Yield Keeper', 'Drawdown Guard', 'Dip Buyer']);
     expect(rows[4]).toMatchObject({ custom: true, role: 'Buys ETH on red days', style: 'momentum-scout', trades: 1, metric: '100% win rate' });
     expect(rows.slice(0, 4).every((r) => r.custom === false)).toBe(true);
+
+    // Each agent that exists on this wallet carries its on-chain key and the budget the chain holds for it; a persona
+    // nobody hired has no row, so nothing to budget.
+    const byName = new Map((rows as unknown as { name: string; onChainKey: string | null; budgetUsd: number | null }[]).map((r) => [r.name, r]));
+    expect(byName.get('Earnings Desk')).toMatchObject({ onChainKey: agentKey('row-ed'), budgetUsd: 25 });
+    expect(byName.get('Dip Buyer')).toMatchObject({ onChainKey: agentKey('row-db'), budgetUsd: 25 });
+    expect(byName.get('Momentum Scout')).toMatchObject({ onChainKey: null, budgetUsd: null });
   });
 
   it('hires a made agent again by its own persona id, and reads another as missing', async () => {

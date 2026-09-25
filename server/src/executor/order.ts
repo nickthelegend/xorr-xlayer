@@ -142,7 +142,14 @@ export async function armExits(
    * type or lied about the shape it had.
    */
   w: Pick<WalletRow, 'id' | 'address' | 'agents_stopped'>,
-  p: { symbol: string; entryPrice: number; stopPrice: number; targetPrice: number },
+  p: {
+    symbol: string;
+    entryPrice: number;
+    stopPrice: number;
+    targetPrice: number;
+    /** The agent whose entry this exit protects: its sale is carried as the agent's, crediting the agent's budget. */
+    agentId?: string | null;
+  },
 ): Promise<{ strategyId: string | null; sentence: string }> {
   if (!(p.stopPrice > 0) || !(p.targetPrice > 0)) {
     return { strategyId: null, sentence: 'It came with no stop or target, so none is set.' };
@@ -182,8 +189,8 @@ export async function armExits(
   }
 
   const row = await one<{ id: string }>(
-    `INSERT INTO strategies (id, wallet_id, kind, state, label, symbol, params, cadence, next_run_at, daily_allocation_usd)
-     VALUES ($1,$2,'exit-rules','live',$3,$4,$5,'daily',$6,0) RETURNING id`,
+    `INSERT INTO strategies (id, wallet_id, kind, state, label, symbol, params, cadence, next_run_at, daily_allocation_usd, agent_id)
+     VALUES ($1,$2,'exit-rules','live',$3,$4,$5,'daily',$6,0,$7) RETURNING id`,
     [
       randomUUID(),
       w.id,
@@ -191,6 +198,7 @@ export async function armExits(
       p.symbol,
       JSON.stringify({ entryPrice: p.entryPrice, takeProfitPct, stopLossPct }),
       nextRuns('daily', 1)[0],
+      p.agentId ?? null,
     ],
   );
   return {

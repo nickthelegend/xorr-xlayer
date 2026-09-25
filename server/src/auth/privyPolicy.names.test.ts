@@ -34,8 +34,8 @@ describe("Privy's rule-name limit", () => {
     const rules = policyRules();
     expect(Object.keys(STOCKS).length).toBeGreaterThan(0);
     expect(rules).toHaveLength(2 * desiredRules().length);
-    // grant + revoke, the five tokens, and one approval per wrapped xStock — each twice.
-    expect(desiredRules()).toHaveLength(2 + 5 + Object.keys(STOCKS).length);
+    // grant + revoke + an agent's budget, the five tokens, and one approval per wrapped xStock — each twice.
+    expect(desiredRules()).toHaveLength(3 + 5 + Object.keys(STOCKS).length);
     for (const r of rules) expect(r.name.length, r.name).toBeLessThan(50);
   });
 

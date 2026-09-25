@@ -61,6 +61,8 @@ export async function chooseSettlement(params: {
   isClose: boolean;
   delegationFrom: Address;
   send: SettlementSend;
+  /** The agent the trade is for (`agentKey`), so OKX's route is simulated as the exact agent call that would carry it. */
+  agent?: `0x${string}`;
 }): Promise<Settlement> {
   const { intent, owner, delegationFrom, send } = params;
 
@@ -140,6 +142,7 @@ export async function chooseSettlement(params: {
         data: okx.data,
         tokenOut: outToken.address,
         minOut: okx.minOut,
+        agent: params.agent,
       }))
     ) {
       return {

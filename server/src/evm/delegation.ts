@@ -112,6 +112,74 @@ export const DELEGATION_ABI = [
     ],
     outputs: [{ name: 'result', type: 'bytes' }],
   },
+  /*
+   * Each agent's own budget (2026-09-25): the owner sets it, an agent's trade is charged to it as well as to the daily
+   * cap, and an agent's sale credits the settlement token it returns back to it. `agent` is `agentKey(agents.id)`.
+   */
+  {
+    type: 'function',
+    name: 'setAgentBudget',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agent', type: 'bytes32' },
+      { name: 'budget', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'spendForAgent',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'agent', type: 'bytes32' },
+      { name: 'token', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'venue', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'minOut', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [{ name: 'result', type: 'bytes' }],
+  },
+  {
+    type: 'function',
+    name: 'closeForAgent',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'agent', type: 'bytes32' },
+      { name: 'token', type: 'address' },
+      { name: 'spender', type: 'address' },
+      { name: 'venue', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'minOut', type: 'uint256' },
+      { name: 'data', type: 'bytes' },
+    ],
+    outputs: [{ name: 'result', type: 'bytes' }],
+  },
+  {
+    type: 'function',
+    name: 'agentBudget',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'agent', type: 'bytes32' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'error',
+    name: 'AgentBudgetExceeded',
+    inputs: [
+      { name: 'agent', type: 'bytes32' },
+      { name: 'requested', type: 'uint256' },
+      { name: 'remaining', type: 'uint256' },
+    ],
+  },
+  { type: 'error', name: 'AgentRequired', inputs: [] },
   {
     type: 'function',
     name: 'SETTLEMENT_TOKEN',
@@ -382,6 +450,11 @@ export async function spendAsDelegate(
     venue?: Address;
     /** Set when the venue pulls through a separate approval contract: the call becomes `spendVia`. */
     spender?: Address;
+    /**
+     * The agent this trade is for (`agentKey(agents.id)`): the call becomes `spendForAgent`, and the contract charges
+     * the agent's own budget as well as the owner's daily cap, refusing past either.
+     */
+    agent?: Hex;
     usd: number;
     data: Hex;
   } & OutputFloor,
@@ -390,6 +463,19 @@ export async function spendAsDelegate(
   if (!venue) throw new Error('This chain has no settlement venue for a spend.');
   const token = params.token ?? ADDRESSES.usdc;
   const amount = usdToUnits(params.usd);
+  if (params.agent) {
+    const call = {
+      account: delegateAccount,
+      address: DELEGATION_ADDRESS,
+      abi: DELEGATION_ABI,
+      functionName: 'spendForAgent',
+      args: [params.owner, params.agent, token, params.spender ?? venue, venue, amount, params.tokenOut, params.minOut, params.data],
+    } as const;
+    const { request } = await publicClient.simulateContract(call);
+    const gas = withHeadroom(await publicClient.estimateContractGas(call));
+    await markBroadcast();
+    return walletClient.writeContract({ ...request, gas });
+  }
   // Simulate first, so a policy violation is caught before anything is signed and surfaces as the
   // contract's own named error rather than as a mined failure.
   if (params.spender) {
@@ -439,19 +525,40 @@ export async function viaWouldFill(
     /** What the call pulls: the settlement token's raw units on a spend, the sold token's on a close. */
     amount: bigint;
     data: Hex;
+    /** The agent the trade is for, so the simulation is the exact call that would carry it (and its budget). */
+    agent?: Hex;
   } & OutputFloor,
 ): Promise<boolean> {
-  const functionName = params.via === 'spend' ? 'spendVia' : 'closePositionVia';
-  return publicClient
-    .simulateContract({
-      account: delegateAccount,
-      address: DELEGATION_ADDRESS,
-      abi: DELEGATION_ABI,
-      functionName,
-      args: [params.owner, params.token, params.spender, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
-    })
-    .then(() => true)
-    .catch(() => false);
+  const simulate = params.agent
+    ? publicClient.simulateContract({
+        account: delegateAccount,
+        address: DELEGATION_ADDRESS,
+        abi: DELEGATION_ABI,
+        functionName: params.via === 'spend' ? 'spendForAgent' : 'closeForAgent',
+        args: [params.owner, params.agent, params.token, params.spender, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
+      })
+    : publicClient.simulateContract({
+        account: delegateAccount,
+        address: DELEGATION_ADDRESS,
+        abi: DELEGATION_ABI,
+        functionName: params.via === 'spend' ? 'spendVia' : 'closePositionVia',
+        args: [params.owner, params.token, params.spender, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
+      });
+  return simulate.then(() => true).catch(() => false);
+}
+
+/**
+ * What an agent may still commit on chain (`agentBudget`), in dollars of the settlement token — before the owner's
+ * daily cap is applied on top. Zero for an agent the owner never budgeted.
+ */
+export async function readAgentBudget(owner: Address, agent: Hex): Promise<number> {
+  const raw = (await publicClient.readContract({
+    address: DELEGATION_ADDRESS,
+    abi: DELEGATION_ABI,
+    functionName: 'agentBudget',
+    args: [owner, agent],
+  })) as bigint;
+  return Number(raw) / 1e6;
 }
 
 /**
@@ -690,10 +797,25 @@ export async function closeAsDelegate(
     venue: Address;
     /** Set when the venue pulls through a separate approval contract: the call becomes `closePositionVia`. */
     spender?: Address;
+    /** The agent whose position this is: the call becomes `closeForAgent`, which credits the sale back to its budget. */
+    agent?: Hex;
     amount: bigint;
     data: Hex;
   } & OutputFloor,
 ): Promise<Hex> {
+  if (params.agent) {
+    const call = {
+      account: delegateAccount,
+      address: DELEGATION_ADDRESS,
+      abi: DELEGATION_ABI,
+      functionName: 'closeForAgent',
+      args: [params.owner, params.agent, params.token, params.spender ?? params.venue, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
+    } as const;
+    const { request } = await publicClient.simulateContract(call);
+    const gas = withHeadroom(await publicClient.estimateContractGas(call));
+    await markBroadcast();
+    return walletClient.writeContract({ ...request, gas });
+  }
   if (params.spender) {
     const call = {
       account: delegateAccount,

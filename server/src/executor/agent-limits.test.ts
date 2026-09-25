@@ -48,6 +48,8 @@ vi.mock('../evm/client.js', () => ({
   delegateAccount: { address: '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5' },
 }));
 vi.mock('../evm/delegation.js', () => ({
+  // A budget on chain larger than anything these tests place, unless a test says otherwise.
+  readAgentBudget: vi.fn(async () => 1_000_000),
   readPolicy: vi.fn(async () => ({
     delegate: '0xC38f38f45463f77bD823FebE16b15714Eb98c8A5',
     dailyCapUsd: 2_000,
@@ -76,6 +78,8 @@ vi.mock('./kinds/index.js', () => ({ PLANNERS: { momentum: vi.fn() }, observatio
 const { chooseSettlement } = await import('./settle.js');
 const { PLANNERS } = await import('./kinds/index.js');
 const { runStrategy } = await import('./run.js');
+const { readAgentBudget } = await import('../evm/delegation.js');
+const { agentKey } = await import('../evm/agentKey.js');
 type StrategyRow = import('./run.js').StrategyRow;
 
 const at = new Date('2026-09-13T09:00:00Z');
@@ -108,6 +112,7 @@ beforeEach(() => {
   h.limits = {};
   h.spent = '0';
   vi.mocked(chooseSettlement).mockClear();
+  vi.mocked(readAgentBudget).mockReset().mockResolvedValue(1_000_000);
   vi.mocked(PLANNERS.momentum!).mockReset();
   vi.mocked(PLANNERS.momentum!).mockResolvedValue(entry);
 });
@@ -134,6 +139,44 @@ describe("an agent's limits", () => {
     expect(spend.params).toEqual(['agent-1']);
     expect(spend.text).toMatch(/r\.side = 'buy'/);
     expect(spend.text).toMatch(/s\.chain = current_setting\('xorr\.chain_key'\)/);
+  });
+
+  /*
+   * The agent's own budget, on chain (2026-09-25): read for the agent's own key, and a trade past it refused in a
+   * sentence before anything is proposed or sent — the contract would refuse it anyway (`AgentBudgetExceeded`).
+   */
+  it('refuse an entry past what the agent has left of its budget on chain', async () => {
+    vi.mocked(readAgentBudget).mockResolvedValue(40);
+    const out = await runStrategy(strategy(), at);
+    expect(out).toMatchObject({
+      status: 'blocked',
+      reason: 'agent_budget',
+      detail: 'Momentum Scout has $40.00 of its budget left on chain, and this asks for $100.00.',
+    });
+    expect(vi.mocked(readAgentBudget).mock.calls[0]![1]).toBe(agentKey('agent-1'));
+    expect(chooseSettlement).not.toHaveBeenCalled();
+  });
+
+  it('say so when the agent has no budget at all', async () => {
+    vi.mocked(readAgentBudget).mockResolvedValue(0);
+    const out = await runStrategy(strategy(), at);
+    expect(out).toMatchObject({
+      status: 'blocked',
+      reason: 'agent_budget',
+      detail: 'Momentum Scout has no budget on chain. Give it one on its page, and it can trade.',
+    });
+  });
+
+  it('refuse when the budget cannot be read: an unchecked budget is not a budget', async () => {
+    vi.mocked(readAgentBudget).mockRejectedValue(new Error('rpc down'));
+    const out = await runStrategy(strategy(), at);
+    expect(out).toMatchObject({ status: 'blocked', reason: 'agent_budget_unread' });
+    expect(chooseSettlement).not.toHaveBeenCalled();
+  });
+
+  it("settle an agent's trade as the agent's", async () => {
+    await runStrategy(strategy(), at);
+    expect(vi.mocked(chooseSettlement).mock.calls[0]![0]).toMatchObject({ agent: agentKey('agent-1') });
   });
 
   it('let a trade inside both carry on to settlement', async () => {

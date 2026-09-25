@@ -16,7 +16,8 @@ import { one, query, tx } from '../db/index.js';
 import { append } from '../audit/log.js';
 import { log } from '../http/request-id.js';
 import { evaluate, recordSpend } from '../rules/engine.js';
-import { closeAsDelegate, readPolicy, spendAsDelegate, usdToUnits, waitForTx } from '../evm/delegation.js';
+import { closeAsDelegate, readAgentBudget, readPolicy, spendAsDelegate, usdToUnits, waitForTx } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { erc20Abi, formatUnits } from 'viem';
 import { publicClient } from '../evm/client.js';
 import { gasStatus } from '../evm/gas.js';
@@ -566,7 +567,7 @@ async function runStrategyInner(
      * proposed or placed — and never against a close, which only reduces risk.
      */
     if (strategy.agent_id && !isCloseIntent(intent)) {
-      const refusal = await agentLimitRefusal(strategy.agent_id, intent.usd);
+      const refusal = await agentLimitRefusal(strategy.agent_id, intent.usd, owner);
       if (refusal) return await finishBlocked(runId, walletId, strategy, refusal.reason, refusal.detail);
     }
 
@@ -667,12 +668,19 @@ async function runStrategyInner(
     const soldToken = VENUE_TOKENS[intent.inSymbol];
     if (!soldToken) throw new Error(`No token registry entry for ${intent.inSymbol}`);
     const closeAmount = intent.amountInRaw ?? BigInt(Math.floor(intent.amountIn * 10 ** soldToken.decimals));
+    /*
+     * An agent's trade is carried as the agent's (2026-09-25): a buy is charged to its on-chain budget, a sale credits
+     * the budget back. A strategy with no agent — the owner's own order, or anything armed before agents had budgets —
+     * trades on the owner's daily cap alone, as before.
+     */
+    const agent = strategy.agent_id ? agentKey(strategy.agent_id) : undefined;
     const { payToken, swap, venue, floor, spender } = await chooseSettlement({
       intent,
       owner,
       isClose: isCloseIntent(intent),
       delegationFrom: DELEGATION_FROM,
       send: isClose ? { via: 'closePosition', amount: closeAmount } : { via: 'spend', amount: usdToUnits(intent.usd) },
+      agent,
     });
 
     /*
@@ -702,6 +710,7 @@ async function runStrategyInner(
           // The amount the route was measured with on a fork — see `closeAmount` above.
           amount: closeAmount,
           data: swap.data,
+          agent,
           ...floor,
         })
       : await spendAsDelegate({
@@ -711,6 +720,7 @@ async function runStrategyInner(
           spender,
           usd: intent.usd,
           data: swap.data,
+          agent,
           ...floor,
         });
 
@@ -1160,7 +1170,11 @@ async function proposeInstead(p: {
  * allows between the agents they hired, so neither can raise anything — the cap and the contract still
  * apply on top.
  */
-async function agentLimitRefusal(agentId: string, usd: number): Promise<{ reason: string; detail: string } | null> {
+async function agentLimitRefusal(
+  agentId: string,
+  usd: number,
+  owner: Address,
+): Promise<{ reason: string; detail: string } | null> {
   const agent = await one<{ name: string; risk_limits: Record<string, unknown> | null }>(
     `SELECT name, risk_limits FROM agents WHERE id = $1`,
     [agentId],
@@ -1168,6 +1182,25 @@ async function agentLimitRefusal(agentId: string, usd: number): Promise<{ reason
   if (!agent) return null;
   const limits = agent.risk_limits ?? {};
   const dollars = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  /*
+   * The agent's own budget, on chain (2026-09-25). The contract refuses an agent's trade past it
+   * (`AgentBudgetExceeded`); asking first turns that revert into a sentence, and keeps a trade the chain would refuse
+   * from ever being signed. A read that fails refuses too: an unchecked budget is not a budget.
+   */
+  const budget = await readAgentBudget(owner, agentKey(agentId)).catch(() => null);
+  if (budget === null) {
+    return { reason: 'agent_budget_unread', detail: `I could not read ${agent.name}'s budget on chain, so I did not place this.` };
+  }
+  if (usd > budget + 0.005) {
+    return {
+      reason: 'agent_budget',
+      detail:
+        budget < 0.01
+          ? `${agent.name} has no budget on chain. Give it one on its page, and it can trade.`
+          : `${agent.name} has ${dollars(budget)} of its budget left on chain, and this asks for ${dollars(usd)}.`,
+    };
+  }
 
   const perTrade = Number(limits.maxUsdPerTrade);
   if (Number.isFinite(perTrade) && perTrade > 0 && usd > perTrade + 0.005) {

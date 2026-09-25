@@ -17,6 +17,9 @@ import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { one, query } from '../db/index.js';
+import type { Address } from 'viem';
+import { readAgentBudget } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { append } from '../audit/log.js';
 import { currentWallet } from '../routes/wallet-context.js';
 import { PERSONAS, type PersonaId } from '../bot/personas.js';
@@ -132,23 +135,49 @@ agents.get('/agents', async (c) => {
   ]);
   const byPersona = new Map(rows.map((r) => [r.persona_id, r]));
 
+  /*
+   * Each agent's own budget, read from the chain (2026-09-25) — the contract's figure, never a copy of it — and the key
+   * the app signs `setAgentBudget` with. Only an agent that exists on this wallet has one: a persona nobody hired yet
+   * has no row, so nothing to budget. A read that fails is null, which the screen says rather than showing $0.
+   */
+  const owner = (
+    await one<{ address: string | null }>(`SELECT address FROM wallets WHERE id = $1`, [id])
+  )?.address;
+  const budgets = new Map<string, number | null>(
+    await Promise.all(
+      rows.map(async (r): Promise<[string, number | null]> => [
+        r.id,
+        owner ? await readAgentBudget(owner as Address, agentKey(r.id)).catch(() => null) : null,
+      ]),
+    ),
+  );
+  const onChain = (row: AgentRow | undefined) =>
+    row
+      ? { onChainKey: agentKey(row.id), budgetUsd: budgets.get(row.id) ?? null }
+      : { onChainKey: null, budgetUsd: null };
+
   const personas = Object.values(PERSONAS).map((p) => {
     const row = byPersona.get(p.id);
-    return toApi(
-      row ?? {
-        id: p.id,
-        wallet_id: id,
-        persona_id: p.id,
-        name: p.name,
-        hired: false,
-        tone: 'dry',
-        risk_limits: {},
-        created_at: new Date(),
-      },
-      records.get(p.id),
-    );
+    return {
+      ...toApi(
+        row ?? {
+          id: p.id,
+          wallet_id: id,
+          persona_id: p.id,
+          name: p.name,
+          hired: false,
+          tone: 'dry',
+          risk_limits: {},
+          created_at: new Date(),
+        },
+        records.get(p.id),
+      ),
+      ...onChain(row),
+    };
   });
-  const made = rows.filter((r) => isCustom(r.persona_id)).map((r) => toApi(r, records.get(r.persona_id) ?? NO_TRADES));
+  const made = rows
+    .filter((r) => isCustom(r.persona_id))
+    .map((r) => ({ ...toApi(r, records.get(r.persona_id) ?? NO_TRADES), ...onChain(r) }));
   return c.json([...personas, ...made]);
 });
 

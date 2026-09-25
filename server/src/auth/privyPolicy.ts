@@ -198,6 +198,19 @@ const GRANT_ABI = [
 ] as const;
 
 const REVOKE_ABI = [{ type: 'function', name: 'revoke', stateMutability: 'nonpayable', inputs: [], outputs: [] }] as const;
+/** Giving an agent its own budget (2026-09-25): owner-only on chain, and only ever about the caller's own agents. */
+const SET_AGENT_BUDGET_ABI = [
+  {
+    type: 'function',
+    name: 'setAgentBudget',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agent', type: 'bytes32' },
+      { name: 'budget', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const;
 
 /**
  * The tokens a grant approves: every one the delegation may need to pull, buy side and sell side.
@@ -261,6 +274,20 @@ export function desiredRules(): PrivyRule[] {
       conditions: [
         to(delegation),
         { field_source: 'ethereum_calldata', field: 'function_name', abi: REVOKE_ABI, operator: 'eq', value: 'revoke' },
+      ],
+    },
+    {
+      ...base,
+      name: "Set an agent's budget",
+      conditions: [
+        to(delegation),
+        {
+          field_source: 'ethereum_calldata',
+          field: 'function_name',
+          abi: SET_AGENT_BUDGET_ABI,
+          operator: 'eq',
+          value: 'setAgentBudget',
+        },
       ],
     },
   ];

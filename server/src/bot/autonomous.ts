@@ -27,7 +27,8 @@ import { log } from '../http/request-id.js';
 import { evaluate, type RuleVerdict } from '../rules/engine.js';
 import { XSTOCKS, xStockPriceUsd, type XStockToken } from '../venues/xstocks.js';
 import { armExits, placeOrder, type OrderResult } from '../executor/order.js';
-import { readPolicy, type OnChainPolicy } from '../evm/delegation.js';
+import { readAgentBudget, readPolicy, type OnChainPolicy } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { publicClient } from '../evm/client.js';
 import type { WalletRow } from '../routes/wallet-context.js';
 import { speak } from './llm.js';
@@ -753,10 +754,35 @@ export async function runAutonomousCycle(
 
   // What is left today is the smaller of our own tally and the contract's: the contract is final.
   const remainingUsd = Math.min(verdict.remainingUsd, policy.remainingTodayUsd);
+  /*
+   * And what the agent that found the setup has left of its own budget, on chain (2026-09-25). The contract charges an
+   * agent's trade to it and refuses past it, so a size above it would only be a refusal waiting to happen; an agent the
+   * owner never budgeted does not trade at all, and says so.
+   */
+  const agentId = agentIdFor(bestSetup.persona);
+  const agentBudgetUsd = agentId ? await readAgentBudget(wallet.address as `0x${string}`, agentKey(agentId)).catch(() => null) : null;
+  if (agentId && agentBudgetUsd === null) {
+    return {
+      executed: false,
+      reason: 'agent_budget_unread',
+      detail: `${bestSetup.personaName}'s budget could not be read on chain, so nothing was placed.`,
+    };
+  }
   const sizeUsd = Math.min(
     options.fixedUsd ?? settings.maxTradeUsd,
     Math.max(settings.minTradeUsd, Math.floor(remainingUsd * settings.allowanceShare)),
+    agentBudgetUsd === null ? Number.POSITIVE_INFINITY : Math.floor(agentBudgetUsd * 100) / 100,
   );
+  if (agentBudgetUsd !== null && sizeUsd < settings.minTradeUsd) {
+    return {
+      executed: false,
+      reason: 'agent_budget',
+      detail:
+        agentBudgetUsd < 0.01
+          ? `${bestSetup.personaName} has no budget on chain yet. Give it one on its page, and it can trade.`
+          : `${bestSetup.personaName} has $${agentBudgetUsd.toFixed(2)} of its budget left on chain, under the $${settings.minTradeUsd} smallest trade.`,
+    };
+  }
   if (sizeUsd < settings.minTradeUsd || sizeUsd > remainingUsd) {
     return {
       executed: false,
@@ -806,6 +832,8 @@ export async function runAutonomousCycle(
       entryPrice: receipt.fillPrice,
       stopPrice: bestSetup.stopPrice,
       targetPrice: bestSetup.targetPrice,
+      // Its sale is the agent's too, so what it returns goes back to the agent's budget.
+      agentId: agentIdFor(bestSetup.persona),
     });
     exitStrategyId = exits.strategyId;
   } catch (e) {
