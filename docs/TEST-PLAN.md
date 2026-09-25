@@ -23,7 +23,7 @@ re-pinned. The addresses below are the ones now live.
 | Executor, fork | `https://executor-fork-production-2db8.up.railway.app` (`XORR_CHAIN=xlayer-fork`) |
 | Fork node | `https://xlayer-fork-production.up.railway.app` (anvil, chain 196) |
 | Executor, testnet | `https://executor-testnet-production.up.railway.app` (`XORR_CHAIN=xlayer-testnet`) |
-| Contracts, testnet | XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196` |
+| Contracts, testnet | XorrDelegation `0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2` (per-agent budgets; `0x156DCE9E…cA22` before 2026-09-25), XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196` |
 | Native app | iOS simulator, debug build `finance.xorr.app`, JS from `npm run start:fork` |
 | Test identities | Privy test accounts `test-9907@privy.io` (`0xe609…d16b`), `test-8958@privy.io` (`0x95A0…e615`), a fresh one for F-tests |
 

@@ -33,9 +33,11 @@ on X Layer (research 2026-09-19).
 
 1. **Contracts.** `CONFIRM_MAINNET=yes ./contracts/deploy-xlayer-mainnet.sh` — refuses without the confirmation and
    under 0.005 OKB; writes `contracts/deployments/xlayer-mainnet.json`. Rehearsed on a fork of mainnet: both contracts
-   deploy against Circle's USDC, and because the deployer has never sent on mainnet they land at the same addresses as
-   on testnet — XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor
-   `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`. Then verify source on Sourcify, as testnet was.
+   deploy against Circle's USDC, and because the deployer has never sent on mainnet they land at the addresses its
+   first two transactions make — XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor
+   `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`, the addresses the first testnet deployment had. The code deployed is
+   today's, with each agent's own budget; testnet's delegation was redeployed with it on 2026-09-25, at
+   `0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`. Then verify source on Sourcify, as testnet was.
 2. **Executor.** New Railway service `executor-mainnet` with its own Postgres, from `server/`:
    `XORR_CHAIN=xlayer`, `ALLOW_MAINNET=yes`, `DELEGATION_ADDRESS`, `ANCHOR_ADDRESS`, `DELEGATE_PRIVATE_KEY` (from
    `server/.env.mainnet-delegate`), `XORR_DELEGATE_ADDRESS`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`,
@@ -48,12 +50,15 @@ on X Layer (research 2026-09-19).
 4. **Privy.** Add the mainnet web URL to the app's allowed domains (dashboard → the app → Domains). The wallet policy
    for mainnet is created by the executor on first use, owned by the same key quorum.
 5. **Prove it.** `/verify` on the mainnet executor, then: sign in, deposit, sign the permission ($100/day, 7 days), one
-   $20 buy from the ticket (settles on Uniswap or OKX DEX, whichever pays more — on mainnet both quote the same
-   chain), Stop all. Every step is an OKLink transaction.
+   $20 buy from the ticket (routed through OKX DEX first, Uniswap v3 only where OKX cannot route or would deliver more
+   than 0.5% less), then one agent's budget set on its page and a "Run now" of a strategy that agent runs — the fill's
+   transaction carries `AgentSpent` for that agent. Then Stop all. Every step is an OKLink transaction.
 
 ## What changes for a user on mainnet
 
 - The agent trades **real USDC** inside the permission: at most the daily cap, only on the allowlisted venues, only
   into the owner's own wallet. Revoking needs one signature and nothing from us.
-- The OKX-vs-Uniswap choice is exact on mainnet: both quote the chain the trade settles on, so no fork drift.
+- OKX DEX routes every leg it can, and on mainnet its route is quoted on the chain the trade settles on, so no fork
+  drift decides it. Uniswap v3 settles only what OKX cannot.
+- Each agent trades only from the budget its owner set for it on chain, and an agent with none does not trade.
 - There are no test funds, so first-time use starts at Deposit.

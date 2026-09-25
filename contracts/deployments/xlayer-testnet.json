@@ -6,6 +6,34 @@
   "deployedAt": "2026-09-19",
   "contracts": {
     "XorrDelegation": {
+      "address": "0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2",
+      "deployTx": "0x861dd0001ae642c4585754a658dacb860cc26c47fe3592b374d803c08386d9e5",
+      "blockNumber": 41884601,
+      "sourceCommit": "a3e9da2ebc003a21e193b59b18314d3427e830dd",
+      "deployedAt": "2026-09-25",
+      "constructorArgs": {
+        "settlementToken": "0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3"
+      },
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-25",
+        "lookup": "https://sourcify.dev/server/v2/contract/1952/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2",
+        "repository": "https://repo.sourcify.dev/1952/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2"
+      },
+      "note": "Per-agent budgets (setAgentBudget / spendForAgent / closeForAgent). Replaces the 2026-09-19 deployment below."
+    },
+    "XorrAuditAnchor": {
+      "address": "0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+      "deployTx": "0xe69b097f9f6de3fd590971cc81dfb6f23d2f97d28c4187728dd070501fb0ea29",
+      "blockNumber": 41340761,
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-19",
+        "lookup": "https://sourcify.dev/server/v2/contract/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+        "repository": "https://repo.sourcify.dev/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196"
+      }
+    },
+    "XorrDelegationBeforeAgentBudgets": {
       "address": "0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
       "deployTx": "0x1b1c3cea3070f4367ab51aa8c83aaf71b62902628626c07ea1572bf7b122e2d0",
       "blockNumber": 41340720,
@@ -18,20 +46,9 @@
         "lookup": "https://sourcify.dev/server/v2/contract/1952/0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
         "repository": "https://repo.sourcify.dev/1952/0x156DCE9E9d523775AB51f882616A431EdBfBcA22"
       }
-    },
-    "XorrAuditAnchor": {
-      "address": "0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
-      "deployTx": "0xe69b097f9f6de3fd590971cc81dfb6f23d2f97d28c4187728dd070501fb0ea29",
-      "blockNumber": 41340761,
-      "verification": {
-        "sourcify": "exact_match",
-        "verifiedAt": "2026-09-19",
-        "lookup": "https://sourcify.dev/server/v2/contract/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
-        "repository": "https://repo.sourcify.dev/1952/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196"
-      }
     }
   },
-  "explorer": "https://www.oklink.com/xlayer-test/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+  "explorer": "https://www.oklink.com/xlayer-test/address/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2",
   "compiler": {
     "evmVersion": "cancun",
     "viaIR": true,
