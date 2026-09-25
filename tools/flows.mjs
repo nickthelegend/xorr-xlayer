@@ -413,6 +413,18 @@ async function main() {
     let signatures = 0;
     await open(page, `/delegate`);
     await page.waitForTimeout(6000);
+    /*
+     * `FLOWS_CAP` sets the daily cap before signing, the way a finger does — down to the floor, then up in the stepper's
+     * own steps. The executor keeps its own tally of the day beside the contract's, so a wallet that already traded
+     * today needs a cap above what it spent to have anything left.
+     */
+    const wantCap = Number(process.env.FLOWS_CAP ?? 0);
+    if (wantCap > 0) {
+      const down = page.getByRole('button', { name: 'Decrease' }).first();
+      const up = page.getByRole('button', { name: 'Increase' }).first();
+      for (let i = 0; i < 110 && (await down.isEnabled().catch(() => false)); i += 1) await down.click();
+      for (let i = 0; i < Math.round((wantCap - 50) / 50); i += 1) await up.click();
+    }
     await page.getByText(/^Sign this permission$/).first().click();
     /*
      * One confirmation per tradable token, then the grant — the screen says how many ("You'll sign 17 times.
@@ -431,6 +443,7 @@ async function main() {
     await page.waitForTimeout(20_000);
     const granted = await apiGet('/limits', bearer);
     check(granted.granted === true && granted.revoked === false, 'the chain holds a live permission again', JSON.stringify({ cap: granted.dailyCapUsd, remaining: granted.remainingUsd }));
+    if (wantCap > 0) check(granted.dailyCapUsd === wantCap, 'at the daily cap chosen on the screen', `$${granted.dailyCapUsd}`);
     seen.quiet('grant');
   }
 
@@ -456,8 +469,10 @@ async function main() {
       const target = agent.budgetUsd === 50 ? 25 : 50;
       await open(page, `/agent/${agent.id}`);
       await page.waitForSelector('text=/^Budget$/', { timeout: 60_000 });
-      await page.getByText(`$${target}`, { exact: true }).first().click();
-      await page.getByText(new RegExp(`^Set budget to \\$${target}\\.00$`)).first().click();
+      // Inside the card: "$50" can appear elsewhere on the page.
+      const card = page.locator('[data-testid="agent-budget"]');
+      await card.getByText(`$${target}`, { exact: true }).first().click();
+      await card.getByText(new RegExp(`^Set budget to \\$${target}\\.00$`)).first().click();
       let signatures = 0;
       for (let i = 0; i < 3; i += 1) {
         const approve = page.getByRole('button', { name: /^Approve$/ }).first();
@@ -473,8 +488,8 @@ async function main() {
         .then(() => true)
         .catch(() => false);
       check(landed, 'the card says the budget is set on chain');
-      const card = await page.innerText('[data-testid="agent-budget"]').catch(() => '');
-      check(card.includes(`$${target}.00`), 'and shows the figure the chain answered', card.split('\n').slice(0, 3).join(' | '));
+      const shown = await card.innerText().catch(() => '');
+      check(shown.includes(`$${target}.00`), 'and shows the figure the chain answered', shown.split('\n').slice(0, 3).join(' | '));
       const reread = await apiGet('/agents', bearer);
       const now = (Array.isArray(reread) ? reread : []).find((a) => a.id === agent.id);
       check(now?.budgetUsd === target, 'the executor reads the same budget off the contract', `$${now?.budgetUsd}`);

@@ -673,7 +673,16 @@ async function runStrategyInner(
      * the budget back. A strategy with no agent — the owner's own order, or anything armed before agents had budgets —
      * trades on the owner's daily cap alone, as before.
      */
-    const agent = strategy.agent_id ? agentKey(strategy.agent_id) : undefined;
+    const lotUnits = Number((strategy.params as Record<string, unknown> | null)?.lotUnits ?? 0);
+    /*
+     * A sale is credited to an agent only when it sells that agent's own lot — its exit, armed with the units its buy
+     * filled (`armExits`). Any other sale by an agent's strategy settles as the owner's close and credits nobody: a
+     * budget may never grow by the proceeds of shares it did not pay for.
+     */
+    const agent =
+      strategy.agent_id && (!isClose || (strategy.kind === 'exit-rules' && lotUnits > 0))
+        ? agentKey(strategy.agent_id)
+        : undefined;
     const { payToken, swap, venue, floor, spender } = await chooseSettlement({
       intent,
       owner,
@@ -1192,7 +1201,9 @@ async function agentLimitRefusal(
   if (budget === null) {
     return { reason: 'agent_budget_unread', detail: `I could not read ${agent.name}'s budget on chain, so I did not place this.` };
   }
-  if (usd > budget + 0.005) {
+  // In the token's own units, as the contract compares them: a dollar test with a half-cent of slack let through a trade
+  // the chain then refused with a raw revert instead of this sentence.
+  if (usdToUnits(usd) > BigInt(Math.round(budget * 1e6))) {
     return {
       reason: 'agent_budget',
       detail:

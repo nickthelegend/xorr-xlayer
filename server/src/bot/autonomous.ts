@@ -515,6 +515,13 @@ export async function evaluateBestSetup(
   return candidates[0] ?? null;
 }
 
+/** Why an agent with too little budget on chain did not trade, in the words the trail keeps. */
+function noBudgetSentence(name: string, budgetUsd: number, minTradeUsd: number): string {
+  return budgetUsd < 0.01
+    ? `${name} has no budget on chain yet. Give it one on its page, and it can trade.`
+    : `${name} has $${budgetUsd.toFixed(2)} of its budget left on chain, under the $${minTradeUsd} smallest trade.`;
+}
+
 /** `agent`: the agent the refusal is about, where it is one agent's — its name, as the trail writes it. */
 type Refusal = { executed: false; reason: string; detail: string; agent?: string };
 
@@ -716,7 +723,38 @@ export async function runAutonomousCycle(
       detail: `${options.setup.symbol} is already held; the agent enters a symbol once and lets its exit decide.`,
     };
   }
-  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held, hired));
+  /*
+   * Which hired agents have a budget to trade from, on chain (2026-09-25).
+   *
+   * An agent trades only from the budget its owner set for it on the contract. Scanning every hired agent and checking
+   * the winner's budget afterwards let an agent nobody budgeted, ranking first, block every agent that had one — on
+   * every tick. So every hired agent's budget is read first, and only an agent holding at least the smallest trade may
+   * take a setup; with none, nothing is scanned at all.
+   */
+  const budgetOf = new Map<PersonaId, number | null>(
+    await Promise.all(
+      [...hired].map(async (persona): Promise<[PersonaId, number | null]> => {
+        const id = agentIdFor(persona);
+        return [persona, id ? await readAgentBudget(wallet.address as `0x${string}`, agentKey(id)).catch(() => null) : null];
+      }),
+    ),
+  );
+  const funded = new Set([...hired].filter((persona) => (budgetOf.get(persona) ?? 0) >= settings.minTradeUsd));
+  if (!options.setup && funded.size === 0) {
+    const only = roster.length === 1 ? roster[0]! : undefined;
+    const unread = [...hired].every((persona) => budgetOf.get(persona) === null);
+    return {
+      executed: false,
+      reason: unread ? 'agent_budget_unread' : 'agent_budget',
+      detail: unread
+        ? `${only ? `${only.name}'s budget` : "Your agents' budgets"} could not be read on chain, so nothing was placed.`
+        : only
+          ? noBudgetSentence(only.name, budgetOf.get(only.persona_id as PersonaId) ?? 0, settings.minTradeUsd)
+          : `None of your agents has the $${settings.minTradeUsd} a trade needs in its budget on chain. Give one a budget on its page, and it can trade.`,
+      ...(only ? { agent: only.name } : {}),
+    };
+  }
+  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held, funded));
   if (!bestSetup) {
     return {
       executed: false,
@@ -764,7 +802,11 @@ export async function runAutonomousCycle(
    * owner never budgeted does not trade at all, and says so.
    */
   const agentId = agentIdFor(bestSetup.persona);
-  const agentBudgetUsd = agentId ? await readAgentBudget(wallet.address as `0x${string}`, agentKey(agentId)).catch(() => null) : null;
+  const agentBudgetUsd = !agentId
+    ? null
+    : budgetOf.has(bestSetup.persona)
+      ? (budgetOf.get(bestSetup.persona) ?? null)
+      : await readAgentBudget(wallet.address as `0x${string}`, agentKey(agentId)).catch(() => null);
   if (agentId && agentBudgetUsd === null) {
     return {
       executed: false,
@@ -782,10 +824,7 @@ export async function runAutonomousCycle(
     return {
       executed: false,
       reason: 'agent_budget',
-      detail:
-        agentBudgetUsd < 0.01
-          ? `${bestSetup.personaName} has no budget on chain yet. Give it one on its page, and it can trade.`
-          : `${bestSetup.personaName} has $${agentBudgetUsd.toFixed(2)} of its budget left on chain, under the $${settings.minTradeUsd} smallest trade.`,
+      detail: noBudgetSentence(bestSetup.personaName, agentBudgetUsd, settings.minTradeUsd),
       agent: bestSetup.personaName,
     };
   }
@@ -838,8 +877,9 @@ export async function runAutonomousCycle(
       entryPrice: receipt.fillPrice,
       stopPrice: bestSetup.stopPrice,
       targetPrice: bestSetup.targetPrice,
-      // Its sale is the agent's too, so what it returns goes back to the agent's budget.
+      // Its sale is the agent's too, so what it returns goes back to the agent's budget — for the lot it bought, only.
       agentId: agentIdFor(bestSetup.persona),
+      lotUnits: receipt.filledUnits,
     });
     exitStrategyId = exits.strategyId;
   } catch (e) {
@@ -888,7 +928,8 @@ export async function runAutonomousCycle(
  * the next sweep is one decision observed twice, not a second one.
  */
 async function sayBudgetRefusal(walletId: string, res: Refusal): Promise<void> {
-  const agent = res.agent ?? 'Agent';
+  // One agent's refusal is filed under it; one about all of them under `xorr`, the name the trail uses for the system.
+  const agent = res.agent ?? 'xorr';
   const last = await one<{ action: string; detail: string | null }>(
     `SELECT action, detail FROM audit_log WHERE wallet_id = $1 AND agent = $2 ORDER BY seq DESC LIMIT 1`,
     [walletId, agent],

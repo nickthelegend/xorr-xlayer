@@ -21,9 +21,14 @@ budget of its own on the contract, filed under `keccak256("xorr-agent:" + agent 
 `setAgentBudget(agent, budget)` sets the budget of whoever sends it, so the bot's key can only ever set its own, which
 nothing reads. An agent's trade goes through `spendForAgent` / `closeForAgent`: a buy is charged to that agent's budget
 and refused past it (`AgentBudgetExceeded(agent, requested, remaining)`), and a sale credits what it returned in the
-settlement token back to it. The one delegate key still signs every trade — as the Solana build's bot key does — but
-which agent a trade is charged to, and how far each agent may go, are the contract's figures, set by the owner's own
-signature (`contracts/test/XorrAgentBudget.t.sol`, 19 tests including a fuzz of the running balance).
+settlement token back to it. An agent's exit sells only the
+lot its buy filled, so a budget is credited only for what it paid for; any other sale is the owner's and credits nobody.
+The one delegate key still signs every trade — as the Solana build's bot key does. What the budgets bind is the trades
+the executor submits AS an agent's (`contracts/test/XorrAgentBudget.t.sol`, 19 tests including a fuzz of the running
+balance). They are not a limit on the key itself: a stolen delegate key could trade as "no agent" (`spend`) and skip
+every budget, or credit a sale to any agent's budget — inside the daily cap, the venue allowlist, the expiry and the
+output floor, which remain the hard limits on the key. An owner opt-in that makes every delegate spend chargeable to
+some budget is the next step, and would need a redeploy.
 
 **What the delegate CAN do**
 - Spend the settlement token (USDC) at a venue the owner allowlisted, up to what is left of today's cap, for a
@@ -34,8 +39,9 @@ signature (`contracts/test/XorrAgentBudget.t.sol`, 19 tests including a fuzz of 
 **What the delegate CANNOT do — enforced by the contract, not by our code**
 - Spend from any address but the delegate's own call: `NotDelegate`.
 - Exceed the day's cap (UTC day): `DailyCapExceeded(requested, remaining)`, checked before anything moves.
-- Spend past an agent's own budget on an agent's trade: `AgentBudgetExceeded`, after the day's cap is checked — or set
-  or raise any agent's budget, which only the owner's own transaction can do.
+- Spend past an agent's own budget on a trade submitted as that agent's: `AgentBudgetExceeded`, after the day's cap is
+  checked — or set any agent's budget, which only the owner's own transaction can do. (It can still submit a trade as
+  nobody's, or credit a sale to an agent: see "Each agent's own budget" above.)
 - Reach a venue the owner did not allow: `VenueNotAllowed(venue)`.
 - Trade after expiry or after the owner revokes: `PolicyExpired`, `PolicyRevoked` — for spends and closes alike, so
   a stop ends stop-losses too.

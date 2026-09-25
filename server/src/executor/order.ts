@@ -149,6 +149,11 @@ export async function armExits(
     targetPrice: number;
     /** The agent whose entry this exit protects: its sale is carried as the agent's, crediting the agent's budget. */
     agentId?: string | null;
+    /**
+     * The units that entry filled (2026-09-25). An agent's exit sells this lot and no more, so what it credits back to the
+     * agent's budget is what the agent's own buy was charged for — never the proceeds of shares someone else bought.
+     */
+    lotUnits?: number;
   },
 ): Promise<{ strategyId: string | null; sentence: string }> {
   if (!(p.stopPrice > 0) || !(p.targetPrice > 0)) {
@@ -196,7 +201,12 @@ export async function armExits(
       w.id,
       `Exit ${p.symbol} at +${takeProfitPct.toFixed(1)}% / -${stopLossPct.toFixed(1)}%`,
       p.symbol,
-      JSON.stringify({ entryPrice: p.entryPrice, takeProfitPct, stopLossPct }),
+      JSON.stringify({
+        entryPrice: p.entryPrice,
+        takeProfitPct,
+        stopLossPct,
+        ...(p.agentId && p.lotUnits && p.lotUnits > 0 ? { lotUnits: p.lotUnits } : {}),
+      }),
       nextRuns('daily', 1)[0],
       p.agentId ?? null,
     ],

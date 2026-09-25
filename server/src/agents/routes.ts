@@ -18,7 +18,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { one, query } from '../db/index.js';
 import { isAddressEqual, parseEventLogs, type Address, type Hex } from 'viem';
-import { DELEGATION_ABI, DELEGATION_ADDRESS, readAgentBudget, waitForReceipt } from '../evm/delegation.js';
+import { DELEGATION_ABI, DELEGATION_ADDRESS, readAgentBudgets, waitForReceipt } from '../evm/delegation.js';
 import { agentKey } from '../evm/agentKey.js';
 import { append } from '../audit/log.js';
 import { currentWallet } from '../routes/wallet-context.js';
@@ -143,14 +143,10 @@ agents.get('/agents', async (c) => {
   const owner = (
     await one<{ address: string | null }>(`SELECT address FROM wallets WHERE id = $1`, [id])
   )?.address;
-  const budgets = new Map<string, number | null>(
-    await Promise.all(
-      rows.map(async (r): Promise<[string, number | null]> => [
-        r.id,
-        owner ? await readAgentBudget(owner as Address, agentKey(r.id)).catch(() => null) : null,
-      ]),
-    ),
-  );
+  const read = owner
+    ? await readAgentBudgets(owner as Address, rows.map((r) => agentKey(r.id))).catch(() => rows.map(() => null))
+    : rows.map(() => null);
+  const budgets = new Map<string, number | null>(rows.map((r, i) => [r.id, read[i] ?? null]));
   const onChain = (row: AgentRow | undefined) =>
     row
       ? { onChainKey: agentKey(row.id), budgetUsd: budgets.get(row.id) ?? null }
@@ -650,6 +646,12 @@ agents.post('/agents/:id/budget', async (c) => {
   }
 
   const budgetUsd = Number(set.args.budget) / 1e6;
+  // The same transaction reported twice is one budget set, recorded once.
+  const already = await one<{ seq: string }>(
+    `SELECT seq FROM audit_log WHERE wallet_id = $1 AND action = 'Budget set' AND signature = $2 LIMIT 1`,
+    [w.id, body.txHash],
+  );
+  if (already) return c.json({ budgetUsd, onChainKey: key });
   await append({
     walletId: w.id,
     agent: row.name,
@@ -707,9 +709,14 @@ agents.delete('/agents/:id', async (c) => {
 
   // Every chain's, deliberately: the agent is not per chain, and a fired agent must not keep trading
   // on a chain other than the one it was fired from.
+  /*
+   * Its exits stay armed (2026-09-25). Since exits carry the agent that bought (so a sale credits its budget), pausing
+   * everything with its id would also have taken the stop-loss off every position it opened — firing an agent must stop
+   * it buying, never leave what it bought unprotected.
+   */
   const paused = await query<{ id: string }>(
     `UPDATE strategies SET state = 'paused'
-     WHERE agent_id = $1 AND state IN ('live','watch') RETURNING id`,
+     WHERE agent_id = $1 AND state IN ('live','watch') AND kind <> 'exit-rules' RETURNING id`,
     [row.id],
   );
 
@@ -719,7 +726,7 @@ agents.delete('/agents/:id', async (c) => {
     action: `Fired ${row.name}`,
     detail:
       paused.length > 0
-        ? `${paused.length} of its strategies were paused. Nothing was sold.`
+        ? `${paused.length} of its strategies were paused. Nothing was sold, and the exits on what it bought stay armed.`
         : 'It had nothing running.',
     kind: 'risk',
     payload: { agentId: row.id, pausedStrategies: paused.length },

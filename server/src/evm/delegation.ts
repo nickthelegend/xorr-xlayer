@@ -572,6 +572,29 @@ export async function readAgentBudget(owner: Address, agent: Hex): Promise<numbe
 }
 
 /**
+ * Several of one owner's agents' budgets, in one round trip (2026-09-25) — the roster asked one `eth_call` per agent, all
+ * at once, and a rate-limited RPC turned some of them into "couldn't read". Each is null where its own read failed; a
+ * multicall that cannot run at all falls back to reading them one by one.
+ */
+export async function readAgentBudgets(owner: Address, agents: Hex[]): Promise<(number | null)[]> {
+  if (agents.length === 0) return [];
+  try {
+    const results = await publicClient.multicall({
+      allowFailure: true,
+      contracts: agents.map((agent) => ({
+        address: DELEGATION_ADDRESS,
+        abi: DELEGATION_ABI,
+        functionName: 'agentBudget' as const,
+        args: [owner, agent] as const,
+      })),
+    });
+    return results.map((r) => (r.status === 'success' ? Number(r.result as bigint) / 1e6 : null));
+  } catch {
+    return Promise.all(agents.map((agent) => readAgentBudget(owner, agent).catch(() => null)));
+  }
+}
+
+/**
  * Which of this chain's venues this owner has actually allowed.
  *
  * The mapping is not enumerable on chain — by design, since an unbounded array in storage is a gas

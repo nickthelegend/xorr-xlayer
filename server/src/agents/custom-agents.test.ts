@@ -22,6 +22,7 @@ vi.mock('../audit/log.js', () => ({ append: vi.fn(async () => undefined) }));
 vi.mock('../evm/delegation.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../evm/delegation.js')>()),
   readAgentBudget: vi.fn(async () => 25),
+  readAgentBudgets: vi.fn(async (_owner: unknown, keys: unknown[]) => keys.map(() => 25)),
 }));
 vi.mock('../routes/wallet-context.js', () => ({
   currentWallet: vi.fn(),

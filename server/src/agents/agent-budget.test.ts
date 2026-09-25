@@ -34,7 +34,7 @@ vi.mock('../routes/wallet-context.js', () => ({
   NoWalletError: class extends Error {},
 }));
 
-const { one } = await import('../db/index.js');
+const { one, query } = await import('../db/index.js');
 const { append } = await import('../audit/log.js');
 const { currentWallet } = await import('../routes/wallet-context.js');
 const { DELEGATION_ABI, waitForReceipt } = await import('../evm/delegation.js');
@@ -152,6 +152,22 @@ describe("recording an agent's budget", () => {
     expect(append).not.toHaveBeenCalled();
   });
 
+  it('records the same transaction once, however often it is reported', async () => {
+    vi.mocked(waitForReceipt).mockResolvedValue(receipt([budgetLog({ budget: 40_000_000n })]));
+    vi.mocked(one).mockImplementation(async (text: string, params?: unknown[]) =>
+      /FROM audit_log/.test(text)
+        ? ({ seq: '7' } as never)
+        : params?.[0] === 'agent-1'
+          ? ({ id: 'agent-1', name: 'Momentum Scout' } as never)
+          : (null as never),
+    );
+
+    const res = await record('agent-1');
+
+    expect(res.status).toBe(200);
+    expect(append).not.toHaveBeenCalled();
+  });
+
   it('answers 404 for an agent this wallet does not have, before reading any receipt', async () => {
     const res = await record('agent-9');
 
@@ -162,5 +178,24 @@ describe("recording an agent's budget", () => {
   it('refuses anything that is not a transaction hash', async () => {
     expect((await record('agent-1', '0xabc')).status).toBe(400);
     expect(waitForReceipt).not.toHaveBeenCalled();
+  });
+});
+
+describe('firing an agent', () => {
+  /*
+   * Its exits carry its id now, so a sale credits its budget; pausing everything with its id would have taken the stop
+   * off every position it opened. Firing stops it buying and leaves what it bought protected.
+   */
+  it('pauses what it runs and leaves the exits on what it bought armed', async () => {
+    vi.mocked(one).mockResolvedValue({ id: 'agent-1', name: 'Momentum Scout' } as never);
+    vi.mocked(query).mockResolvedValue([{ id: 'strategy-1' }] as never);
+
+    const res = await app.request('/agents/agent-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(200);
+    const [sql] = vi.mocked(query).mock.calls[0]! as [string, unknown[]];
+    expect(sql).toMatch(/UPDATE strategies SET state = 'paused'/);
+    expect(sql).toMatch(/kind <> 'exit-rules'/);
+    expect(vi.mocked(append).mock.calls[0]![0].detail).toMatch(/exits on what it bought stay armed/);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { agentKey } from '../evm/agentKey.js';
 
 const oneMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
 const queryMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown[]>>();
@@ -698,11 +699,36 @@ describe('autonomous xStocks trading agent', () => {
 
     it('an agent with no budget on chain places nothing, and says so', async () => {
       ready();
+      hiredRoster = [{ id: 'agent-momentum', persona_id: 'momentum-scout', name: 'Momentum Scout' }];
       readAgentBudgetMock.mockResolvedValue(0);
       const result = await runAutonomousCycle('wallet-1');
-      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
-      expect((result as { detail: string }).detail).toMatch(/no budget on chain yet/);
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget', agent: 'Momentum Scout' });
+      expect((result as { detail: string }).detail).toMatch(/Momentum Scout has no budget on chain yet/);
       expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('with no agent budgeted, nothing is scanned at all, and the refusal names them together', async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(0);
+      xStockPriceMock.mockClear();
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
+      expect((result as { detail: string }).detail).toMatch(/None of your agents has the \$\d+ a trade needs/);
+      expect((result as { agent?: string }).agent).toBeUndefined();
+      expect(xStockPriceMock).not.toHaveBeenCalled();
+    });
+
+    /*
+     * An agent nobody budgeted must not stand in the way of one that has a budget: only funded agents take setups.
+     */
+    it('an agent with a budget trades while the others have none', async () => {
+      ready();
+      readAgentBudgetMock.mockImplementation(async (_owner: unknown, key: unknown) =>
+        key === agentKey('agent-momentum') ? 100 : 0,
+      );
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      expect(placeOrderMock.mock.calls.at(-1)![5]).toBe('agent-momentum');
     });
 
     it('a budget under the smallest trade places nothing', async () => {
@@ -1121,8 +1147,9 @@ describe('autonomous xStocks trading agent', () => {
       expect(appendMock).toHaveBeenCalledTimes(1);
       const [entry] = appendMock.mock.calls[0]! as [{ agent: string; action: string; detail: string; kind: string }];
       expect(entry).toMatchObject({ action: 'Skipped a trade', kind: 'block' });
-      expect(entry.detail).toContain('no budget on chain');
-      expect(entry.detail).toContain(entry.agent);
+      // Three agents hired, none budgeted: one row for all of them, under the system's own name.
+      expect(entry.detail).toMatch(/budget on chain/);
+      expect(entry.agent).toBe('xorr');
 
       lastRow = { action: entry.action, detail: entry.detail };
       await autonomousAgentSweep();
