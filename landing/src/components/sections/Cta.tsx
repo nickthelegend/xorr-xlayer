@@ -97,7 +97,7 @@ export function Cta() {
           <Icon name="github" className="size-4" />
         </a>
         <a href={APP_URL} className="transition-colors duration-200 hover:text-ink">
-          app.xorr.finance
+          xorr-xlayer.vercel.app
         </a>
       </footer>
     </section>
