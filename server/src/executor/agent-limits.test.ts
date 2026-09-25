@@ -28,7 +28,7 @@ vi.mock('../db/index.js', () => {
     },
     one: async (text: string, params: unknown[] = []) => {
       record(text, params);
-      if (/FROM wallets/.test(text)) return { address: '0x95A0b368588713011a15f4b1041423f31B08e615' };
+      if (/FROM wallets/.test(text)) return { address: '0x95A0b368588713011a15f4b1041423f31B08e615', name: 'Momentum Scout' };
       if (/FROM agents/.test(text)) return { name: 'Momentum Scout', risk_limits: h.limits };
       return undefined;
     },
@@ -160,14 +160,29 @@ describe("an agent's limits", () => {
     expect(chooseSettlement).not.toHaveBeenCalled();
   });
 
-  it('say so when the agent has no budget at all', async () => {
+  /*
+   * An agent with nothing in its budget waits rather than spending the period (2026-09-25): a made agent's strategies are
+   * live before its owner gives it a budget, and a refusal would have used up the week — "Run now" then did nothing.
+   */
+  it('wait, without claiming the period, while the agent has no budget at all', async () => {
     vi.mocked(readAgentBudget).mockResolvedValue(0);
     const out = await runStrategy(strategy(), at);
     expect(out).toMatchObject({
-      status: 'blocked',
-      reason: 'agent_budget',
-      detail: 'Momentum Scout has no budget on chain. Give it one on its page, and it can trade.',
+      status: 'skipped',
+      reason: 'awaiting_budget',
+      detail: 'Momentum Scout has no budget on chain yet, so "WETH breakout" waits. Give it one on its page, and it runs.',
     });
+    expect(h.statements.some((st) => /INSERT INTO strategy_runs/.test(st.text))).toBe(false);
+    expect(chooseSettlement).not.toHaveBeenCalled();
+  });
+
+  it('claim and run as soon as the budget is there', async () => {
+    vi.mocked(readAgentBudget).mockResolvedValue(0);
+    await runStrategy(strategy(), at);
+    vi.mocked(readAgentBudget).mockResolvedValue(500);
+    await runStrategy(strategy(), at);
+    expect(h.statements.some((st) => /INSERT INTO strategy_runs/.test(st.text))).toBe(true);
+    expect(chooseSettlement).toHaveBeenCalledTimes(1);
   });
 
   it('refuse when the budget cannot be read: an unchecked budget is not a budget', async () => {

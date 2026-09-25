@@ -252,7 +252,9 @@ function StrategyRow({ s, onChanged }: { s: Strategy; onChanged: () => void }) {
             ? 'Already ran this period.'
             : r.reason === 'awaiting_approval'
               ? 'Waiting for your approval.'
-              : 'Checked — nothing to do.';
+              : r.reason === 'awaiting_budget'
+                ? (r.detail ?? 'Waiting for its agent to have a budget.')
+                : 'Checked — nothing to do.';
         setNote(
           r.status === 'filled'
             ? r.units != null && r.price != null
