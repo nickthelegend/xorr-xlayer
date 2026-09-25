@@ -46,7 +46,7 @@ const RPC = process.env.PROOF_RPC ?? 'http://127.0.0.1:8562';
 /** Only to learn which contract the hosted fork runs; the decisions below never ask it anything. */
 const EXECUTOR = (process.env.PROOF_EXECUTOR ?? 'https://executor-fork-production-2db8.up.railway.app').replace(/\/+$/, '');
 /** The hosted X Layer fork's delegation, used when neither PROOF_DELEGATION nor the executor names one. */
-const HOSTED_DELEGATION = '0xba23ece812dab11f66a39c9d273d40b716ecc93a';
+const HOSTED_DELEGATION = '0x141e03dbf25265491eca6b33881e9774e7735ef5';
 /** X Layer mainnet's settlement venues (server/src/evm/chains.ts SETTLEMENT_VENUES), for a grant made on the local copy. */
 const XLAYER_VENUES: Address[] = [
   '0x4f0C28f5926AFDA16bf2506D5D9e57Ea190f9bcA',

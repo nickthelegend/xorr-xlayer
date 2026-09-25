@@ -64,7 +64,7 @@ const LOCAL_RPC = process.env.PROOF_LOCAL_RPC;
 const TOKEN = process.env.PROOF_TOKEN;
 
 /** The hosted X Layer fork's deployment — the chain-only defaults. */
-const HOSTED_DELEGATION = '0xba23ece812dab11f66a39c9d273d40b716ecc93a';
+const HOSTED_DELEGATION = '0x141e03dbf25265491eca6b33881e9774e7735ef5';
 const HOSTED_ANCHOR = '0x9d22e2b3e1d31a6973b6395cbb6d369ef8b6cf12';
 
 /** Circle's native USDC on X Layer (server/src/evm/chains.ts): mainnet and its fork, and the testnet. */

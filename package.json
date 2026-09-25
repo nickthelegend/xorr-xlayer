@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "start:fork": "sh -c 'EXPO_PUBLIC_XORR_CHAIN=xlayer-fork EXPO_PUBLIC_CHAIN_RPC=https://xlayer-fork-production.up.railway.app EXPO_PUBLIC_DELEGATION_ADDRESS=0xba23ece812dab11f66a39c9d273d40b716ecc93a EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app exec expo start --port 8081 --clear'",
+    "start:fork": "sh -c 'EXPO_PUBLIC_XORR_CHAIN=xlayer-fork EXPO_PUBLIC_CHAIN_RPC=https://xlayer-fork-production.up.railway.app EXPO_PUBLIC_DELEGATION_ADDRESS=0x141e03dbf25265491eca6b33881e9774e7735ef5 EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app exec expo start --port 8081 --clear'",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
