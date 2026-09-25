@@ -74,6 +74,49 @@ export type BacktestResult = {
 
 const cache = new Map<string, { at: number; prices: [number, number][] }>();
 const TTL_MS = 10 * 60_000;
+/**
+ * How long a series stays usable once it is past its TTL, when a refresh is refused (2026-09-26).
+ *
+ * Daily closes change once a day. CoinGecko's keyless tier answered every refresh with 429 for minutes at a time, and the
+ * cache, expired after ten, left every replay on the agent screens failing with it — "Couldn't replay it right now" under
+ * every strategy, on mainnet, on camera. A day-old series of daily closes is still the same series.
+ */
+const STALE_OK_MS = 24 * 60 * 60_000;
+
+/**
+ * OKX's public daily candles, for when CoinGecko refuses (2026-09-26). Keyless, 100 bars a call, paged back by `after`.
+ * The pair is the asset against USDT: XBTC is priced as BTC and WOKB as OKB, the assets they wrap one to one.
+ */
+const OKX_PAIRS: Record<string, string> = {
+  bitcoin: 'BTC-USDT',
+  'okx-wrapped-btc': 'BTC-USDT',
+  ethereum: 'ETH-USDT',
+  weth: 'ETH-USDT',
+  solana: 'SOL-USDT',
+  'wrapped-okb': 'OKB-USDT',
+  ripple: 'XRP-USDT',
+  dogecoin: 'DOGE-USDT',
+  aave: 'AAVE-USDT',
+  chainlink: 'LINK-USDT',
+  'the-open-network': 'TON-USDT',
+};
+const OKX_CANDLES = 'https://www.okx.com/api/v5/market/history-candles';
+
+/** Up to `days` daily closes from OKX, oldest first, as [ms, close] — the shape CoinGecko's series takes here. */
+export async function okxDailyCloses(pair: string, days: number): Promise<[number, number][]> {
+  const out: [number, number][] = [];
+  let after: string | undefined;
+  while (out.length < days) {
+    const url = `${OKX_CANDLES}?instId=${pair}&bar=1Dutc&limit=100${after ? `&after=${after}` : ''}`;
+    const json = await getJson<{ code?: string; data?: string[][] }>(url, 10 * 60_000);
+    const rows = json.data ?? [];
+    if (json.code !== '0' || rows.length === 0) break;
+    for (const r of rows) out.push([Number(r[0]), Number(r[4])]);
+    after = rows[rows.length - 1]![0];
+    if (rows.length < 100) break;
+  }
+  return out.filter(([t, c]) => Number.isFinite(t) && c > 0).sort((a, b) => a[0] - b[0]);
+}
 
 /**
  * Daily closes for a symbol, cached and sliced from one long fetch.
@@ -130,13 +173,26 @@ export async function history(symbol: string, days: number): Promise<[number, nu
    * one sample per day gives the same series the parameter would have, from data we are allowed
    * to ask for.
    */
-  const json = await getJson<{ prices?: [number, number][] }>(
-    `${COINGECKO}/coins/${id}/market_chart?vs_currency=usd&days=${span}`,
-    // History changes once a day; caching it hard is both correct and kind to the upstream.
-    10 * 60_000,
-  );
-  const full = daily(json.prices ?? []);
-  if (full.length < 5) throw new Error(`not enough history for ${symbol}`);
+  let full: [number, number][];
+  try {
+    const json = await getJson<{ prices?: [number, number][] }>(
+      `${COINGECKO}/coins/${id}/market_chart?vs_currency=usd&days=${span}`,
+      // History changes once a day; caching it hard is both correct and kind to the upstream.
+      10 * 60_000,
+    );
+    full = daily(json.prices ?? []);
+    if (full.length < 5) throw new Error(`not enough history for ${symbol}`);
+  } catch (e) {
+    // Refused or failed: the last good series while it is a day old at most, then OKX's own candles.
+    const stale = [...cache.entries()].find(
+      ([k, v]) => k.startsWith(`${id}:`) && Date.now() - v.at < STALE_OK_MS && Number(k.slice(id.length + 1)) >= days,
+    );
+    if (stale) return stale[1].prices.slice(-(days + 1));
+    const pair = OKX_PAIRS[id];
+    if (!pair) throw e;
+    full = daily(await okxDailyCloses(pair, span + 1));
+    if (full.length < 5) throw e;
+  }
   cache.set(`${id}:${span}`, { at: Date.now(), prices: full });
   const prices = full.slice(-(days + 1));
   cache.set(key, { at: Date.now(), prices });

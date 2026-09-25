@@ -113,3 +113,31 @@ describe('daily sampling', () => {
     expect(daily([])).toEqual([]);
   });
 });
+
+describe('history when CoinGecko refuses (2026-09-26)', () => {
+  /*
+   * CoinGecko's keyless tier answered 429 for minutes on mainnet, and every replay on the agent screens failed with it.
+   * OKX's public daily candles are the second source: the same daily closes, for the assets X Layer trades.
+   */
+  it("replays from OKX's daily candles when CoinGecko answers 429", async () => {
+    const day = 86_400_000;
+    const start = Date.UTC(2026, 0, 1);
+    // OKX pages newest first: [ts, open, high, low, close, ...].
+    const candles = Array.from({ length: 100 }, (_, i) => {
+      const t = start + (99 - i) * day;
+      return [String(t), '1', '1', '1', String(100 + (99 - i))];
+    });
+    vi.mocked(getJson).mockReset();
+    vi.mocked(getJson).mockImplementation(async (url: string) => {
+      if (url.includes('coingecko')) throw new Error('429 Too Many Requests');
+      if (url.includes('instId=OKB-USDT') && !url.includes('after=')) return { code: '0', data: candles } as never;
+      return { code: '0', data: [] } as never;
+    });
+
+    const r = await backtestDca({ symbol: 'WOKB', lookback: '30d', perRunUsd: 50, dailyCapUsd: 1_000, everyNDays: 7 });
+
+    expect(r.trades).toBeGreaterThan(0);
+    expect(r.ret).toBeGreaterThan(0); // the closes rise from 100 to 199
+    expect(vi.mocked(getJson).mock.calls.some(([u]) => String(u).includes('instId=OKB-USDT'))).toBe(true);
+  });
+});
