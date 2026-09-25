@@ -227,9 +227,13 @@ cd contracts && forge test                 # + XLAYER_RPC for the fork suite
   could skip the budgets by trading as "no agent" (`spend`), inside the daily cap, and could credit a sale to any
   agent's budget. Future work: an owner opt-in on the contract so that every delegate spend must be charged to some
   budget.
-- **Only an agent's own sales refill its budget.** An agent's exit sells its own lot as the agent's. Anything beyond
-  that lot, and any sale you make yourself (the order ticket, "Sell everything"), is sold as yours and refills
-  nothing.
+- **Only an agent's exit of the lot it bought refills its budget.** When an agent enters a position on its own, it
+  arms an exit for exactly the units that entry filled. That exit sells only that lot, never the rest of your holding,
+  and its proceeds go back to the agent's budget (`closeForAgent`). Every other sale settles as yours
+  (`closePosition`) and refills no budget: an agent strategy's own close (a momentum stop, an event-driven close), the
+  order ticket, and "Sell everything". So a buy by an agent's strategy, including a proposal from it that you approve,
+  is charged to that agent and is not paid back when the strategy sells. Firing an agent pauses its strategies but
+  leaves its exits armed, so its positions keep their stops.
 - **A fork is pinned at a block.** Its pools stop moving while the market doesn't. So on a fork, prices, observations
   and the agent's signals read the live X Layer mainnet pools, while fills settle against the fork's own pools — the
   ticket shows both ("$362.38 each · mark $364.95"). Fill-vs-market figures on the fork therefore mix venue quality with

@@ -42,7 +42,9 @@ custody (hand over the funds) or a blank-cheque approval. Neither survives a bad
   outside the cap so a stop-loss always fires; `revoke()` needs no server.
 - **A budget per agent, in the same contract.** The owner sets each agent's budget with `setAgentBudget`, which only
   ever sets the sender's own, so only the owner can set one. `spendForAgent` charges an agent's buy to its budget as
-  well as the daily cap, and `closeForAgent` credits its sales back. A trade past the budget reverts
+  well as the daily cap, including a proposal from its strategy that the owner approves. `closeForAgent` credits back
+  what the exit of an agent's own entry returns, and that exit sells only the lot the entry filled. A trade past the
+  budget reverts
   (`AgentBudgetExceeded`), and an agent nobody budgeted cannot buy at all. The budgets bound what the executor submits
   as each agent's trade; the delegate key itself is bounded by the cap, the venues, the expiry, the output floor and
   revoke (see Honest limits). Nineteen contract tests, including a 256-run fuzz, hold this.
@@ -107,7 +109,10 @@ the owner, and revoke. A stolen key could skip the budgets by trading as "no age
 could credit a sale to any agent's budget. Future work: an owner opt-in on the contract so that every delegate spend
 must be charged to some budget.
 
-Only an agent's own sales refill its budget. A sale the owner makes (the order ticket, "Sell everything") refills
-nothing.
+Only an agent's exit of the lot it bought refills its budget. An agent's own entry arms an exit for exactly the units
+it filled, never the rest of the holding. Every other sale settles as the owner's and refills no budget: an agent
+strategy's own close (a momentum stop, an event-driven close), the order ticket, and "Sell everything". So a buy by an
+agent's strategy is charged to that agent and is not paid back when the strategy sells. Firing an agent pauses its
+strategies but leaves its exits armed.
 
 Wrapped xStocks track shares through Backed's issuance and are not the shares themselves.
