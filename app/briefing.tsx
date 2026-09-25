@@ -65,7 +65,7 @@ export default function Briefing() {
         </Text>
       </View>
       <Text variant="secondary" style={{ marginTop: space.s10 }}>
-        Only what moved your book, and what each agent did about it.
+        Headlines that touch what you hold, or the newest ones until something does — and what each could mean.
       </Text>
 
       <Fill style={{ marginTop: space.s18 }}>

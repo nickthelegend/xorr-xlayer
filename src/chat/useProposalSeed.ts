@@ -24,6 +24,12 @@ export function useProposalSeed(): void {
   // Ask for an open proposal; if there is none, ask the agent to CONSIDER one. Without this
   // the approve-before-execute pipeline had no producer and the thread was permanently empty.
   const { data } = useAsync(async () => {
+    /*
+     * Only for a wallet that hired Momentum Scout, whose proposals these are (2026-09-25). A new account opened the
+     * drawer to a message from an agent it never had, and a "Proposed nothing" row in its trail under that name.
+     */
+    const roster = await repos.bot.listAgents().catch(() => []);
+    if (!roster.some((a) => a.hired && a.name === DECLINE_VOICE)) return null;
     const open = await repos.bot.currentProposal();
     if (open) return { proposal: open, declined: undefined as string | undefined };
     return repos.bot.generateProposal();

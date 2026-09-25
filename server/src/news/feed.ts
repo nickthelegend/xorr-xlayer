@@ -166,7 +166,14 @@ export async function briefing(walletId: string, tone: ToneId = 'dry'): Promise<
     const said = await speak({
       persona,
       toneInstruction: TONE_INSTRUCTIONS[tone],
-      situation: `A headline says: "${h.title}". Say in one sentence what you did or will do about the user's position, without naming any figure.`,
+      /*
+       * What it means and what to watch — never what was done (2026-09-25). No agent acts on a headline, so "what you
+       * did about it" invited a sentence claiming an action nobody took; and a headline that touches nothing held is
+       * the newest news, not news about the user's book.
+       */
+      situation: h.symbol
+        ? `A headline about ${h.symbol}, which the user holds, says: "${h.title}". Say in one sentence what it could mean for that position and what you would watch, without naming any figure and without claiming you did anything.`
+        : `A headline says: "${h.title}". None of the user's holdings is in it. Say in one sentence what it could mean for someone holding tokenized US stocks, without naming any figure and without claiming you did anything.`,
     });
     const style = TAG_STYLE[h.tag] ?? TAG_STYLE.MACRO!;
     out.push({

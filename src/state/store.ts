@@ -237,7 +237,7 @@ export const useStore = create<Store>()(
 
       // ── market UI ──
       tab: 0,
-      mkt: 2, // state.md: default Commodities
+      mkt: 0, // Stocks — the tokenized shares this app trades (2026-09-25; was Commodities, a class with no prices)
       tab5: 1, // state.md: default Markets
       setTab: (i) => set({ tab: i }),
       setMkt: (i) => set({ mkt: i }),

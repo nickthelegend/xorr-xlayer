@@ -6,7 +6,7 @@
  * and a share has none, so asking would only add the slowest read in the app to a screen that ignores it.
  */
 import { useMemo } from 'react';
-import { assetClasses } from '@/data/fixtures/markets';
+import { shownClasses } from '@/data/fixtures/markets';
 import { fetchQuotes, fetchStockQuotes, type StockQuote } from '@/data/marketData';
 import { FEED_SYMBOLS, priceClasses, sourceOf, type PricedClass } from './prices';
 import { useLiveRead } from './useLiveRead';
@@ -25,7 +25,7 @@ export function useMarketPrices(options: { stocks?: boolean } = {}): MarketClass
   const { data: stockData, error: stockError, reload: reloadStocks } = stocks;
 
   return useMemo(() => {
-    const classes = assetClasses.filter((c) => withStocks || sourceOf(c) === 'feed');
+    const classes = shownClasses.filter((c) => withStocks || sourceOf(c) === 'feed');
     return priceClasses(
       classes,
       { data: feedData, error: feedError },

@@ -628,3 +628,11 @@ export const assetClasses: AssetClass[] = [
     ]
   }
 ];
+
+/**
+ * The classes the app lists (2026-09-25): the ones with a price behind every row. Commodities, indices and pre-IPO are
+ * catalog rows with no feed and nothing on X Layer to trade them — a list of dashes under a tab reads as a market that
+ * is not there, so they are not shown. They stay in the catalog for names and colours. Stocks first: the tokenized
+ * shares are what this app trades; crypto is priced beside them.
+ */
+export const shownClasses: AssetClass[] = ['stocks', 'crypto'].map((id) => assetClasses.find((c) => c.id === id)!);

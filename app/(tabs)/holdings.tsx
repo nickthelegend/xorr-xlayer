@@ -98,6 +98,11 @@ export default function Assets() {
    * read the fixture, so a user who had rebalanced to 70/20/10 was shown 55/30/15.
    */
   const approvedWeights = useStore((st) => st.weights);
+  /*
+   * Shown only once the user has approved a mix (2026-09-25). Before that the card was the product's starting weights —
+   * 55/30/15 over three fixture sleeve names — drawn directly above the real holdings, as if someone had chosen it.
+   */
+  const mixApproved = useStore((st) => st.approved);
   const weights = (sleeves.data ?? []).map((sleeve, i) => approvedWeights[i] ?? sleeve.weight);
   // Real holdings from the position book. This previously listed watchlist FIXTURES, so it
   // showed assets the user did not own at prices that never moved.
@@ -159,50 +164,52 @@ export default function Assets() {
           </Text>
         ) : null}
 
-        <SheetCard borderRadius={radius.panel} padding={space.s16} style={{ marginTop: space.s20 }}>
-          {/*
-            "Allocation" was a claim about what the wallet HOLDS, and these numbers are not that.
-            They are the target mix — product config the user adjusts and approves on the proposal
-            screen — sitting directly above the real Holdings list. So a wallet holding no
-            tokenized equities displayed "Tokenized equities 30%" as though it did. The numbers are
-            fine; the word was wrong, and the caption now says which of the two this is.
-          */}
-          <Eyebrow small>Target mix</Eyebrow>
-          {/* The 8pt stacked proportion bar from screen 10, reused verbatim. */}
-          <View style={{ flexDirection: 'row', gap: space.s2, height: BAR_H, marginTop: space.s12 }}>
-            {(sleeves.data ?? []).map((s, i) => (
-              <View
-                key={s.name}
-                style={{
-                  width: `${weightBarPct(weights, i)}%`,
-                  backgroundColor: s.color,
-                  borderRadius: BAR_H / 2,
-                }}
-              />
-            ))}
-          </View>
-          <View style={{ marginTop: space.s14, gap: space.s10 }}>
-            {(sleeves.data ?? []).map((s, i) => (
-              <View
-                key={s.name}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: space.s10 }}
-              >
+        {mixApproved ? (
+          <SheetCard borderRadius={radius.panel} padding={space.s16} style={{ marginTop: space.s20 }}>
+            {/*
+              "Allocation" was a claim about what the wallet HOLDS, and these numbers are not that.
+              They are the target mix — product config the user adjusts and approves on the proposal
+              screen — sitting directly above the real Holdings list. So a wallet holding no
+              tokenized equities displayed "Tokenized equities 30%" as though it did. The numbers are
+              fine; the word was wrong, and the caption now says which of the two this is.
+            */}
+            <Eyebrow small>Target mix</Eyebrow>
+            {/* The 8pt stacked proportion bar from screen 10, reused verbatim. */}
+            <View style={{ flexDirection: 'row', gap: space.s2, height: BAR_H, marginTop: space.s12 }}>
+              {(sleeves.data ?? []).map((s, i) => (
                 <View
+                  key={s.name}
                   style={{
-                    width: BAR_H,
-                    height: BAR_H,
-                    borderRadius: BAR_H / 2,
+                    width: `${weightBarPct(weights, i)}%`,
                     backgroundColor: s.color,
+                    borderRadius: BAR_H / 2,
                   }}
                 />
-                <Text variant="body" style={{ flex: 1 }}>
-                  {s.name}
-                </Text>
-                <Price color={colors.ink55}>{weights[i] ?? s.weight}%</Price>
-              </View>
-            ))}
-          </View>
-        </SheetCard>
+              ))}
+            </View>
+            <View style={{ marginTop: space.s14, gap: space.s10 }}>
+              {(sleeves.data ?? []).map((s, i) => (
+                <View
+                  key={s.name}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: space.s10 }}
+                >
+                  <View
+                    style={{
+                      width: BAR_H,
+                      height: BAR_H,
+                      borderRadius: BAR_H / 2,
+                      backgroundColor: s.color,
+                    }}
+                  />
+                  <Text variant="body" style={{ flex: 1 }}>
+                    {s.name}
+                  </Text>
+                  <Price color={colors.ink55}>{weights[i] ?? s.weight}%</Price>
+                </View>
+              ))}
+            </View>
+          </SheetCard>
+        ) : null}
 
         <Text variant="cardTitle" style={{ marginTop: space.s26, marginBottom: space.s6 }}>
           Holdings
