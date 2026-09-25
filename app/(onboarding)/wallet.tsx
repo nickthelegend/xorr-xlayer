@@ -45,7 +45,7 @@ import { codeFailure, connectFailure, oauthFailure, verifyFailure } from '@/auth
 import { NotSignedIn } from '@/data/api';
 
 const STEPS = [
-  { label: 'Signed in', detail: 'A code, Google, X or your own wallet' },
+  { label: 'Signed in', detail: 'A code, Google, X, GitHub or your own wallet' },
   { label: 'Wallet created', detail: 'Only you can sign' },
   { label: 'Connected', detail: 'The app can read this wallet' },
   { label: 'Ready to fund', detail: 'Nothing is deposited yet' },
