@@ -578,7 +578,15 @@ export async function demoWalletId(): Promise<string | undefined> {
   const row = await one<{ value: string }>(`SELECT value FROM app_config WHERE key = $1`, [
     DEMO_WALLET_KEY,
   ]);
-  if (row?.value) return row.value;
+  /*
+   * Checked, as the remembered policy id is (`ensurePolicyFresh`): an id this app's Privy no longer recognises — a
+   * deleted wallet, or one made under a different Privy app before the deployment moved — is minted again rather than
+   * handed to `/verify`, where every refusal check would then fail against a wallet that is not there.
+   */
+  if (row?.value) {
+    const known = await getPrivyWallet(row.value).catch(() => undefined);
+    if (known) return row.value;
+  }
 
   const created = await createPolicyWallet();
   await query(

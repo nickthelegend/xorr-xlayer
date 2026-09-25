@@ -14,6 +14,12 @@ import { PrivyElements } from '@privy-io/expo/ui';
 import { colors } from '@/ui';
 
 const APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
+/**
+ * The app client this build signs in through (dashboard → App clients). Privy ties the phone's bundle id and URL scheme
+ * to a client, which is what lets Google, X and GitHub hand the session back to `xorr://` rather than to a browser tab.
+ * Optional: without one, the app's default client answers, as it always has for an emailed code.
+ */
+const CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID || undefined;
 
 if (!APP_ID) {
   throw new Error(
@@ -24,7 +30,7 @@ if (!APP_ID) {
 
 export function AppPrivyProvider({ children }: { children: React.ReactNode }) {
   return (
-    <Provider appId={APP_ID!} config={{ embedded: { ethereum: { createOnLogin: 'users-without-wallets' } } }}>
+    <Provider appId={APP_ID!} clientId={CLIENT_ID} config={{ embedded: { ethereum: { createOnLogin: 'users-without-wallets' } } }}>
       {children}
       {/* Privy's own login sheet, themed to match the app's true-black surface. */}
       <PrivyElements config={{ appearance: { colorScheme: 'dark', accentColor: colors.ink } }} />
