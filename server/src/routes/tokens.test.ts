@@ -41,7 +41,7 @@ vi.mock('../evm/chains.js', () => ({
   },
 }));
 vi.mock('../evm/client.js', () => ({ publicClient: { getBalance: h.getBalance } }));
-vi.mock('../evm/balances.js', () => ({ holdings: vi.fn(), cashUsd: vi.fn() }));
+vi.mock('../evm/balances.js', () => ({ heldUnits: vi.fn(), cashUsd: vi.fn() }));
 vi.mock('../venues/tokens.js', () => ({
   // The registry, at X Layer mainnet's addresses.
   TOKENS: {
@@ -54,7 +54,7 @@ vi.mock('../market/logos.js', () => ({ logosFor: vi.fn() }));
 vi.mock('../market/prices.js', () => ({ priceOf: vi.fn() }));
 
 const { requireWallet } = await import('./wallet-context.js');
-const { cashUsd, holdings } = await import('../evm/balances.js');
+const { cashUsd, heldUnits } = await import('../evm/balances.js');
 const { logosFor } = await import('../market/logos.js');
 const { priceOf } = await import('../market/prices.js');
 const { errorResponse } = await import('../http/errors.js');
@@ -99,7 +99,7 @@ describe("on every X Layer network, the chain's word", () => {
     async (chain) => {
       h.chain = chain;
       const addresses = chain === 'xlayer-testnet' || chain === 'localnet' ? h.TESTNET : h.MAINNET;
-      vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 0.25, usd: 1_000, raw: 250_000_000_000_000_000n }]);
+      vi.mocked(heldUnits).mockResolvedValue([{ symbol: 'WETH', units: 0.25, raw: 250_000_000_000_000_000n }]);
       vi.mocked(cashUsd).mockResolvedValue(42.5);
       h.getBalance.mockResolvedValue(2_000_000_000_000_000n);
       // OKB's logo resolved, no registry has one for WETH, and USDC's did not come back inside the deadline.
@@ -124,7 +124,7 @@ describe("on every X Layer network, the chain's word", () => {
         ],
         undescribed: [],
       });
-      expect(holdings).toHaveBeenCalledWith(OWNER);
+      expect(heldUnits).toHaveBeenCalledWith(OWNER);
       expect(cashUsd).toHaveBeenCalledWith(OWNER);
       expect(h.getBalance).toHaveBeenCalledWith({ address: OWNER });
       expect([...vi.mocked(logosFor).mock.calls[0]![0]].sort()).toEqual(['OKB', 'USDC', 'WETH']);
@@ -132,7 +132,7 @@ describe("on every X Layer network, the chain's word", () => {
   );
 
   it('a feed that fails, answers something that is not a price, or does not answer in time leaves that token unpriced, never $0', async () => {
-    vi.mocked(holdings).mockResolvedValue([{ symbol: 'WETH', units: 1, usd: 0, raw: 10n ** 18n }]);
+    vi.mocked(heldUnits).mockResolvedValue([{ symbol: 'WETH', units: 1, raw: 10n ** 18n }]);
     vi.mocked(cashUsd).mockResolvedValue(5);
     h.getBalance.mockResolvedValue(2n * 10n ** 18n);
     vi.mocked(logosFor).mockResolvedValue({});
@@ -164,7 +164,7 @@ describe("on every X Layer network, the chain's word", () => {
 
   it('nothing held is an empty list: an answer, not an error', async () => {
     h.chain = 'xlayer-fork';
-    vi.mocked(holdings).mockResolvedValue([]);
+    vi.mocked(heldUnits).mockResolvedValue([]);
     vi.mocked(cashUsd).mockResolvedValue(0);
     h.getBalance.mockResolvedValue(0n);
     vi.mocked(logosFor).mockResolvedValue({});
@@ -176,12 +176,12 @@ describe("on every X Layer network, the chain's word", () => {
   });
 
   it.each([
-    ['the registry multicall', () => vi.mocked(holdings).mockRejectedValue(new Error('fetch failed'))],
+    ['the registry multicall', () => vi.mocked(heldUnits).mockRejectedValue(new Error('fetch failed'))],
     ['USDC', () => vi.mocked(cashUsd).mockRejectedValue(new Error('The request took too long to respond.'))],
     ['native OKB', () => h.getBalance.mockRejectedValue(new Error('HTTP request failed.'))],
   ])('a failed read of %s is a 502 saying what could not be read, never an empty list', async (_read, fail) => {
     h.chain = 'xlayer-fork';
-    vi.mocked(holdings).mockResolvedValue([]);
+    vi.mocked(heldUnits).mockResolvedValue([]);
     vi.mocked(cashUsd).mockResolvedValue(10);
     h.getBalance.mockResolvedValue(10n ** 18n);
     fail();
@@ -207,6 +207,6 @@ describe('whose wallet', () => {
 
     expect(status).toBe(409);
     expect(body).toMatchObject({ error: 'no_wallet' });
-    expect(holdings).not.toHaveBeenCalled();
+    expect(heldUnits).not.toHaveBeenCalled();
   });
 });

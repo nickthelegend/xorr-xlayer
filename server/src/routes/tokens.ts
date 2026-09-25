@@ -14,7 +14,7 @@ import { formatUnits, getAddress, type Address } from 'viem';
 import { readChain } from '../http/chain-read.js';
 import { ADDRESSES, CHAIN_KEY } from '../evm/chains.js';
 import { publicClient } from '../evm/client.js';
-import { cashUsd, holdings } from '../evm/balances.js';
+import { cashUsd, heldUnits } from '../evm/balances.js';
 import { TOKENS } from '../venues/tokens.js';
 import { logosFor } from '../market/logos.js';
 import { priceOf } from '../market/prices.js';
@@ -74,7 +74,8 @@ tokenRoutes.get('/wallet/tokens', async (c) => {
  */
 async function chainHoldings(owner: Address): Promise<Omit<HeldToken, 'logo'>[]> {
   const [registered, usdc, wei] = await Promise.all([
-    holdings(owner),
+    // Units only: this route prices every row itself, under its own deadline (`priced`).
+    heldUnits(owner),
     cashUsd(owner),
     publicClient.getBalance({ address: owner }),
   ]);

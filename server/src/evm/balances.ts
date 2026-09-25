@@ -115,6 +115,28 @@ export function clearReadableTokenCache(): void {
  * dropped, so the units still show and the missing price is visible instead of silent.
  */
 export async function holdings(owner: Address, opts: ReadOptions = {}): Promise<Holding[]> {
+  const held = await heldUnits(owner);
+  return Promise.all(
+    held.map(async ({ symbol, units, raw }) => {
+      // Strict: an unpriced holding throws instead of counting as $0 (see `totalValueUsd`). A late price always throws.
+      const price = await priceOf(symbol, opts.priceDeadlineMs).catch((e: unknown) => {
+        if (opts.strict || e instanceof StillFetching) throw e;
+        return 0;
+      });
+      return { symbol, units, usd: units * price, raw };
+    }),
+  );
+}
+
+/**
+ * What the wallet holds of each registry token, and nothing about what it is worth: the one multicall behind
+ * `holdings`, for a caller that prices on its own terms.
+ *
+ * `/wallet/tokens` read `holdings` for the units, discarded its prices and priced every row again under a four-second
+ * cap — but `holdings` had already waited, uncapped, for each price it then threw away. With the price feed cold and
+ * CoinGecko answering 429, the Holdings and Deposit screens took 31.7 seconds to learn the wallet's balances.
+ */
+export async function heldUnits(owner: Address): Promise<{ symbol: string; units: number; raw: bigint }[]> {
   const entries = await readableTokens();
 
   const balances = await publicClient.multicall({
@@ -135,17 +157,7 @@ export async function holdings(owner: Address, opts: ReadOptions = {}): Promise<
     const units = Number(formatUnits(raw, token.decimals));
     if (units > 0) held.push({ symbol, units, raw });
   });
-
-  return Promise.all(
-    held.map(async ({ symbol, units, raw }) => {
-      // Strict: an unpriced holding throws instead of counting as $0 (see `totalValueUsd`). A late price always throws.
-      const price = await priceOf(symbol, opts.priceDeadlineMs).catch((e: unknown) => {
-        if (opts.strict || e instanceof StillFetching) throw e;
-        return 0;
-      });
-      return { symbol, units, usd: units * price, raw };
-    }),
-  );
+  return held;
 }
 
 /**
