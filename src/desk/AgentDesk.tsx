@@ -23,6 +23,7 @@ import { agentLine, deskFeed, isFresh, spentBy, type DeskStanding } from './desk
 /** The trail is read this often while Home is in view: a fill is a transaction, so a few seconds late is on time. */
 const FEED_EVERY_MS = 6_000;
 const BOOK_EVERY_MS = 20_000;
+const BUDGET_EVERY_MS = 10_000;
 const ORB = 52 as const;
 const DOT = 7;
 const METER_H = 4;
@@ -45,6 +46,12 @@ export function AgentDesk({
   const now = useNow(1_000);
   const trail = usePoll(() => repos.activity.list(), FEED_EVERY_MS);
   const book = usePoll(() => repos.strategies.list(), BOOK_EVERY_MS);
+  /*
+   * The budgets, read again while Home is in view (2026-09-26). Home's roster is read once, so after an agent's own buy
+   * the card went on saying "$25.00 left" beside "$25.00 spent" until the screen was left and come back to.
+   */
+  const onChain = usePoll(() => repos.bot.listAgents(), BUDGET_EVERY_MS);
+  const budgetOf = (a: Agent) => onChain.data?.find((x) => x.id === a.id)?.budgetUsd ?? a.budgetUsd;
   const events = trail.data ?? [];
   const feed = deskFeed(events, agents.map((a) => a.name));
   const live = standing === 'live';
@@ -62,8 +69,9 @@ export function AgentDesk({
       </View>
 
       {agents.map((a) => {
-        const line = agentLine(a, book.data ?? [], standing, now);
-        const left = a.budgetUsd ?? 0;
+        const budget = budgetOf(a);
+        const line = agentLine({ ...a, budgetUsd: budget }, book.data ?? [], standing, now);
+        const left = budget ?? 0;
         const spent = spentBy(a.name, events);
         const share = left + spent > 0 ? left / (left + spent) : 0;
         return (
@@ -86,7 +94,7 @@ export function AgentDesk({
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text variant="rowPrimary" figure="own">
-                  {a.budgetUsd === null || a.budgetUsd === undefined ? '—' : money(left)}
+                  {budget === null || budget === undefined ? '—' : money(left)}
                 </Text>
                 <Text variant="footnote" color={colors.ink40}>
                   left on chain
