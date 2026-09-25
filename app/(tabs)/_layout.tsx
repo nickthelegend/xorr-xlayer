@@ -21,6 +21,7 @@ import { useChatAgents } from '@/chat/agents';
 import { useChatDrawer } from '@/chat/chatDrawer';
 import { summaries, unreadTotal } from '@/chat/conversations';
 import { useVoice } from '@/chat/voice';
+import { useHasHydrated, useStore } from '@/state/store';
 
 
 export default function TabsLayout() {
@@ -33,6 +34,14 @@ export default function TabsLayout() {
   const hydrate = useThread((s) => s.hydrate);
   const readVoice = useVoice((s) => s.read);
   const agents = useChatAgents();
+  /*
+   * No tab bar until the entry gate has decided (2026-09-25): on a first launch it was drawn over an empty screen for the
+   * second before the welcome screen replaced everything. `app/(tabs)/index.tsx` waits on the same two facts.
+   */
+  const hydrated = useHasHydrated();
+  const wallet = useStore((s) => s.wallet);
+  const walletChecked = useStore((s) => s.walletChecked);
+  const decided = hydrated && (!!wallet || walletChecked);
 
   // The count on Messages is the thread's, so the thread is read as the shell mounts rather than when the drawer opens.
   useEffect(() => {
@@ -57,7 +66,7 @@ export default function TabsLayout() {
             onSwap={() => router.push('/swap')}
             onMessages={() => show()}
             unread={unread}
-            hidden={drawerRaised}
+            hidden={drawerRaised || !decided}
           />
         )}
         screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
