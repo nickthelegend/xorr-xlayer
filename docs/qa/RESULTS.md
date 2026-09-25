@@ -414,3 +414,14 @@ Sourcify exact match**, with a mainnet executor (`executor-mainnet`) on its own 
 - Mainnet: the executor boots with `ALLOW_MAINNET=yes`, migrations applied; its database was seeded with 55,730 X Layer
   pool readings for the 11 xStocks (since 2026-09-19), which the fork executor had recorded from the live mainnet pools
   — each row's `source` says so — so the agents' bands and the charts start from real history rather than from nothing.
+- Deployed at the end of this pass: **https://xorr-xlayer.vercel.app is the mainnet app** (pin `0x156D…cA22`,
+  executor-mainnet) and **https://xorr-xlayer-demo.vercel.app the no-money sandbox** (pin `0xAf70…7058`,
+  executor-fork) — both bundles read back and checked for their pin; all three executors on the same server code. The
+  iPhone app has its own simulator ("xorr-xlayer iPhone 17 Pro", `npm run ios:sim:release`): a Release build with mainnet
+  built in, because the Solana build shares the bundle id and a debug build loads whatever answers on :8081.
+- User signatures: on every chain the wallet now signs and the app broadcasts (`c8852f7`), the path every signed flow
+  above was proven on; a per-wallet nonce floor keeps seventeen back-to-back signatures from reusing a nonce against
+  X Layer's load-balanced RPC. `EXPO_PUBLIC_WALLET_SENDS=1` hands sending back to the wallet.
+
+**Not done in this pass:** a real trade on mainnet — it needs the owner's own deposit and signatures, which this
+session does not make; the old fork's orphaned fills (previous Privy identities) are still not reconciled.
