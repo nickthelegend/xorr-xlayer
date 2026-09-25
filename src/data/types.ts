@@ -94,7 +94,10 @@ export type ActivityKind = 'trade' | 'risk' | 'block' | 'yield';
 
 export type ActivityEvent = {
   id: string;
+  /** The server's clock time, in the server's time zone. Shown only when `at` is missing (an older executor). */
   t: string;
+  /** When it happened, epoch ms — printed in this phone's own time zone (`eventTime`). */
+  at?: number;
   agent: string;
   action: string;
   detail: string;

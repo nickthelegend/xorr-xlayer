@@ -15,7 +15,8 @@
  *
  * And where the executor cannot be asked at all, a screen reads the permission here itself (`standingOnChain`).
  */
-import { isAddressEqual, type Address, type Hex, type PublicClient } from 'viem';
+import { isAddressEqual, type Address, type Hex, type PublicClient, type TransactionReceipt } from 'viem';
+import { readAgain, receiptOf } from './receipt';
 
 /** `XorrDelegation.policyOf` — the getter the contract exposes for exactly this. */
 export const POLICY_ABI = [
@@ -34,7 +35,7 @@ export const POLICY_ABI = [
 ] as const;
 
 /** The reads this needs, from the chain the build settles on (`chainAccess`). */
-export type ChainReader = Pick<PublicClient, 'getCode' | 'readContract' | 'waitForTransactionReceipt'>;
+export type ChainReader = Pick<PublicClient, 'getCode' | 'readContract' | 'getTransactionReceipt'>;
 
 export type OnChainPolicy = { delegate: Address; dailyCap: bigint; expiresAt: bigint; revoked: boolean };
 
@@ -63,13 +64,20 @@ export async function assertGrantDestination(
 }
 
 /** This wallet's policy on `contract`, or null where there is no contract or it never granted there. */
-export async function readPolicy(reader: ChainReader, contract: Address, owner: Address): Promise<OnChainPolicy | null> {
-  if (!hasCode(await reader.getCode({ address: contract }))) return null;
+export async function readPolicy(
+  reader: ChainReader,
+  contract: Address,
+  owner: Address,
+  /** Read as of this block rather than the node's latest: after a transaction, the block it landed in. */
+  blockNumber?: bigint,
+): Promise<OnChainPolicy | null> {
+  if (!hasCode(await reader.getCode({ address: contract, blockNumber }))) return null;
   const [delegate, dailyCap, expiresAt, revoked] = (await reader.readContract({
     address: contract,
     abi: POLICY_ABI,
     functionName: 'policyOf',
     args: [owner],
+    blockNumber,
   })) as readonly [Address, bigint, bigint, boolean];
   if (isAddressEqual(delegate, NO_ADDRESS)) return null;
   return { delegate, dailyCap, expiresAt, revoked };
@@ -146,9 +154,9 @@ export async function contractToStop(
 
 /** After a stop is sent: the chain says whether it took, or this throws. */
 export async function confirmStopped(reader: ChainReader, contract: Address, owner: Address, txHash: Hex): Promise<void> {
-  let receipt: Awaited<ReturnType<ChainReader['waitForTransactionReceipt']>>;
+  let receipt: TransactionReceipt;
   try {
-    receipt = await reader.waitForTransactionReceipt({ hash: txHash, timeout: RECEIPT_TIMEOUT_MS });
+    receipt = await receiptOf(reader, txHash, { timeoutMs: RECEIPT_TIMEOUT_MS });
   } catch {
     // Not "nothing was sent", which is what a timeout reads as elsewhere: this one was.
     throw new Error('The stop was sent, and the chain has not confirmed it yet. Check Safety again in a minute.');
@@ -156,7 +164,11 @@ export async function confirmStopped(reader: ChainReader, contract: Address, own
   if (receipt.status !== 'success') {
     throw new Error('The stop reverted on the chain, so the permission did not change.');
   }
-  const policy = await readPolicy(reader, contract, owner);
+  /*
+   * As of the block the stop landed in, asked again while a node has not reached it (2026-09-26): read at "latest", a
+   * node a block behind still holds the live policy, and this would have called a stop that landed a failure.
+   */
+  const policy = await readAgain(() => readPolicy(reader, contract, owner, receipt.blockNumber));
   if (!policy?.revoked) {
     throw new Error('The stop landed, but the chain does not show the permission revoked.');
   }

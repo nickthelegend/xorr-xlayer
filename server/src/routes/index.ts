@@ -941,6 +941,11 @@ routes.get('/activity', async (c) => {
     rows.map((r) => ({
       id: String(r.seq),
       t: new Date(r.at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      /*
+       * The moment itself, for the phone to print in its own time zone (2026-09-26). `t` is this server's clock — UTC on
+       * Railway — so a buy made at 12:55 AM in India read 07:25 PM. `t` stays for builds that do not read `at`.
+       */
+      at: new Date(r.at).getTime(),
       agent: r.agent,
       action: r.action,
       detail: r.detail,

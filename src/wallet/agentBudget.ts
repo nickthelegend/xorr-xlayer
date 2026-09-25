@@ -9,7 +9,7 @@
  * The key an agent's budget is filed under is `keccak256("xorr-agent:" + agent id)`: the executor derives it the same
  * way (`server/src/evm/agentKey.ts`), and the fixed vector in the test holds the two to one answer.
  */
-import { encodeFunctionData, keccak256, parseUnits, toBytes, type Address, type Hex } from 'viem';
+import { encodeFunctionData, isAddressEqual, keccak256, parseEventLogs, parseUnits, toBytes, type Address, type Hex, type Log } from 'viem';
 
 export const AGENT_BUDGET_ABI = [
   {
@@ -31,6 +31,15 @@ export const AGENT_BUDGET_ABI = [
       { name: 'agent', type: 'bytes32' },
     ],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'event',
+    name: 'AgentBudgetSet',
+    inputs: [
+      { name: 'owner', type: 'address', indexed: true },
+      { name: 'agent', type: 'bytes32', indexed: true },
+      { name: 'budget', type: 'uint256', indexed: false },
+    ],
   },
 ] as const;
 
@@ -82,4 +91,22 @@ export async function readAgentBudget(reader: BudgetReader, contract: Address, o
     args: [owner, agent],
   });
   return Number(raw) / 10 ** USD_DECIMALS;
+}
+
+/**
+ * The budget a mined `setAgentBudget` set for `agent`, from the transaction's own log (2026-09-26) — or undefined when
+ * the delegation logged none for this owner and agent.
+ *
+ * Read from the receipt rather than asked of the chain afterwards: a node a block behind the one that returned the
+ * receipt still holds the old figure, and the card would have printed it as the one just set.
+ */
+export function budgetFromLogs(logs: readonly Log[], contract: Address, owner: Address, agent: Hex): number | undefined {
+  const set = parseEventLogs({ abi: AGENT_BUDGET_ABI, eventName: 'AgentBudgetSet', logs: [...logs] }).filter(
+    (l) =>
+      isAddressEqual(l.address, contract) &&
+      isAddressEqual(l.args.owner, owner) &&
+      l.args.agent.toLowerCase() === agent.toLowerCase(),
+  );
+  const last = set.at(-1);
+  return last ? Number(last.args.budget) / 10 ** USD_DECIMALS : undefined;
 }

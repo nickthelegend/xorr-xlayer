@@ -11,7 +11,7 @@
  */
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
   BackButton,
@@ -45,6 +45,8 @@ import { errorText } from '@/data/apiError';
 export default function GrantDelegation() {
   const router = useRouter();
   const goBack = useGoBack();
+  /** Onboarding's Fund step asks for its next step; Home's setup card and Safety ask for nothing, and are gone back to. */
+  const { then } = useLocalSearchParams<{ then?: string }>();
   const signedOut = useSignedOut();
   const cap = useStore((s) => s.cap);
   const bumpCap = useStore((s) => s.bumpCap);
@@ -91,7 +93,13 @@ export default function GrantDelegation() {
       // Read it back from the chain rather than trusting what we just sent, and file it against
       // the address it was read for (`wallet/readDelegation.ts`).
       await readDelegationIntoStore();
-      router.replace('/proposal');
+      /*
+       * Onboarding goes on to the draft portfolio; everywhere else goes back to where the permission was asked for
+       * (2026-09-26). This always replaced with /proposal, so a permission signed from Home's setup card or from Safety
+       * landed on onboarding's portfolio screen, whose only way on was to start a rebalance nobody had asked for.
+       */
+      if (then === 'proposal') router.replace('/proposal');
+      else goBack();
     } catch (e) {
       setLocalError(errorText(e));
     }

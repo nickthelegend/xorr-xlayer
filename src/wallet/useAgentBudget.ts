@@ -15,7 +15,8 @@ import { pinnedDelegation } from '@/chain';
 import { chainAccess } from './chainAccess';
 import { assertGrantDestination } from './delegationChain';
 import { humanWalletError } from './walletError';
-import { agentKey, budgetProblem, readAgentBudget, setAgentBudgetCall } from './agentBudget';
+import { agentKey, budgetFromLogs, budgetProblem, readAgentBudget, setAgentBudgetCall } from './agentBudget';
+import { receiptOf } from './receipt';
 
 /** How long to wait for the budget to land. The fork mines at once; X Layer in a few seconds. */
 const RECEIPT_TIMEOUT_MS = 60_000;
@@ -42,10 +43,13 @@ export function useAgentBudget() {
 
         const key = agentKey(agentId);
         const txHash = await sendTransaction(contract, setAgentBudgetCall(key, typed));
-        const receipt = await chainAccess.waitForTransactionReceipt({ hash: txHash, timeout: RECEIPT_TIMEOUT_MS });
+        const receipt = await receiptOf(chainAccess, txHash, { timeoutMs: RECEIPT_TIMEOUT_MS });
         if (receipt.status !== 'success') throw new Error('The chain refused that budget, so nothing changed.');
 
-        const budgetUsd = await readAgentBudget(chainAccess, contract, receipt.from, key);
+        // What the transaction itself set, from its log; the contract is asked only if it logged nothing for this agent.
+        const budgetUsd =
+          budgetFromLogs(receipt.logs, contract, receipt.from, key) ??
+          (await readAgentBudget(chainAccess, contract, receipt.from, key));
         await api.post(`/agents/${agentId}/budget`, { txHash }).catch(() => undefined);
         return { txHash, budgetUsd };
       } catch (e) {

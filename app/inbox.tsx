@@ -33,6 +33,7 @@ import { useAsync } from '@/data/useAsync';
 import { useRefreshControl } from '@/ui/useRefreshControl';
 import { interruptionFor, routeFor } from '@/notifications/routes';
 import { plainAction, plainDetail } from '@/format/activity';
+import { eventTime } from '@/format';
 
 const DOT = 8;
 
@@ -95,7 +96,7 @@ export default function Inbox() {
                   />
                 }
                 title={plainAction(event.action)}
-                secondary={`${plainDetail(event.detail)} · ${event.t}`}
+                secondary={`${plainDetail(event.detail)} · ${eventTime(event)}`}
                 height={68}
                 onPress={() => router.push(route as never)}
               />

@@ -436,11 +436,16 @@ export default function Home() {
         firstFocus.current = false;
         return;
       }
+      /*
+       * The chip is read from the chain on every return, set up or not (2026-09-26). It was re-read only while the setup
+       * card showed, so once the first trade had filled, a stop signed on Safety came back to a green ARMED over a
+       * permission the contract had just revoked — on mainnet, on camera. It is the one label here that must not lag.
+       */
+      reloadStanding();
       if (!setupShowing.current) return;
       reloadBalance();
       reloadLimits();
       reloadPermission();
-      reloadStanding();
       reloadRuns();
     }, [reloadBalance, reloadLimits, reloadPermission, reloadStanding, reloadRuns]),
   );

@@ -113,8 +113,8 @@ let idle = 0;
 let stalledOn = '';
 for (let t = 0; t < 120 && pressed < 20; t += 1) {
   await page.waitForTimeout(2000);
-  // The app moves on to the proposal screen only after the grant is recorded.
-  if (/\/proposal/.test(page.url())) break;
+  // The app leaves the grant screen only after the grant is recorded: on to the proposal in onboarding, back otherwise.
+  if (!/\/delegate/.test(page.url())) break;
   let clicked = false;
   const seen = [];
   for (const frame of page.frames()) {

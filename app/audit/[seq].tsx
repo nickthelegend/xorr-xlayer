@@ -28,6 +28,7 @@ import {
 } from '@/ui';
 import { useAsync } from '@/data/useAsync';
 import { repos } from '@/data';
+import { eventTime } from '@/format';
 
 export default function AuditEntry() {
   const goBack = useGoBack();
@@ -69,7 +70,7 @@ export default function AuditEntry() {
           >
             <SheetCard bordered borderRadius={radius.panel} padding={space.s18}>
               <Text variant="footnote" color={colors.ink55}>
-                {entry.agent.toUpperCase()} · {entry.t}
+                {entry.agent.toUpperCase()} · {eventTime(entry)}
               </Text>
               <Text variant="screenTitle" style={{ marginTop: space.s6 }}>
                 {entry.action}

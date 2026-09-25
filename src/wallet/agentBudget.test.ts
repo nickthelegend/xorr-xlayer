@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeFunctionData } from 'viem';
-import { AGENT_BUDGET_ABI, agentKey, budgetProblem, readAgentBudget, setAgentBudgetCall } from './agentBudget';
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, type Address, type Hex, type Log } from 'viem';
+import { AGENT_BUDGET_ABI, agentKey, budgetFromLogs, budgetProblem, readAgentBudget, setAgentBudgetCall } from './agentBudget';
 
 describe("an agent's budget", () => {
   /*
@@ -45,5 +45,32 @@ describe("an agent's budget", () => {
     const contract = '0x141e03dbf25265491eca6b33881e9774e7735ef5';
     expect(await readAgentBudget(reader, contract, owner, agentKey('agent-1'))).toBe(25.5);
     expect(asked[0]).toMatchObject({ address: contract, functionName: 'agentBudget', args: [owner, agentKey('agent-1')] });
+  });
+
+  /*
+   * The card shows what the transaction set, read from its own log: asked of the chain just after, a node a block behind
+   * answers with the budget from before it (2026-09-26).
+   */
+  it('is read from the log the transaction left, for this owner and agent only', () => {
+    const owner = '0x5c702B0E062850551E10F4827018e2670E9183d7' as Address;
+    const contract = '0x156DCE9E9d523775AB51f882616A431EdBfBcA22' as Address;
+    const log = (agent: Hex, budget: bigint, address: Address = contract, who: Address = owner) =>
+      ({
+        address,
+        topics: encodeEventTopics({ abi: AGENT_BUDGET_ABI, eventName: 'AgentBudgetSet', args: { owner: who, agent } }),
+        data: encodeAbiParameters([{ type: 'uint256' }], [budget]),
+        blockNumber: 1n,
+        blockHash: `0x${'00'.repeat(32)}`,
+        logIndex: 0,
+        transactionHash: `0x${'ab'.repeat(32)}`,
+        transactionIndex: 0,
+        removed: false,
+      }) as unknown as Log;
+
+    expect(budgetFromLogs([log(agentKey('agent-1'), 50_000_000n)], contract, owner, agentKey('agent-1'))).toBe(50);
+    expect(budgetFromLogs([log(agentKey('agent-2'), 50_000_000n)], contract, owner, agentKey('agent-1'))).toBeUndefined();
+    const elsewhere = '0x00000000000000000000000000000000000000aa' as Address;
+    expect(budgetFromLogs([log(agentKey('agent-1'), 1n, elsewhere)], contract, owner, agentKey('agent-1'))).toBeUndefined();
+    expect(budgetFromLogs([], contract, owner, agentKey('agent-1'))).toBeUndefined();
   });
 });
