@@ -657,7 +657,7 @@ agents.post('/agents/:id/budget', async (c) => {
     detail:
       budgetUsd > 0
         ? `${row.name} may spend $${budgetUsd.toFixed(2)} from here, held by the contract. Its buys come out of it, and its sales go back in.`
-        : `${row.name} has no budget now, so the contract will refuse any trade it tries.`,
+        : `${row.name} has no budget now, so the contract will refuse any buy it tries. A sale of what it holds puts the proceeds back.`,
     kind: 'risk',
     signature: body.txHash,
     payload: { agentKey: key, budgetUsd },

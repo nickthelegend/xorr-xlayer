@@ -8,6 +8,7 @@
  *
  *   node scripts/deploy-executor.mjs executor-fork
  *   node scripts/deploy-executor.mjs executor-testnet
+ *   node scripts/deploy-executor.mjs executor-mainnet
  *
  * `-dirty` is appended when `server/` has uncommitted changes, so a hand-patched deploy says so.
  */
@@ -17,6 +18,8 @@ import { execFileSync } from 'node:child_process';
 const SERVICES = {
   'executor-fork': 'https://executor-fork-production-2db8.up.railway.app',
   'executor-testnet': 'https://executor-testnet-production.up.railway.app',
+  // X Layer mainnet — real money; the service refuses to start without ALLOW_MAINNET=yes (docs/MAINNET.md).
+  'executor-mainnet': 'https://executor-mainnet-production.up.railway.app',
 };
 
 const service = process.argv[2];

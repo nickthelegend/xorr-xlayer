@@ -102,13 +102,13 @@ describe("recording an agent's budget", () => {
     );
   });
 
-  it('says a budget of zero stops the agent', async () => {
+  it("says a budget of zero stops the agent's buys", async () => {
     vi.mocked(waitForReceipt).mockResolvedValue(receipt([budgetLog({ budget: 0n })]));
 
     const res = await record('agent-1');
 
     expect(res.status).toBe(200);
-    expect(vi.mocked(append).mock.calls[0]![0].detail).toContain('refuse any trade');
+    expect(vi.mocked(append).mock.calls[0]![0].detail).toContain('refuse any buy');
   });
 
   it("refuses another agent's budget, and records nothing", async () => {

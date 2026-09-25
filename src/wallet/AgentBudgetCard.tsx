@@ -2,8 +2,9 @@
  * One agent's budget, as the contract holds it, and the owner's hand on it (2026-09-25).
  *
  * The figure is the chain's: what `GET /agents` read from the contract, and after a change what the chain answered once
- * the transaction landed — never the amount that was typed. Setting it is a transaction the owner signs; zero takes the
- * budget away, and the contract then refuses anything the agent tries.
+ * the transaction landed — never the amount that was typed. Setting it is a transaction the owner signs. Zero stops the
+ * agent's buys; a sale of something it bought still settles, and its proceeds go back to the budget, as any sale's do —
+ * so to stop an agent for good, fire it.
  */
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
@@ -71,7 +72,7 @@ export function AgentBudgetCard({
           ? 'Couldn’t read it from the chain just now.'
           : shown > 0
             ? `What ${name} may still spend. The contract takes its buys out of this and puts its sales back, and refuses any trade past it.`
-            : `${name} has no budget, so the contract refuses any trade it tries. Give it one, and it can trade.`}
+            : `${name} has no budget, so the contract refuses any buy it tries. Selling what it holds puts the proceeds back; give it a budget, and it can buy.`}
       </Text>
 
       <View style={{ flexDirection: 'row', gap: space.s8, marginTop: space.s4 }}>
@@ -113,7 +114,7 @@ export function AgentBudgetCard({
         loading={busy}
       />
       {shown !== null && shown > 0 ? (
-        <Button label="Take its budget away" variant="ghost" onPress={() => void submit('0')} disabled={busy} />
+        <Button label="Set budget to $0" variant="ghost" onPress={() => void submit('0')} disabled={busy} />
       ) : null}
 
       {error ? (
