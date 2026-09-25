@@ -8,7 +8,8 @@
 
 Non-custodial. Your wallet, your keys, and a **scoped on-chain permission** the agent trades inside: capped per day,
 restricted to venues you approved, time-boxed, and revocable without our cooperation. Inside it, **every agent has a
-budget of its own on chain** — set by you, enforced by the contract, and beyond the bot's power to raise.
+budget of its own on chain**. You set it, and the contract charges that agent's trades to it and refuses any trade
+past it.
 
 Chain: **OKX X Layer** (chain 196). Assets: **xStocks** (Backed's tokenized equities — TSLAx, NVDAx, SPYx, …).
 Venues: the **OKX DEX aggregator** first, **Uniswap v3** on X Layer as the fallback. Yield: **Aave v3 on X Layer**
@@ -121,7 +122,8 @@ The $0.05 is two 0.05% pool fees; nothing else is taken. CI runs both proofs on 
 - **a budget per agent**: `setAgentBudget(agent, amount)` sets the budget of whoever sends it, so only the owner can set
   their agents' budgets. `spendForAgent` charges an agent's buy to its budget as well as the daily cap, and reverts
   with `AgentBudgetExceeded` past it; `closeForAgent` credits what a sale returns in USDC back to it. An agent's key is
-  `keccak256("xorr-agent:" + its id)`, and `agentBudget(owner, agent)` is readable by anyone
+  `keccak256("xorr-agent:" + its id)`, and `agentBudget(owner, agent)` is readable by anyone. A budget bounds the
+  trades submitted as that agent's. It is not a limit on the delegate key itself: see Known limitations
 - `revoke()` needs only the owner's signature: no server, no oracle, no cooperation from the agent
 
 It never custodies: it pulls exactly the approved amount at the moment of a trade, forwards it, holds nothing
@@ -217,11 +219,17 @@ cd contracts && forge test                 # + XLAYER_RPC for the fork suite
 - **The X Layer testnet has no DEX.** Contracts and wallet flows run there; fills happen on the fork, where the
   pools are mainnet's. Nothing in this repo moves real money, and mainnet needs `ALLOW_MAINNET=yes` to start at all.
   <!-- MAINNET: fill after deploy -->
-- **One key signs for every agent.** Agents are not separate wallets: the executor holds one delegate key, and it
-  signs each agent's trades. What keeps the agents apart is the contract. Each agent's trades are charged to that
-  agent's own budget, a trade past it reverts, and the delegate key cannot raise any budget, because `setAgentBudget`
-  only ever sets the sender's own. That is how this EVM build gives each agent money of its own, instead of a key
-  per agent. The key is still bounded by the daily cap, the venue list, the expiry and the output floor.
+- **One key signs for every agent, and the budgets do not bind that key.** Agents are not separate wallets: the
+  executor holds one delegate key, and it signs every agent's trades. The budgets bound what the executor submits as
+  each agent's trade. Each such trade is charged to that agent's budget, a trade past it reverts, and only you can set
+  a budget. The hard limits on the key itself are the ones that bind it no matter which function it calls: the
+  daily cap, the venue allowlist, the expiry, the output floor that makes every fill pay you, and revoke. A stolen key
+  could skip the budgets by trading as "no agent" (`spend`), inside the daily cap, and could credit a sale to any
+  agent's budget. Future work: an owner opt-in on the contract so that every delegate spend must be charged to some
+  budget.
+- **Only an agent's own sales refill its budget.** An agent's exit sells its own lot as the agent's. Anything beyond
+  that lot, and any sale you make yourself (the order ticket, "Sell everything"), is sold as yours and refills
+  nothing.
 - **A fork is pinned at a block.** Its pools stop moving while the market doesn't. So on a fork, prices, observations
   and the agent's signals read the live X Layer mainnet pools, while fills settle against the fork's own pools — the
   ticket shows both ("$362.38 each · mark $364.95"). Fill-vs-market figures on the fork therefore mix venue quality with

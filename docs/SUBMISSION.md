@@ -41,10 +41,11 @@ custody (hand over the funds) or a blank-cheque approval. Neither survives a bad
   that pulls through a separate approval contract (OKX DEX) fill under the same rules. `closePosition` sells back
   outside the cap so a stop-loss always fires; `revoke()` needs no server.
 - **A budget per agent, in the same contract.** The owner sets each agent's budget with `setAgentBudget`, which only
-  ever sets the sender's own, so the bot cannot raise one. `spendForAgent` charges an agent's buy to its budget as well
-  as the daily cap, and `closeForAgent` credits its sales back. A trade past the budget reverts
-  (`AgentBudgetExceeded`), and an agent nobody budgeted cannot trade at all. Nineteen contract tests, including a
-  256-run fuzz, hold this.
+  ever sets the sender's own, so only the owner can set one. `spendForAgent` charges an agent's buy to its budget as
+  well as the daily cap, and `closeForAgent` credits its sales back. A trade past the budget reverts
+  (`AgentBudgetExceeded`), and an agent nobody budgeted cannot buy at all. The budgets bound what the executor submits
+  as each agent's trade; the delegate key itself is bounded by the cap, the venues, the expiry, the output floor and
+  revoke (see Honest limits). Nineteen contract tests, including a 256-run fuzz, hold this.
 - **The agents** — score setups on 11 wrapped xStocks and crypto on X Layer (momentum, mean reversion, earnings
   windows from SEC EDGAR). They size against the cap and their own budget, both read from the chain, and hold outside
   Nasdaq hours when the pool drifts from xStocks' own reference price. They warn ahead of splits read from the token's
@@ -99,7 +100,14 @@ OKX DEX routing needs an API key; the deployed executor has one. On the fork, OK
 are frozen at the fork block, so a route the fork cannot fill settles on Uniswap instead. The executor checks this by
 simulating the call before anything is signed.
 
-One delegate key signs every agent's trades. The agents are kept apart by their on-chain budgets, which that key cannot
-raise. That is how this EVM build gives each agent money of its own, rather than a key of its own.
+One delegate key signs every agent's trades, and the budgets do not bind that key. They bound what the executor
+submits as each agent's trade: each such trade is charged to that agent's budget, and a trade past it reverts. The hard
+limits on the key itself are the daily cap, the venue allowlist, the expiry, the output floor that makes every fill pay
+the owner, and revoke. A stolen key could skip the budgets by trading as "no agent" (`spend`), inside the daily cap, and
+could credit a sale to any agent's budget. Future work: an owner opt-in on the contract so that every delegate spend
+must be charged to some budget.
+
+Only an agent's own sales refill its budget. A sale the owner makes (the order ticket, "Sell everything") refills
+nothing.
 
 Wrapped xStocks track shares through Backed's issuance and are not the shares themselves.
