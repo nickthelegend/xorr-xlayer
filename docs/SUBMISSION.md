@@ -3,13 +3,15 @@
 **Deadline:** 2026-09-25 23:59 UTC. **Track:** Build a Market — build with X Layer. **Repo:**
 https://github.com/nickthelegend/xorr-xlayer (public at submission, after a history secret scan — PLAN.md D14).
 
-**Live:** **https://xorr-xlayer.vercel.app** (Vercel project `xorr-xlayer`), executor on Railway at
-`https://executor-fork-production-2db8.up.railway.app` (`/health`, `/verify`), trading against a hosted fork of X Layer
-mainnet (`https://xlayer-fork-production.up.railway.app`, chain 196). Contracts on X Layer testnet, source-verified:
-XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`,
-served by `https://executor-testnet-production.up.railway.app`.
+**Live on X Layer mainnet:** **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`), executor at
+`https://executor-mainnet-production.up.railway.app` (`/health`, `/verify`), contracts on chain 196 and Sourcify exact
+match: XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor
+`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196` (`contracts/deployments/xlayer-mainnet.json`).
 
-<!-- MAINNET: fill after deploy -->
+**Sandbox, no money:** **https://xorr-xlayer-demo.vercel.app** — the same app against a hosted fork of X Layer mainnet
+(`https://xlayer-fork-production.up.railway.app`), executor `https://executor-fork-production-2db8.up.railway.app`,
+with test funds on Deposit. **Testnet:** XorrDelegation `0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`, Sourcify exact,
+served by `https://executor-testnet-production.up.railway.app`.
 
 **Video:** [`demo/xorr-demo.mp4`](demo/xorr-demo.mp4) — 2:43, recorded against the deployed build on 2026-09-20 by
 [`tools/record-demo.mjs`](../tools/record-demo.mjs), which signs in, walks the beats in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md)
@@ -95,8 +97,9 @@ custody (hand over the funds) or a blank-cheque approval. Neither survives a bad
 
 ## Honest limits
 
-No real money moves: the X Layer testnet has no DEX, so fills are shown on a fork of mainnet.
-<!-- MAINNET: fill after deploy -->
+Real money moves on mainnet, and only inside the permission the owner signs; mainnet is new as of 2026-09-25, so its
+history is short (its price bands start from readings the fork executor recorded from the live mainnet pools, and say
+so). The X Layer testnet has no DEX, so the sandbox fills on a fork of mainnet instead.
 
 OKX DEX routing needs an API key; the deployed executor has one. On the fork, OKX quotes mainnet while the fork's pools
 are frozen at the fork block, so a route the fork cannot fill settles on Uniswap instead. The executor checks this by

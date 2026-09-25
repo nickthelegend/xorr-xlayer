@@ -15,7 +15,12 @@ Chain: **OKX X Layer** (chain 196). Assets: **xStocks** (Backed's tokenized equi
 Venues: the **OKX DEX aggregator** first, **Uniswap v3** on X Layer as the fallback. Yield: **Aave v3 on X Layer**
 (USDT0). Built for OKX Dev Day 2026.
 
-<!-- MAINNET: fill after deploy -->
+**Live on X Layer mainnet** (chain 196) since 2026-09-25: XorrDelegation
+[`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22)
+and XorrAuditAnchor
+[`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196),
+both Sourcify exact match, behind **https://xorr-xlayer.vercel.app** — real USDC, inside a permission you sign. The same
+app on a fork of mainnet, with test funds on Deposit, is the no-money sandbox at **https://xorr-xlayer-demo.vercel.app**.
 
 **[▶ Watch the demo](docs/demo/xorr-demo.mp4)** (2:43) — the permission, the agent's own fills, the cap refusing an order,
 and `/judge` re-checking all 20 claims against the chain. Recorded against the live build by
@@ -179,9 +184,8 @@ and pushed to the phone.
 ## Deployment
 
 Open **https://xorr-xlayer.vercel.app** (X Layer mainnet) or **https://xorr-xlayer-demo.vercel.app** (the sandbox, no
-money) and sign in; `/judge` re-runs every claim below against the live chain.
-
-<!-- MAINNET: fill after deploy -->
+money) and sign in; `/judge` re-runs every claim below against the live chain. Every executor's `/health` names the commit it
+runs, and the app says whether that is its own.
 
 
 | | |
@@ -222,9 +226,11 @@ cd contracts && forge test                 # + XLAYER_RPC for the fork suite
 
 ## Known limitations — read these before you believe us
 
-- **The X Layer testnet has no DEX.** Contracts and wallet flows run there; fills happen on the fork, where the
-  pools are mainnet's. Nothing in this repo moves real money, and mainnet needs `ALLOW_MAINNET=yes` to start at all.
-  <!-- MAINNET: fill after deploy -->
+- **Mainnet is real money, and it is new.** The mainnet executor starts only with `ALLOW_MAINNET=yes`, and it trades
+  only inside a permission the owner signed. Its database was seeded with the X Layer pool readings the fork executor
+  had recorded from the live mainnet pools since 2026-09-19 (each row says so in `source`), so its agents' price bands
+  start from real history; its own trail starts on 2026-09-25. The X Layer testnet has no DEX, so its contracts and
+  wallet flows run there, and fills happen on mainnet and on the fork.
 - **One key signs for every agent, and the budgets do not bind that key.** Agents are not separate wallets: the
   executor holds one delegate key, and it signs every agent's trades. The budgets bound what the executor submits as
   each agent's trade. Each such trade is charged to that agent's budget, a trade past it reverts, and only you can set
