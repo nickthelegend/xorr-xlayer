@@ -420,7 +420,17 @@ extra.post('/proposals/:id/decide', async (c) => {
     return c.json({ status: 'blocked', reason: 'no_size', message });
   }
 
-  const order = await placeOrder(w, symbol, usd, `${money(usd)} of ${symbol}, approved`);
+  /*
+   * The agent whose strategy asked, when one did (2026-09-25): the buy is that agent's, so it is charged to the agent's
+   * own budget on chain like any trade it places unattended. A proposal from the chat is the owner's own decision.
+   */
+  const askedBy = text('strategyId')
+    ? await one<{ agent_id: string | null }>(
+        `SELECT agent_id FROM strategies WHERE id = $1 AND wallet_id = $2 AND chain = ${THIS_CHAIN}`,
+        [text('strategyId'), w.id],
+      ).catch(() => null)
+    : null;
+  const order = await placeOrder(w, symbol, usd, `${money(usd)} of ${symbol}, approved`, {}, askedBy?.agent_id ?? null);
   if (!order.placed) {
     const message = `I placed nothing. ${order.refusal.detail}`;
     await record(message, 'block', { reason: order.refusal.reason });

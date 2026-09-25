@@ -191,6 +191,36 @@ describe('POST /proposals/:id/decide (E160)', () => {
     expect(append).not.toHaveBeenCalled();
   });
 
+  /*
+   * A proposal a strategy made is that strategy's agent's trade (2026-09-25): approving it places the buy for the agent,
+   * so it is charged to the agent's own budget on chain — and a chat proposal stays the owner's own order.
+   */
+  it("places an approved strategy proposal for the agent whose strategy asked", async () => {
+    proposals((text) =>
+      /UPDATE proposals/.test(text)
+        ? [{ id: 'p-1', agent: 'Dip Buyer', payload: { symbol: 'TSLAx', usd: '25', strategyId: 'strategy-9' } }]
+        : [],
+    );
+    vi.mocked(one).mockImplementation((async (text: string) =>
+      /SELECT agent_id FROM strategies/.test(text) ? { agent_id: 'agent-7' } : null) as never);
+    vi.mocked(placeOrder).mockResolvedValue({ placed: false, refusal: { status: 'blocked', reason: 'agent_budget', detail: 'x' } } as never);
+
+    await post('/proposals/p-1/decide', { decision: 'approve' });
+
+    expect(vi.mocked(placeOrder).mock.calls[0]![5]).toBe('agent-7');
+  });
+
+  it('places an approved chat proposal as the owner’s own order', async () => {
+    proposals((text) =>
+      /UPDATE proposals/.test(text) ? [{ id: 'p-2', agent: 'Momentum Scout', payload: { symbol: 'TSLAx', usd: '25' } }] : [],
+    );
+    vi.mocked(placeOrder).mockResolvedValue({ placed: false, refusal: { status: 'blocked', reason: 'x', detail: 'x' } } as never);
+
+    await post('/proposals/p-2/decide', { decision: 'approve' });
+
+    expect(vi.mocked(placeOrder).mock.calls[0]![5]).toBeNull();
+  });
+
   it('still answers a proposal that was already decided with what was decided', async () => {
     proposals((text) => (/SELECT decision/.test(text) ? [{ decision: 'skip' }] : []));
     expect(await post('/proposals/p-1/decide', { decision: 'skip' })).toEqual({

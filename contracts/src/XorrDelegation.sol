@@ -43,6 +43,15 @@ interface IERC20 {
  *     of that call (`activeOwner`), so a venue that pays out — our books — refuses any other recipient;
  *   - closing refuses the settlement token, so a close cannot move the asset the cap exists to limit.
  *
+ * EACH AGENT'S OWN BUDGET (2026-09-25)
+ *
+ * One delegate key trades for every agent a person hires, and each agent can be given its own budget here, in the
+ * settlement token: `setAgentBudget(agent, amount)`, one signature. An agent's trade (`spendForAgent`) is charged to
+ * that budget AND to the owner's daily cap, and the contract refuses it past either. Its sales (`closeForAgent`) credit
+ * what they return in the settlement token back to its budget — the EVM counterpart of an agent trading from a wallet
+ * of its own, with the difference that the money never leaves the owner's wallet. The owner can raise, lower or zero a
+ * budget at any time; `revoke()` still stops every agent at once.
+ *
  * What this does not claim: the floor is chosen by the delegate. A route that pays the owner the
  * floor and sends the rest elsewhere would satisfy it; that residue is bounded by the daily cap, the
  * venue allowlist and the kill switch, not by this check. The executor sets the floor from a live
@@ -73,6 +82,9 @@ contract XorrDelegation {
      * user who thought they had removed it. Only the owner's own calls grow this.
      */
     mapping(address => address[]) private _venueList;
+
+    /// @dev owner => agent => what that agent may still commit, in `SETTLEMENT_TOKEN` units.
+    mapping(address => mapping(bytes32 => uint256)) private _agentBudget;
 
     /// @dev EIP-1153 slot holding the owner the current venue call is being made for.
     bytes32 private constant ACTIVE_OWNER_SLOT = keccak256("xorr.delegation.activeOwner");
@@ -105,6 +117,13 @@ contract XorrDelegation {
         uint256 spentToday
     );
 
+    /// @notice The owner set what an agent may commit from here on.
+    event AgentBudgetSet(address indexed owner, bytes32 indexed agent, uint256 budget);
+    /// @notice An agent's trade was charged to its budget.
+    event AgentSpent(address indexed owner, bytes32 indexed agent, uint256 amount, uint256 budgetLeft);
+    /// @notice An agent's sale returned settlement token to its budget.
+    event AgentCredited(address indexed owner, bytes32 indexed agent, uint256 amount, uint256 budgetLeft);
+
     error NotDelegate();
     error PolicyRevoked();
     error PolicyExpired();
@@ -120,6 +139,10 @@ contract XorrDelegation {
     error OutputNotReceived(uint256 received, uint256 minOut);
     /// @notice Closing is not capped, so it may not be used to move the asset the cap limits.
     error SettlementTokenNotClosable();
+    /// @notice An agent's trade asked for more than its budget holds.
+    error AgentBudgetExceeded(bytes32 agent, uint256 requested, uint256 remaining);
+    /// @notice The zero id is "no agent", so it cannot be given a budget or charged to one.
+    error AgentRequired();
 
     constructor(address settlementToken) {
         require(settlementToken != address(0), "settlement token required");
@@ -186,6 +209,18 @@ contract XorrDelegation {
         _setVenue(msg.sender, venue, allowed);
     }
 
+    /**
+     * @notice Give one agent a budget: the most it may commit, in the settlement token, until the owner changes it.
+     * @dev Sets the remaining budget outright — raising, lowering and zeroing are all this one call. The agent id is the
+     *      app's own identifier for the agent, hashed (`keccak256("xorr-agent:" + id)`), so nothing about the agent is
+     *      published but the fact that the owner budgeted it.
+     */
+    function setAgentBudget(bytes32 agent, uint256 budget) external {
+        if (agent == bytes32(0)) revert AgentRequired();
+        _agentBudget[msg.sender][agent] = budget;
+        emit AgentBudgetSet(msg.sender, agent, budget);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Delegate action — the only thing the bot's key can do
     // ─────────────────────────────────────────────────────────────────────────
@@ -211,7 +246,7 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
-        return _spend(owner, token, venue, venue, amount, tokenOut, minOut, data);
+        return _spend(owner, bytes32(0), token, venue, venue, amount, tokenOut, minOut, data);
     }
 
     /**
@@ -234,11 +269,32 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
-        return _spend(owner, token, spender, venue, amount, tokenOut, minOut, data);
+        return _spend(owner, bytes32(0), token, spender, venue, amount, tokenOut, minOut, data);
+    }
+
+    /**
+     * @notice An agent's trade: `spendVia`, charged to that agent's budget as well as the owner's daily cap.
+     * @dev For a venue that pulls for itself (Uniswap), pass it as both `spender` and `venue`.
+     * @param agent The agent the trade is for — its budget is charged, and the contract refuses the trade past it.
+     */
+    function spendForAgent(
+        address owner,
+        bytes32 agent,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) external returns (bytes memory result) {
+        if (agent == bytes32(0)) revert AgentRequired();
+        return _spend(owner, agent, token, spender, venue, amount, tokenOut, minOut, data);
     }
 
     function _spend(
         address owner,
+        bytes32 agent,
         address token,
         address spender,
         address venue,
@@ -261,13 +317,14 @@ contract XorrDelegation {
         uint256 spent = _spentOnDay[owner][day];
         uint256 remaining = p.dailyCap > spent ? p.dailyCap - spent : 0;
         if (amount > remaining) revert DailyCapExceeded(amount, remaining);
+        if (agent != bytes32(0)) _chargeAgent(owner, agent, amount);
 
         // Effects before interactions.
         _spentOnDay[owner][day] = spent + amount;
 
         // Pull exactly `amount` from the owner. The contract holds nothing between trades.
         require(IERC20(token).transferFrom(owner, address(this), amount), "pull failed");
-        result = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
+        (result, ) = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
 
         emit Spent(owner, p.delegate, venue, token, amount, spent + amount);
     }
@@ -310,7 +367,7 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
-        return _close(owner, token, venue, venue, amount, tokenOut, minOut, data);
+        return _close(owner, bytes32(0), token, venue, venue, amount, tokenOut, minOut, data);
     }
 
     /// @notice `closePosition` through a venue that pulls via a separate, allowlisted approval contract. See `spendVia`.
@@ -324,11 +381,31 @@ contract XorrDelegation {
         uint256 minOut,
         bytes calldata data
     ) external returns (bytes memory result) {
-        return _close(owner, token, spender, venue, amount, tokenOut, minOut, data);
+        return _close(owner, bytes32(0), token, spender, venue, amount, tokenOut, minOut, data);
+    }
+
+    /**
+     * @notice An agent's sale: `closePositionVia`, with what it returns in the settlement token credited back to that
+     *         agent's budget — its sales pay back into what it may spend, as a wallet of its own would.
+     */
+    function closeForAgent(
+        address owner,
+        bytes32 agent,
+        address token,
+        address spender,
+        address venue,
+        uint256 amount,
+        address tokenOut,
+        uint256 minOut,
+        bytes calldata data
+    ) external returns (bytes memory result) {
+        if (agent == bytes32(0)) revert AgentRequired();
+        return _close(owner, agent, token, spender, venue, amount, tokenOut, minOut, data);
     }
 
     function _close(
         address owner,
+        bytes32 agent,
         address token,
         address spender,
         address venue,
@@ -349,7 +426,9 @@ contract XorrDelegation {
         _requireNamedOutput(token, tokenOut, minOut);
 
         require(IERC20(token).transferFrom(owner, address(this), amount), "pull failed");
-        result = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
+        uint256 received;
+        (result, received) = _callVenue(owner, token, spender, venue, amount, tokenOut, minOut, data);
+        if (agent != bytes32(0) && tokenOut == SETTLEMENT_TOKEN) _creditAgent(owner, agent, received);
 
         emit Closed(owner, p.delegate, venue, token, amount);
     }
@@ -379,6 +458,11 @@ contract XorrDelegation {
         return _spentOnDay[owner][_dayOf(block.timestamp)];
     }
 
+    /// @notice What an agent may still commit, before the owner's daily cap is applied on top.
+    function agentBudget(address owner, bytes32 agent) external view returns (uint256) {
+        return _agentBudget[owner][agent];
+    }
+
     function isVenueAllowed(address owner, address venue) external view returns (bool) {
         return _venueAllowed[owner][venue];
     }
@@ -406,6 +490,19 @@ contract XorrDelegation {
         emit VenueAllowed(owner, venue, allowed);
     }
 
+    function _chargeAgent(address owner, bytes32 agent, uint256 amount) private {
+        uint256 left = _agentBudget[owner][agent];
+        if (amount > left) revert AgentBudgetExceeded(agent, amount, left);
+        _agentBudget[owner][agent] = left - amount;
+        emit AgentSpent(owner, agent, amount, left - amount);
+    }
+
+    function _creditAgent(address owner, bytes32 agent, uint256 amount) private {
+        uint256 left = _agentBudget[owner][agent] + amount;
+        _agentBudget[owner][agent] = left;
+        emit AgentCredited(owner, agent, amount, left);
+    }
+
     function _requireNamedOutput(address token, address tokenOut, uint256 minOut) private pure {
         if (tokenOut == address(0) || tokenOut == token) revert InvalidTokenOut();
         if (minOut == 0) revert ZeroMinOut();
@@ -425,7 +522,7 @@ contract XorrDelegation {
         address tokenOut,
         uint256 minOut,
         bytes calldata data
-    ) private returns (bytes memory ret) {
+    ) private returns (bytes memory ret, uint256 received) {
         // Approve the spender for exactly this trade, and nothing more.
         IERC20(token).approve(spender, amount);
         uint256 before = IERC20(tokenOut).balanceOf(owner);
@@ -440,7 +537,7 @@ contract XorrDelegation {
         IERC20(token).approve(spender, 0);
 
         uint256 afterCall = IERC20(tokenOut).balanceOf(owner);
-        uint256 received = afterCall > before ? afterCall - before : 0;
+        received = afterCall > before ? afterCall - before : 0;
         if (received < minOut) revert OutputNotReceived(received, minOut);
     }
 

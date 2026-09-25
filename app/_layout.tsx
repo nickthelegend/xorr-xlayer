@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppPrivyProvider } from '@/auth/PrivyProvider';
 import { PhoneFrame, colors } from '@/ui';
 import { useRegisterDevice } from '@/notifications/useRegisterDevice';
+import { useTradeNotifications } from '@/notifications/useTradeNotifications';
 import { useNotificationRoute } from '@/notifications/useNotificationRoute';
 import { useHydrateWallet } from '@/wallet/useHydrateWallet';
 import { useHydrateDelegation } from '@/wallet/useHydrateDelegation';
@@ -29,13 +30,15 @@ import { useChatDrawer } from '@/chat/chatDrawer';
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 /**
- * Files this device's push token against the signed-in wallet.
+ * Files this device's push token against the signed-in wallet — and, where there is no token to file, raises the
+ * banner a fill's push would have while the app is open (`useTradeNotifications`, 2026-09-25).
  *
  * A component rather than a hook call in RootLayout so it sits INSIDE the Privy provider — the
  * wallet it keys on does not exist above it. Renders nothing.
  */
 function DeviceRegistration() {
-  useRegisterDevice();
+  const push = useRegisterDevice();
+  useTradeNotifications(push);
   return null;
 }
 

@@ -22,7 +22,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter, type Href } from 'expo-router';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -253,7 +254,7 @@ export function ChatSheet({ open, onClose }: ChatSheetProps) {
    */
   if (!mounted) return null;
 
-  return (
+  const drawer = (
     <View style={StyleSheet.absoluteFill}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }, scrim]}>
         <Pressable
@@ -304,6 +305,21 @@ export function ChatSheet({ open, onClose }: ChatSheetProps) {
         <RoomFade room={room} />
       </Animated.View>
     </View>
+  );
+
+  /*
+   * On iOS the drawer rises in a window of its own (2026-09-25).
+   *
+   * A native sheet — the profile, and anything pushed from it — is presented above every React view, the drawer included.
+   * Explore's Markets row, opened from the profile, puts the tab bar inside that sheet; Messages then rose behind it,
+   * unseen, and the tab bar, which goes down as the drawer rises, stayed down with nothing on screen to close. In a
+   * full-window overlay the drawer is over the sheets too. Its drag needs a gesture root of its own there.
+   */
+  if (Platform.OS !== 'ios') return drawer;
+  return (
+    <FullWindowOverlay>
+      <GestureHandlerRootView style={StyleSheet.absoluteFill}>{drawer}</GestureHandlerRootView>
+    </FullWindowOverlay>
   );
 }
 

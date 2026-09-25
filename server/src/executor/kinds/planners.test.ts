@@ -174,6 +174,42 @@ describe('tier 3 — take profit and stop loss', () => {
     expect(i!.usd).toBeLessThan(held[0]!.usd);
   });
 
+  /*
+   * An agent's exit sells the lot that agent bought, and no more (2026-09-25): its sale is credited to the agent's own
+   * budget on chain, so it may not sell — and be credited for — shares the owner or another agent paid for.
+   */
+  it("an agent's exit sells only the lot its buy filled", async () => {
+    vi.mocked(holdings).mockResolvedValue(held);
+    vi.mocked(priceOf).mockResolvedValue(3_000);
+
+    const i = await planExitRules({
+      owner: OWNER,
+      budgetUsd: 0,
+      params: { entryPrice: 2_400, takeProfitPct: 20, lotUnits: 0.1 },
+      symbol: 'WETH',
+      claimedSellUnits: 0,
+    });
+
+    expect(i?.amountIn).toBeCloseTo(0.1, 9);
+    expect(i?.amountInRaw).toBeUndefined();
+    expect(i!.usd).toBeCloseTo(held[0]!.usd * (0.1 / held[0]!.units), 6);
+  });
+
+  it("and never more than is left once the rest of the stack has claimed its share", async () => {
+    vi.mocked(holdings).mockResolvedValue(held);
+    vi.mocked(priceOf).mockResolvedValue(3_000);
+
+    const i = await planExitRules({
+      owner: OWNER,
+      budgetUsd: 0,
+      params: { entryPrice: 2_400, takeProfitPct: 20, lotUnits: 1_000 },
+      symbol: 'WETH',
+      claimedSellUnits: 0.3,
+    });
+
+    expect(i?.amountIn).toBeCloseTo(held[0]!.units - 0.3, 9);
+  });
+
   it('closes the whole position, to the wei, when nothing else is stacked', async () => {
     vi.mocked(holdings).mockResolvedValue(held);
     vi.mocked(priceOf).mockResolvedValue(3_000);

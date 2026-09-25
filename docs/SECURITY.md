@@ -5,9 +5,10 @@ trust boundary. Written against the code as it stands, not against intentions.
 
 ## 1. The delegation primitive — the thing standing between a bug and someone's capital
 
-**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on the hosted fork of X Layer
-mainnet (`0x141e03dbf25265491eca6b33881e9774e7735ef5`, chain 196) and on X Layer testnet
-(`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, chain 1952, Sourcify exact match — `contracts/deployments/xlayer-testnet.json`). The owner calls
+**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on **X Layer mainnet**
+(`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, chain 196, Sourcify exact match — `contracts/deployments/xlayer-mainnet.json`),
+on the hosted fork of X Layer mainnet (`0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058`, chain 196) and on X Layer testnet
+(`0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`, chain 1952, Sourcify exact match — `contracts/deployments/xlayer-testnet.json`). The owner calls
 `grant(delegate, dailyCap, expiresAt, venues)` from their own wallet; the bot's key may then call `spend()`,
 `spendVia()`, `closePosition()` and `closePositionVia()` for that owner, and nothing else.
 
@@ -15,6 +16,20 @@ mainnet (`0x141e03dbf25265491eca6b33881e9774e7735ef5`, chain 196) and on X Layer
 contract approves `spender` rather than `venue`. Both must be on the owner's allowlist (`VenueNotAllowed` otherwise),
 every other check below applies unchanged, and the approval is set for exactly `amount` and reset to zero in the same
 call (`contracts/test/XorrDelegationVia.t.sol`).
+
+**Each agent's own budget (2026-09-25).** Inside the owner's daily cap, every agent the owner hired or made has a
+budget of its own on the contract, filed under `keccak256("xorr-agent:" + agent id)`. The OWNER sets it —
+`setAgentBudget(agent, budget)` sets the budget of whoever sends it, so the bot's key can only ever set its own, which
+nothing reads. An agent's trade goes through `spendForAgent` / `closeForAgent`: a buy is charged to that agent's budget
+and refused past it (`AgentBudgetExceeded(agent, requested, remaining)`), and a sale credits what it returned in the
+settlement token back to it. An agent's exit sells only the
+lot its buy filled, so a budget is credited only for what it paid for; any other sale is the owner's and credits nobody.
+The one delegate key still signs every trade — as the Solana build's bot key does. What the budgets bind is the trades
+the executor submits AS an agent's (`contracts/test/XorrAgentBudget.t.sol`, 19 tests including a fuzz of the running
+balance). They are not a limit on the key itself: a stolen delegate key could trade as "no agent" (`spend`) and skip
+every budget, or credit a sale to any agent's budget — inside the daily cap, the venue allowlist, the expiry and the
+output floor, which remain the hard limits on the key. An owner opt-in that makes every delegate spend chargeable to
+some budget is the next step, and would need a redeploy.
 
 **What the delegate CAN do**
 - Spend the settlement token (USDC) at a venue the owner allowlisted, up to what is left of today's cap, for a
@@ -25,6 +40,9 @@ call (`contracts/test/XorrDelegationVia.t.sol`).
 **What the delegate CANNOT do — enforced by the contract, not by our code**
 - Spend from any address but the delegate's own call: `NotDelegate`.
 - Exceed the day's cap (UTC day): `DailyCapExceeded(requested, remaining)`, checked before anything moves.
+- Spend past an agent's own budget on a trade submitted as that agent's: `AgentBudgetExceeded`, after the day's cap is
+  checked — or set any agent's budget, which only the owner's own transaction can do. (It can still submit a trade as
+  nobody's, or credit a sale to an agent: see "Each agent's own budget" above.)
 - Reach a venue the owner did not allow: `VenueNotAllowed(venue)`.
 - Trade after expiry or after the owner revokes: `PolicyExpired`, `PolicyRevoked` — for spends and closes alike, so
   a stop ends stop-losses too.

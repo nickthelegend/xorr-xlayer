@@ -246,7 +246,14 @@ export async function planExitRules(ctx: PlanContext): Promise<TradeIntent | nul
    * After the level check, not before: whether these levels can be trusted at all is a question
    * about the split, and there is no point sizing a sale that must not happen.
    */
-  const sellable = sellableUnits(held.units, ctx.claimedSellUnits ?? 0);
+  /*
+   * An agent's exit sells the lot that agent bought, and no more (2026-09-25). Its sale is credited to the agent's own
+   * budget on chain, so it may only sell what that budget paid for — the rest of the holding is the owner's, with the
+   * owner's own exits. An exit armed without a lot is the owner's, and closes the holding as it always has.
+   */
+  const lotUnits = Number(ctx.params.lotUnits ?? 0);
+  const unclaimed = sellableUnits(held.units, ctx.claimedSellUnits ?? 0);
+  const sellable = lotUnits > 0 ? Math.min(unclaimed, lotUnits) : unclaimed;
   if (sellable <= 0) return null;
   const sellUsd = held.units > 0 ? held.usd * (sellable / held.units) : 0;
   if (sellUsd < MIN_TRADE_USD) return null;

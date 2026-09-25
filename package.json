@@ -5,9 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "start:fork": "sh -c 'EXPO_PUBLIC_XORR_CHAIN=xlayer-fork EXPO_PUBLIC_CHAIN_RPC=https://xlayer-fork-production.up.railway.app EXPO_PUBLIC_DELEGATION_ADDRESS=0x141e03dbf25265491eca6b33881e9774e7735ef5 EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app exec expo start --port 8081 --clear'",
+    "start:fork": "sh -c 'EXPO_PUBLIC_XORR_CHAIN=xlayer-fork EXPO_PUBLIC_CHAIN_RPC=https://xlayer-fork-production.up.railway.app EXPO_PUBLIC_PINNED_DELEGATION=0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058 EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app exec expo start --port 8081 --clear'",
+    "start:mainnet": "sh -c 'EXPO_PUBLIC_XORR_CHAIN=xlayer EXPO_PUBLIC_CHAIN_RPC= EXPO_PUBLIC_PINNED_DELEGATION=0x156DCE9E9d523775AB51f882616A431EdBfBcA22 EXPO_PUBLIC_API_URL=https://executor-mainnet-production.up.railway.app exec expo start --port 8081 --clear'",
     "ios": "expo run:ios",
     "ios:sim": "./scripts/ios-sim.sh",
+    "ios:sim:release": "./scripts/ios-sim-release.sh",
     "android": "expo run:android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
@@ -16,7 +18,7 @@
     "test:watch": "vitest",
     "test:live": "LIVE=1 vitest run live.test",
     "postinstall": "patch-package",
-    "deploy:web": "node scripts/build-web.mjs && cd dist-web && vercel link --yes --project xorr-xlayer --scope nicolas-projects-f497bb7f && vercel deploy --prod --yes",
+    "deploy:web": "node scripts/build-web.mjs && cd dist-web && vercel link --yes --project ${XORR_WEB_PROJECT:-xorr-xlayer} --scope nicolas-projects-f497bb7f && vercel deploy --prod --yes",
     "deploy:executor": "node scripts/deploy-executor.mjs"
   },
   "dependencies": {

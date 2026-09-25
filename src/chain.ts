@@ -133,12 +133,18 @@ export const networkChip = testNetwork ? 'Test network' : chainLabel;
  *
  * Privy's embedded wallet previews and broadcasts through its own RPC for a chain it knows, and a fork of X Layer is chain
  * 196 — indistinguishable from real X Layer, where the wallet holds nothing, so every user-signed transaction would be
- * simulated against the wrong state. On a copy the wallet only SIGNS (nonce, gas and fees read from the fork) and the app
- * broadcasts to the fork itself (`src/wallet/userSigning.ts`). On mainnet and testnet the wallet sends.
+ * simulated against the wrong state. So on a copy the wallet only SIGNS (nonce, gas and fees read from the fork) and the
+ * app broadcasts to the fork itself (`src/wallet/userSigning.ts`).
+ *
+ * And, since 2026-09-25, everywhere else too. That path is the one every signed flow has been proven on — the
+ * seventeen-signature grant, the conversion, the stop, an agent's budget — while "the wallet sends" had been exercised on
+ * no build of this app, and the iPhone's Privy provider is not even told which RPC X Layer has. Signing is the same act on
+ * mainnet; only the broadcast moves to the RPC this build reads, where `userSigning.ts` also keeps nonces from colliding.
+ * `EXPO_PUBLIC_WALLET_SENDS=1` puts the wallet back in charge of sending, as a switch that needs no release.
  *
  * The bot's own trades never depend on this: the executor signs with its delegate key against the RPC it is given.
  */
-export const walletSignsOnly = money === 'copy';
+export const walletSignsOnly = process.env.EXPO_PUBLIC_WALLET_SENDS !== '1' || money === 'copy';
 
 /**
  * Can a deposit code name the chain this build is on?

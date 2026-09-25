@@ -219,7 +219,7 @@ export default function Fund() {
         </ScrollView>
       </Fill>
 
-      <Button label="Continue — set the limits" onPress={() => router.push('/delegate')} />
+      <Button label="Continue — set the limits" onPress={() => router.push({ pathname: '/delegate', params: { then: 'proposal' } })} />
     </Screen>
   );
 }

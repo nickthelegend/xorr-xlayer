@@ -2,8 +2,8 @@
  * Screen 19 — Swap. screens.md Group B; rebuilt for PLAN.md 3.9.
  *
  * Pay card (surface, radius 26): eyebrow + balance, the amount as typed + USD line, token pill. A 40pt circle
- * with a 3pt ring OVERLAPS THE SEAM (margin −14, zIndex 2) and flips the pair. Receive card mirrors it. Rows:
- * Route / You receive at least / Price impact / Max slippage.
+ * with a 3pt ring OVERLAPS THE SEAM (margin −14, zIndex 2) and flips the pair. Receive card mirrors it. The keypad
+ * while typing; under review the rows take its place: Minimum received / Price impact / Network fee / Max slippage.
  *
  * It was a fixed WETH → USDC card whose token pills, direction circle and settings gear did nothing, and whose
  * "Review swap" opened a sell ticket at the stop tolerance. Now the pair is picked from what this executor settles
@@ -319,44 +319,59 @@ export default function Swap() {
                 );
               })}
             </View>
-          ) : (
+          ) : reviewing && q ? (
+            /*
+             * The rows take the keypad's place under review, not a place beside it. Both at once do not fit a phone: on
+             * an iPhone 17 Pro the keypad, centred in what was left, spilled up over "Max slippage" (2026-09-25). While
+             * typing, the receive card already carries the quote and its minimum; the rows are what is read before Confirm.
+             */
             <>
-              {/* The rows arrive with a quote: four dashes before anything is typed say nothing. */}
-              {q ? (
-                <View style={{ marginTop: space.s14 }}>
-                  <Row
-                    title="Minimum received"
-                    // The floor, not a fee: xorr charges none, and this is the number the fill is held to on chain.
-                    value={<Price figure="market">{`${quantity(q.minimumOut)} ${receive}`}</Price>}
-                    height={46}
-                  />
-                  <Row
-                    title="Price impact"
-                    value={
-                      <Price figure="market">
-                        {q.priceImpactPct !== null ? percent(q.priceImpactPct, { digits: 3, explicitSign: false }) : '—'}
-                      </Price>
-                    }
-                    height={46}
-                  />
-                  <Row
-                    title="Network fee"
-                    // What sending it costs, and who pays: the executor that sends the swap does (PLAN.md 3.13).
-                    value={<Price figure="market">{networkFee(q?.gas)}</Price>}
-                    height={46}
-                  />
-                  <Row
-                    title="Max slippage"
-                    value={<Price figure="input">{percent(slippagePct, { digits: 1, explicitSign: false })}</Price>}
-                    height={46}
-                    divider={false}
-                  />
-                </View>
-              ) : null}
-              <Fill style={{ justifyContent: 'center' }}>
-                <Keypad onPress={pressKey} />
-              </Fill>
+              <View style={{ marginTop: space.s14 }}>
+                <Row
+                  title="Minimum received"
+                  // The floor, not a fee: xorr charges none, and this is the number the fill is held to on chain.
+                  value={<Price figure="market">{`${quantity(q.minimumOut)} ${receive}`}</Price>}
+                  height={46}
+                />
+                <Row
+                  title="Price impact"
+                  value={
+                    <Price figure="market">
+                      {q.priceImpactPct !== null ? percent(q.priceImpactPct, { digits: 3, explicitSign: false }) : '—'}
+                    </Price>
+                  }
+                  height={46}
+                />
+                <Row
+                  title="Network fee"
+                  // What sending it costs, and who pays: the executor that sends the swap does (PLAN.md 3.13).
+                  value={<Price figure="market">{networkFee(q.gas)}</Price>}
+                  height={46}
+                />
+                <Row
+                  title="Max slippage"
+                  value={<Price figure="input">{percent(slippagePct, { digits: 1, explicitSign: false })}</Price>}
+                  height={46}
+                  divider={false}
+                />
+              </View>
+              {/* The way back to the keypad; nothing is sent until Confirm. */}
+              <Press
+                onPress={() => setReviewing(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Change the amount"
+                hitHeight={size.hit}
+                style={{ alignSelf: 'center', marginTop: space.s12 }}
+              >
+                <Text variant="control" color={colors.ink55}>
+                  Change amount
+                </Text>
+              </Press>
             </>
+          ) : (
+            <Fill style={{ justifyContent: 'center' }}>
+              <Keypad onPress={pressKey} />
+            </Fill>
           )}
         </Fill>
       )}

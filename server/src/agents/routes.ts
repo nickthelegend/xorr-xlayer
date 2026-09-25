@@ -17,6 +17,9 @@ import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { one, query } from '../db/index.js';
+import { isAddressEqual, parseEventLogs, type Address, type Hex } from 'viem';
+import { DELEGATION_ABI, DELEGATION_ADDRESS, readAgentBudgets, waitForReceipt } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { append } from '../audit/log.js';
 import { currentWallet } from '../routes/wallet-context.js';
 import { PERSONAS, type PersonaId } from '../bot/personas.js';
@@ -132,23 +135,45 @@ agents.get('/agents', async (c) => {
   ]);
   const byPersona = new Map(rows.map((r) => [r.persona_id, r]));
 
+  /*
+   * Each agent's own budget, read from the chain (2026-09-25) — the contract's figure, never a copy of it — and the key
+   * the app signs `setAgentBudget` with. Only an agent that exists on this wallet has one: a persona nobody hired yet
+   * has no row, so nothing to budget. A read that fails is null, which the screen says rather than showing $0.
+   */
+  const owner = (
+    await one<{ address: string | null }>(`SELECT address FROM wallets WHERE id = $1`, [id])
+  )?.address;
+  const read = owner
+    ? await readAgentBudgets(owner as Address, rows.map((r) => agentKey(r.id))).catch(() => rows.map(() => null))
+    : rows.map(() => null);
+  const budgets = new Map<string, number | null>(rows.map((r, i) => [r.id, read[i] ?? null]));
+  const onChain = (row: AgentRow | undefined) =>
+    row
+      ? { onChainKey: agentKey(row.id), budgetUsd: budgets.get(row.id) ?? null }
+      : { onChainKey: null, budgetUsd: null };
+
   const personas = Object.values(PERSONAS).map((p) => {
     const row = byPersona.get(p.id);
-    return toApi(
-      row ?? {
-        id: p.id,
-        wallet_id: id,
-        persona_id: p.id,
-        name: p.name,
-        hired: false,
-        tone: 'dry',
-        risk_limits: {},
-        created_at: new Date(),
-      },
-      records.get(p.id),
-    );
+    return {
+      ...toApi(
+        row ?? {
+          id: p.id,
+          wallet_id: id,
+          persona_id: p.id,
+          name: p.name,
+          hired: false,
+          tone: 'dry',
+          risk_limits: {},
+          created_at: new Date(),
+        },
+        records.get(p.id),
+      ),
+      ...onChain(row),
+    };
   });
-  const made = rows.filter((r) => isCustom(r.persona_id)).map((r) => toApi(r, records.get(r.persona_id) ?? NO_TRADES));
+  const made = rows
+    .filter((r) => isCustom(r.persona_id))
+    .map((r) => ({ ...toApi(r, records.get(r.persona_id) ?? NO_TRADES), ...onChain(r) }));
   return c.json([...personas, ...made]);
 });
 
@@ -583,6 +608,65 @@ agents.post('/agents/custom', async (c) => {
 });
 
 /** PATCH /agents/:id — tone and limits. */
+/**
+ * An agent's budget, just set by its owner on chain, written into the trail (2026-09-25).
+ *
+ * The owner signs `setAgentBudget` with their own wallet; the executor could not set a budget if it tried. So this
+ * records one and never makes one: the figure is the transaction's own `AgentBudgetSet` event, from the delegation
+ * contract, for this wallet and this agent's key — not anything the app says it asked for.
+ */
+agents.post('/agents/:id/budget', async (c) => {
+  const body = z
+    .object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'must be a 32-byte transaction hash') })
+    .parse(await c.req.json());
+  const w = await currentWallet(c);
+  if (!w?.address) return c.json({ error: 'no_wallet' }, 400);
+  const row = await one<{ id: string; name: string }>(`SELECT id, name FROM agents WHERE id = $1 AND wallet_id = $2`, [
+    c.req.param('id'),
+    w.id,
+  ]);
+  if (!row) return c.json({ error: 'not_found', message: 'This wallet has no such agent.' }, 404);
+
+  const receipt = await waitForReceipt(body.txHash as Hex).catch(() => undefined);
+  if (!receipt) {
+    return c.json({ error: 'tx_not_found', message: 'That transaction is not on this chain, so nothing was recorded.' }, 422);
+  }
+  if (receipt.status !== 'success') {
+    return c.json({ error: 'tx_reverted', message: 'That transaction failed on chain, so it set no budget.' }, 422);
+  }
+  const key = agentKey(row.id);
+  const set = parseEventLogs({ abi: DELEGATION_ABI, logs: receipt.logs, eventName: 'AgentBudgetSet' }).find(
+    (l) =>
+      isAddressEqual(l.address, DELEGATION_ADDRESS) &&
+      isAddressEqual(l.args.owner, w.address as Address) &&
+      l.args.agent === key,
+  );
+  if (!set) {
+    return c.json({ error: 'not_a_budget', message: `That transaction did not set ${row.name}'s budget.` }, 422);
+  }
+
+  const budgetUsd = Number(set.args.budget) / 1e6;
+  // The same transaction reported twice is one budget set, recorded once.
+  const already = await one<{ seq: string }>(
+    `SELECT seq FROM audit_log WHERE wallet_id = $1 AND action = 'Budget set' AND signature = $2 LIMIT 1`,
+    [w.id, body.txHash],
+  );
+  if (already) return c.json({ budgetUsd, onChainKey: key });
+  await append({
+    walletId: w.id,
+    agent: row.name,
+    action: 'Budget set',
+    detail:
+      budgetUsd > 0
+        ? `${row.name} may spend $${budgetUsd.toFixed(2)} from here, held by the contract. Its buys come out of it, and its sales go back in.`
+        : `${row.name} has no budget now, so the contract will refuse any buy it tries. A sale of what it holds puts the proceeds back.`,
+    kind: 'risk',
+    signature: body.txHash,
+    payload: { agentKey: key, budgetUsd },
+  });
+  return c.json({ budgetUsd, onChainKey: key });
+});
+
 agents.patch('/agents/:id', async (c) => {
   const body = PatchInput.parse(await c.req.json());
   const id = await walletId(c);
@@ -625,9 +709,14 @@ agents.delete('/agents/:id', async (c) => {
 
   // Every chain's, deliberately: the agent is not per chain, and a fired agent must not keep trading
   // on a chain other than the one it was fired from.
+  /*
+   * Its exits stay armed (2026-09-25). Since exits carry the agent that bought (so a sale credits its budget), pausing
+   * everything with its id would also have taken the stop-loss off every position it opened — firing an agent must stop
+   * it buying, never leave what it bought unprotected.
+   */
   const paused = await query<{ id: string }>(
     `UPDATE strategies SET state = 'paused'
-     WHERE agent_id = $1 AND state IN ('live','watch') RETURNING id`,
+     WHERE agent_id = $1 AND state IN ('live','watch') AND kind <> 'exit-rules' RETURNING id`,
     [row.id],
   );
 
@@ -637,7 +726,7 @@ agents.delete('/agents/:id', async (c) => {
     action: `Fired ${row.name}`,
     detail:
       paused.length > 0
-        ? `${paused.length} of its strategies were paused. Nothing was sold.`
+        ? `${paused.length} of its strategies were paused. Nothing was sold, and the exits on what it bought stay armed.`
         : 'It had nothing running.',
     kind: 'risk',
     payload: { agentId: row.id, pausedStrategies: paused.length },

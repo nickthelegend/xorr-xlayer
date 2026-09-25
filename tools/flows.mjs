@@ -6,9 +6,9 @@
  * form twice on purpose, reloads mid-flow, and checks what the executor actually recorded afterwards. Both sign in the
  * same way, through the real Privy form with a test credential (`signIn` there explains why that is a genuine session).
  *
- * Nothing here signs a transaction. Every step is either a read or a reversible write (an alert created and then
- * deleted), so it is safe to run against the fork deployment repeatedly. The one thing it will not do is spend the
- * daily cap — a fill is the owner's to authorise.
+ * Without `FLOWS_SIGN=1` nothing here signs a transaction: every step is a read or a reversible write (an alert created
+ * and then deleted), so it is safe to run against the fork deployment repeatedly. With it, on a fork or a testnet only,
+ * the owner's own signatures are exercised too — a buy, the stop, the grant, and one agent's budget.
  *
  *   APP_URL=https://xorr-xlayer.vercel.app EXPO_PUBLIC_API_URL=https://executor-fork-production-2db8.up.railway.app \
  *     node tools/flows.mjs
@@ -413,6 +413,18 @@ async function main() {
     let signatures = 0;
     await open(page, `/delegate`);
     await page.waitForTimeout(6000);
+    /*
+     * `FLOWS_CAP` sets the daily cap before signing, the way a finger does — down to the floor, then up in the stepper's
+     * own steps. The executor keeps its own tally of the day beside the contract's, so a wallet that already traded
+     * today needs a cap above what it spent to have anything left.
+     */
+    const wantCap = Number(process.env.FLOWS_CAP ?? 0);
+    if (wantCap > 0) {
+      const down = page.getByRole('button', { name: 'Decrease' }).first();
+      const up = page.getByRole('button', { name: 'Increase' }).first();
+      for (let i = 0; i < 110 && (await down.isEnabled().catch(() => false)); i += 1) await down.click();
+      for (let i = 0; i < Math.round((wantCap - 50) / 50); i += 1) await up.click();
+    }
     await page.getByText(/^Sign this permission$/).first().click();
     /*
      * One confirmation per tradable token, then the grant — the screen says how many ("You'll sign 17 times.
@@ -431,7 +443,61 @@ async function main() {
     await page.waitForTimeout(20_000);
     const granted = await apiGet('/limits', bearer);
     check(granted.granted === true && granted.revoked === false, 'the chain holds a live permission again', JSON.stringify({ cap: granted.dailyCapUsd, remaining: granted.remainingUsd }));
+    if (wantCap > 0) check(granted.dailyCapUsd === wantCap, 'at the daily cap chosen on the screen', `$${granted.dailyCapUsd}`);
     seen.quiet('grant');
+  }
+
+  /*
+   * One agent's own budget, signed by the owner in the app (`FLOWS_SIGN=1`, 2026-09-25).
+   *
+   * The Budget card on the agent's page sends `setAgentBudget` from the embedded wallet — one confirmation — and then
+   * shows the figure the chain answers, not the one tapped. What is checked afterwards is the executor reading the same
+   * figure off the contract, and the trail recording it from the transaction's own event.
+   */
+  if (process.env.FLOWS_SIGN === '1') {
+    const health = await (await fetch(`${API}/health`)).json();
+    if (!/fork|localnet|testnet/.test(String(health.chain))) throw new Error(`refusing to sign on ${health.chain}`);
+
+    console.log("\n3e. an agent's own budget, signed in the app");
+    seen.clear();
+    const roster = await apiGet('/agents', bearer);
+    const agent = (Array.isArray(roster) ? roster : []).find((a) => a.hired && a.onChainKey);
+    if (!agent) {
+      console.log('  – no hired agent on this wallet, so there is no budget to set');
+    } else {
+      // A figure different from the one it holds, so the change is visible.
+      const target = agent.budgetUsd === 50 ? 25 : 50;
+      await open(page, `/agent/${agent.id}`);
+      await page.waitForSelector('text=/^Budget$/', { timeout: 60_000 });
+      // Inside the card: "$50" can appear elsewhere on the page.
+      const card = page.locator('[data-testid="agent-budget"]');
+      await card.getByText(`$${target}`, { exact: true }).first().click();
+      await card.getByText(new RegExp(`^Set budget to \\$${target}\\.00$`)).first().click();
+      let signatures = 0;
+      for (let i = 0; i < 3; i += 1) {
+        const approve = page.getByRole('button', { name: /^Approve$/ }).first();
+        await approve.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => undefined);
+        if (!(await approve.isVisible().catch(() => false))) break;
+        await approve.click();
+        signatures += 1;
+        await page.waitForTimeout(4000);
+      }
+      check(signatures === 1, 'one confirmation, in the wallet’s own dialog', `${signatures} signatures`);
+      const landed = await page
+        .waitForSelector('text=/Set on chain\\./', { timeout: 180_000 })
+        .then(() => true)
+        .catch(() => false);
+      check(landed, 'the card says the budget is set on chain');
+      const shown = await card.innerText().catch(() => '');
+      check(shown.includes(`$${target}.00`), 'and shows the figure the chain answered', shown.split('\n').slice(0, 3).join(' | '));
+      const reread = await apiGet('/agents', bearer);
+      const now = (Array.isArray(reread) ? reread : []).find((a) => a.id === agent.id);
+      check(now?.budgetUsd === target, 'the executor reads the same budget off the contract', `$${now?.budgetUsd}`);
+      const trail = await apiGet('/activity', bearer);
+      const row = (Array.isArray(trail) ? trail : []).find((e) => e.action === 'Budget set' && e.agent === agent.name);
+      check(Boolean(row?.detail?.includes(`$${target}.00`)), 'the trail records it, from the transaction', row?.detail ?? '');
+      seen.quiet("agent's budget");
+    }
   }
 
   // ── 4. The strategy book, from the home sheet, the way a person reaches it ────────────────────

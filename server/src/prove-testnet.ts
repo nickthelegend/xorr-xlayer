@@ -40,7 +40,7 @@ import { xLayerTestnet } from 'viem/chains';
 
 const RPC = process.env.XLAYER_TESTNET_RPC ?? 'https://testrpc.xlayer.tech';
 const EXECUTOR = process.env.TESTNET_EXECUTOR ?? 'https://executor-testnet-production.up.railway.app';
-const DELEGATION: Address = '0x156DCE9E9d523775AB51f882616A431EdBfBcA22';
+const DELEGATION: Address = '0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2';
 const USDC: Address = '0xDec90b78111Ba2fc6FC6d84d8B9ec159A2d4b9B3';
 const EXPLORER = 'https://www.oklink.com/xlayer-test/tx/';
 

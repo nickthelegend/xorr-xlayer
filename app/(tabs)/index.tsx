@@ -76,6 +76,7 @@ import { contractToRead } from '@/wallet/contractToRead';
 import { killSwitchChip } from '@/state/killSwitch';
 import { KillSwitchChip } from '@/ui/KillSwitchChip';
 import { TradingTicker } from '@/ui/TradingTicker';
+import { AgentDesk } from '@/desk/AgentDesk';
 import { usePoll } from '@/data/usePoll';
 import { ratio } from '@/format';
 
@@ -90,6 +91,8 @@ const TABS: readonly { key: SheetTab; label: string }[] = [
 ];
 
 const AVATAR = 40;
+/** The empty state's "make one" orb: the New agent tile's, larger. */
+const FIRST_ORB = 76;
 const GRABBER_W = 36;
 const GRABBER_H = 4;
 const TAB_RULE = 2;
@@ -341,11 +344,14 @@ export default function Home() {
   );
   const logos = useLogos(markSyms);
 
-  /* Hired agents first — the ones actually allowed to act on this wallet. */
-  const roster = useMemo<Agent[]>(
-    () => [...(agents.data ?? [])].sort((a, b) => Number(!!b.hired) - Number(!!a.hired)),
-    [agents.data],
-  );
+  /*
+   * This wallet's own agents only — the ones it hired or made (2026-09-25).
+   *
+   * The four built-in personas came back from `/agents` whether or not anyone had hired them, and all four were drawn
+   * here as "Not hired": a brand-new account opened onto a row of agents it never had. They are a catalog to hire from
+   * (`/bot/roster`), not agents you have; until you hire or make one, this row is empty and says so.
+   */
+  const roster = useMemo<Agent[]>(() => (agents.data ?? []).filter((a) => a.hired), [agents.data]);
 
   const total = balance.data?.total ?? null;
 
@@ -431,11 +437,16 @@ export default function Home() {
         firstFocus.current = false;
         return;
       }
+      /*
+       * The chip is read from the chain on every return, set up or not (2026-09-26). It was re-read only while the setup
+       * card showed, so once the first trade had filled, a stop signed on Safety came back to a green ARMED over a
+       * permission the contract had just revoked — on mainnet, on camera. It is the one label here that must not lag.
+       */
+      reloadStanding();
       if (!setupShowing.current) return;
       reloadBalance();
       reloadLimits();
       reloadPermission();
-      reloadStanding();
       reloadRuns();
     }, [reloadBalance, reloadLimits, reloadPermission, reloadStanding, reloadRuns]),
   );
@@ -465,6 +476,12 @@ export default function Home() {
    * user on a fresh device is not bounced back through sign-up.
    */
   if (hydrated && walletChecked && !wallet) return <Redirect href="/welcome" />;
+  /*
+   * Only the background until it is known whether this device has a wallet (2026-09-25). A first launch drew Home — the
+   * setup steps, an agents row, the tab bar — for the second the check took, then swapped it for the welcome screen. A
+   * device that remembers a wallet goes straight to Home, as before.
+   */
+  if (!hydrated || (!wallet && !walletChecked)) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
     <Screen tabBar gutter="none">
@@ -501,6 +518,28 @@ export default function Home() {
             </Text>
           </View>
         </Press>
+        {/*
+          Whether the agents can act right now, and the way to Safety — beside the bell since 2026-09-25, where it is read
+          first. It sat at the end of the sheet's tab row and squeezed the fourth tab to "Future".
+        */}
+        {signedOut ? null : (
+          <Press
+            onPress={() => router.push('/safety')}
+            accessibilityRole="button"
+            accessibilityLabel={`${killSwitchChip(standing.data, standing.error !== undefined).detail} Open Safety.`}
+            hitHeight={size.hit}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: space.s12,
+              height: 32,
+              borderRadius: radius.full,
+              backgroundColor: colors.surfaceAlt,
+            }}
+          >
+            <KillSwitchChip standing={standing.data} failed={standing.error !== undefined} />
+          </Press>
+        )}
         <IconButton name="bell" accessibilityLabel="Notifications" onPress={() => router.push('/inbox')} />
       </Rise>
 
@@ -641,13 +680,13 @@ export default function Home() {
               borderBottomColor: colors.hairline,
             }}
           >
-            {/* The tabs scroll sideways on a narrow phone rather than crowding the Live dot out — five of them since Strategies joined. */}
+            {/* The tabs scroll sideways on a narrow phone — five of them since Strategies joined. */}
             <ScrollView
               ref={tabsRef}
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 1 }}
-              contentContainerStyle={{ gap: space.s22, paddingLeft: space.gutter, paddingRight: space.s14 }}
+              style={{ flexGrow: 1 }}
+              contentContainerStyle={{ gap: space.s22, paddingLeft: space.gutter, paddingRight: space.gutter }}
             >
               {TABS.map((t) => {
                 const selected = t.key === tab;
@@ -672,33 +711,6 @@ export default function Home() {
                 );
               })}
             </ScrollView>
-            {/*
-              Whether the agents can act right now, and the way to Safety.
-
-              From THE CHAIN (`standing`), not from `store.killed` and not from the executor's `/limits`. The stored
-              flag is a boolean this browser wrote when someone pressed the button here, and it drifts the moment
-              anything happens anywhere else — a revoke from another device, a permission that expired on its own, a
-              reload after site data was cleared. This app has already shipped a green LIVE badge over a permission the
-              contract reported revoked, and that is exactly this bug.
-
-              Armed is claimed only where the chain said `live`. A chain that could not be read says so, in amber: a
-              grey dot would read as a settled, harmless "off", and rounding "could not ask" down to "stopped" tells
-              someone the agents are off when they may be trading.
-            */}
-            <Press
-              onPress={() => router.push('/safety')}
-              accessibilityRole="button"
-              accessibilityLabel={`${killSwitchChip(standing.data, standing.error !== undefined).detail} Open Safety.`}
-              style={{
-                marginLeft: 'auto',
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingBottom: space.s10,
-                paddingRight: space.gutter,
-              }}
-            >
-              <KillSwitchChip standing={standing.data} failed={standing.error !== undefined} />
-            </Press>
           </View>
 
           <GestureDetector gesture={swipeTabs}>
@@ -715,6 +727,8 @@ export default function Home() {
                   </View>
                 ) : agents.error ? (
                   <TabFailed what="agents" error={agents.error} onRetry={agents.reload} />
+                ) : roster.length === 0 ? (
+                  <FirstAgent onMake={() => router.push('/agent/new')} onHire={() => router.push('/bot/roster')} />
                 ) : (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.s18, marginTop: space.s18 }}>
                     {roster.map((a, i) => (
@@ -777,6 +791,15 @@ export default function Home() {
                         </Text>
                       </Press>
                     </Rise>
+                    {/* The desk: what each agent will do next, and what they did, as it lands (2026-09-26). */}
+                    <View style={{ width: '100%' }}>
+                      <AgentDesk
+                        agents={roster}
+                        standing={standing.data}
+                        onOpenAgent={(id) => router.push(`/agent/${id}`)}
+                        onSeeAll={() => router.push('/activity')}
+                      />
+                    </View>
                   </View>
                 )
               ) : tab === 'gainers' ? (
@@ -947,5 +970,48 @@ export default function Home() {
         </Rise>
       </ScrollView>
     </Screen>
+  );
+}
+
+/**
+ * A wallet with no agents yet (2026-09-25): what an agent is, in two lines, and the one thing to do next.
+ *
+ * The row used to fill with the four built-in personas as "Not hired" — a new account looked as if it came with agents —
+ * and, once those were gone, with a single line of grey text over an empty sheet. This is the first thing a new person
+ * sees on Home, so it says what happens when they make one, and makes that the obvious tap.
+ */
+function FirstAgent({ onMake, onHire }: { onMake: () => void; onHire: () => void }) {
+  return (
+    <Rise index={ROWS_FROM} style={{ alignItems: 'center', paddingTop: space.s30, paddingBottom: space.s18 }}>
+      <View
+        style={{
+          width: FIRST_ORB,
+          height: FIRST_ORB,
+          borderRadius: FIRST_ORB / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1.5,
+          borderStyle: 'dashed',
+          borderColor: colors.ink28,
+          backgroundColor: colors.surface,
+        }}
+      >
+        <Icon name="plus" size={30} color={colors.ink} strokeWidth={2} />
+      </View>
+      <Text variant="titleLg" align="center" style={{ marginTop: space.s18 }}>
+        Your agents live here
+      </Text>
+      <Text variant="body" color={colors.ink55} align="center" style={{ marginTop: space.s8, maxWidth: 300 }}>
+        Make one, give it a strategy and a budget of its own. It trades inside the permission you sign, never past it.
+      </Text>
+      <View style={{ alignSelf: 'stretch', marginTop: space.s22 }}>
+        <Button label="Make your first agent" onPress={onMake} />
+      </View>
+      <Press onPress={onHire} accessibilityRole="button" hitHeight={size.hit} style={{ marginTop: space.s14 }}>
+        <Text variant="control" color={colors.ink55}>
+          Or hire one of ours
+        </Text>
+      </Press>
+    </Rise>
   );
 }

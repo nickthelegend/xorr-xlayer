@@ -12,6 +12,7 @@ import { useCallback, useState } from 'react';
 import { formatUnits, type Address, type Hex } from 'viem';
 import { useGrantDelegation } from '@/auth/useGrantDelegation';
 import { chainAccess } from '@/wallet/chainAccess';
+import { receiptOf } from '@/wallet/receipt';
 import { humanWalletError } from '@/wallet/walletError';
 import { api } from '@/data/api';
 import { ApiError, errorText } from '@/data/apiError';
@@ -99,7 +100,7 @@ export function useConvertUsdt0(owner: Address | undefined, onConverted?: () => 
         setState({ step: 'signing', preview: shown, of: i + 1, total: calls.length });
         const hash = await sendTransaction(call.to, call.data);
         // Each is mined before the next is asked for: the swap cannot be estimated until its approval is on chain.
-        const receipt = await chainAccess.waitForTransactionReceipt({ hash });
+        const receipt = await receiptOf(chainAccess, hash);
         if (receipt.status !== 'success') throw new Error('The transaction reverted on chain. Your USDT0 was not converted.');
         last = hash;
       }

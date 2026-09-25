@@ -7,11 +7,34 @@
 **An autonomous agent that trades tokenized US stocks for you — inside a permission you can revoke in one tap.**
 
 Non-custodial. Your wallet, your keys, and a **scoped on-chain permission** the agent trades inside: capped per day,
-restricted to venues you approved, time-boxed, and revocable without our cooperation.
+restricted to venues you approved, time-boxed, and revocable without our cooperation. Inside it, **every agent has a
+budget of its own on chain**. You set it, and the contract charges that agent's trades to it and refuses any trade
+past it.
 
 Chain: **OKX X Layer** (chain 196). Assets: **xStocks** (Backed's tokenized equities — TSLAx, NVDAx, SPYx, …).
-Venues: **Uniswap v3** on X Layer and the **OKX DEX aggregator**. Yield: **Aave v3 on X Layer** (USDT0).
-Built for OKX Dev Day 2026.
+Venues: the **OKX DEX aggregator** first, **Uniswap v3** on X Layer as the fallback. Yield: **Aave v3 on X Layer**
+(USDT0). Built for OKX Dev Day 2026.
+
+**Live on X Layer mainnet** (chain 196) since 2026-09-25: XorrDelegation
+[`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22)
+and XorrAuditAnchor
+[`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196),
+both Sourcify exact match, behind **https://xorr-xlayer.vercel.app** — real USDC, inside a permission you sign. The same
+app on a fork of mainnet, with test funds on Deposit, is the no-money sandbox at **https://xorr-xlayer-demo.vercel.app**.
+
+**The first real run, 2026-09-26** — a new wallet in the iOS app, funded with 90 USDT0 on X Layer, every step on OKLink:
+
+1. The owner converted the USDT0 to 89.97 USDC, signed with their own wallet —
+   [`0xbe2868ca…4885`](https://www.oklink.com/xlayer/tx/0xbe2868ca13c41f19b5b18314e0ccd13afd46fd730360c964fc56d86f84424885).
+2. They granted the bot a $100-a-day, 7-day permission —
+   [`0x79bf486f…f70c`](https://www.oklink.com/xlayer/tx/0x79bf486f5cc0368e6052884c81f76cb297698c21647d938853083be9be35f70c).
+3. They made an agent, *Weekly Stacker* (a weekly OKB buy), and set its budget to $50 on chain —
+   [`0x0879c7d5…7f9d`](https://www.oklink.com/xlayer/tx/0x0879c7d5203c2e2ecedc0226d3337c3a8d95014279baf3b83346e52466c27f9d).
+4. The agent bought 0.2070 WOKB for $25 through the OKX DEX aggregator, and the transaction carries `AgentSpent` for
+   that agent: $25 spent, $25 left —
+   [`0x3df85bc7…cbf9a`](https://www.oklink.com/xlayer/tx/0x3df85bc700db96e97abce805d1f268eec6b25bcb63b1034a525d7d58480cbf9a).
+5. Stop all revoked the permission on chain, and the funds never left the wallet —
+   [`0x56945e3e…45a3`](https://www.oklink.com/xlayer/tx/0x56945e3e32aaa0a86a39d19fd26c10a317b07a349fa06916241e9503ca3345a3).
 
 **[▶ Watch the demo](docs/demo/xorr-demo.mp4)** (2:43) — the permission, the agent's own fills, the cap refusing an order,
 and `/judge` re-checking all 20 claims against the chain. Recorded against the live build by
@@ -25,8 +48,10 @@ Handing a bot your money is a trust problem, not a trading problem. So the permi
 `XorrDelegation` is a contract you grant that caps what the agent can spend per day, restricts it to the venues you
 allowlisted, expires on its own, and **cannot send funds to an address of the agent's choosing** — every fill must
 land the bought asset in *your* wallet or the transaction reverts. Revoking needs one signature from you and nothing
-from us. The agent itself reads the market (xStock pool prices, a Solana-listed reference for off-hours drift, SEC
-EDGAR earnings windows, corporate-action multipliers) and trades wrapped xStocks on X Layer inside that permission.
+from us. Each agent you hire or make spends from its own budget on the same contract, which only you can set. The
+agents read the market (xStock pool prices, a Solana-listed reference for off-hours drift, SEC EDGAR earnings windows,
+corporate-action multipliers) and trade wrapped xStocks on X Layer inside that permission, routed through OKX DEX
+first.
 
 ## Verify it yourself — on a fork of X Layer mainnet, in about five minutes
 
@@ -46,9 +71,13 @@ npm ci --ignore-scripts && (cd server && npm ci --ignore-scripts)
 cd contracts && XLAYER_RPC=https://rpc.xlayer.tech forge test -vv
 ```
 
-45 unit tests plus the fork suite: a delegated buy of wrapped TSLAx directly against USDC, NVDAx through the USDG
+64 unit tests plus the fork suite: a delegated buy of wrapped TSLAx directly against USDC, NVDAx through the USDG
 hop, the daily cap refusing a buy, a venue the owner never allowed refused, a position sold back through
-`closePosition`, and `revoke()` stopping everything.
+`closePosition`, and `revoke()` stopping everything. Nineteen of them are the per-agent budgets
+(`XorrAgentBudget.t.sol`): an agent's buy charged to its budget and its sale credited back, a trade past the budget and
+one by an agent nobody budgeted both refused, one agent's spending never touching another's, nobody but the owner able
+to set a budget, revoke and expiry stopping every agent, and a 256-run fuzz that no sequence of trades takes an agent
+past its budget.
 
 **2. The permission on a public chain** — X Layer testnet, the deployed contracts, every step an OKLink transaction
 (needs the deployer's test OKB: `server/.env.deployer`):
@@ -109,6 +138,11 @@ The $0.05 is two 0.05% pool fees; nothing else is taken. CI runs both proofs on 
   spender): both addresses must be on the allowlist, and the approval is reset to zero in the same call
 - `closePosition` sells a held asset back to USDC **without** touching the cap — a stop-loss a spending limit could
   silence is not a stop-loss
+- **a budget per agent**: `setAgentBudget(agent, amount)` sets the budget of whoever sends it, so only the owner can set
+  their agents' budgets. `spendForAgent` charges an agent's buy to its budget as well as the daily cap, and reverts
+  with `AgentBudgetExceeded` past it; `closeForAgent` credits what a sale returns in USDC back to it. An agent's key is
+  `keccak256("xorr-agent:" + its id)`, and `agentBudget(owner, agent)` is readable by anyone. A budget bounds the
+  trades submitted as that agent's. It is not a limit on the delegate key itself: see Known limitations
 - `revoke()` needs only the owner's signature: no server, no oracle, no cooperation from the agent
 
 It never custodies: it pulls exactly the approved amount at the moment of a trade, forwards it, holds nothing
@@ -121,8 +155,8 @@ contract is built for Cancun — X Layer executes it (proven on the fork above).
 |---|---|
 | Stocks | 11 wrapped xStocks (ERC-4626 wrappers over Backed's rebasing tokens): TSLAx, NVDAx, AAPLx, MSFTx, AMZNx, GOOGLx, METAx, MSTRx, COINx, SPYx, QQQx |
 | Crypto | XBTC, WOKB (OKB), USDG, USDT0, USDC — only assets with a real pool against a stablecoin |
-| Venue 1 | Uniswap v3 on X Layer — QuoterV2 prices, SwapRouter02 fills; TSLAx/QQQx/GOOGLx/COINx direct against USDC, the rest through the USDC/USDG 0.01% hop |
-| Venue 2 | OKX DEX aggregator API (v6, HMAC-signed) — chosen only when its guaranteed output beats Uniswap's; fills through `spendVia` |
+| Venue 1 | OKX DEX aggregator API (v6, HMAC-signed) — settles every trade it can route, fills through `spendVia`. The executor first simulates the exact contract call, and keeps OKX's route unless the contract would refuse it here or its guaranteed output is more than 0.5% below Uniswap's |
+| Venue 2 | Uniswap v3 on X Layer, the fallback — QuoterV2 prices, SwapRouter02 fills; TSLAx/QQQx/GOOGLx/COINx direct against USDC, the rest through the USDC/USDG 0.01% hop |
 | Yield | Aave v3 on X Layer: idle USDC is swapped to USDT0 and supplied (USDT0 reserve ~3.5% APY read live from `currentLiquidityRate`; USDC's reserve pays ~0%) |
 | Deposits | USDC or USDT0 on X Layer to your address (QR); OKX for buying; USDT0 → USDC is a swap **you** sign |
 
@@ -140,6 +174,8 @@ the worst outcome available.
 | Backing | Backed's contracts read directly: owner and pauser are 2-of-3 Safes, the minter an ordinary wallet, and the burner **cannot** seize balances — plus Backed's proof-of-reserves feed |
 | Logos | The issuer's own marks (Backed's xStocks API) and CoinGecko |
 | Permission | On chain, signed by the user's embedded wallet |
+| Agent budgets | Read from the contract (`agentBudget`) every time the app shows one; setting one is a transaction the owner signs, and the figure shown afterwards is the chain's answer, not what was typed |
+| Venue | Every fill records the venue that filled it, and its receipt names it — OKX DEX or Uniswap v3 — beside the transaction |
 
 ## Architecture
 
@@ -154,21 +190,29 @@ infra/xlayer-fork/ the hosted anvil fork of X Layer (Railway), state kept across
 ```
 
 The agent's loop: the scheduler ticks → each live strategy or the autonomous agent plans a trade → the executor
-reads the owner's policy **from the chain** (never from our database) → prices the route → the delegate key calls
-`spend` → the fill is measured from the owner's balance, booked, audited (hash-chained, anchored on chain) and pushed
-to the phone.
+reads the owner's policy and that agent's budget **from the chain** (never from our database) → routes it through OKX
+DEX, or Uniswap where OKX cannot fill it → the delegate key calls `spendForAgent` (or `spend`, for an order the owner
+placed themselves) → the fill is measured from the owner's balance, booked, audited (hash-chained, anchored on chain)
+and pushed to the phone.
 
 ## Deployment
 
-Open **https://xorr-xlayer.vercel.app** and sign in; `/judge` re-runs every claim below against the live chain.
+Open **https://xorr-xlayer.vercel.app** (X Layer mainnet) or **https://xorr-xlayer-demo.vercel.app** (the sandbox, no
+money) and sign in; `/judge` re-runs every claim below against the live chain. Every executor's `/health` names the commit it
+runs, and the app says whether that is its own.
 
 
 | | |
 |---|---|
+| **Contracts, X Layer mainnet** | XorrDelegation [`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — chain 196, both Sourcify exact match (`contracts/deployments/xlayer-mainnet.json`) |
+| **Executor (X Layer mainnet)** | https://executor-mainnet-production.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-mainnet`, its own Postgres; starts only with `ALLOW_MAINNET=yes`) |
+| **Web app (mainnet)** | **https://xorr-xlayer.vercel.app** — real USDC, deposited from OKX as USDT on X Layer |
+| Sandbox (no money) | **https://xorr-xlayer-demo.vercel.app** — the same app on a fork of X Layer mainnet, with test funds on Deposit, for trying it without money |
 | Executor (X Layer fork) | https://executor-fork-production-2db8.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-fork`, `node scripts/deploy-executor.mjs executor-fork`) |
+| Contracts, hosted fork | XorrDelegation `0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058` (per-agent budgets, 2026-09-25), XorrAuditAnchor `0x4c4eda9a67c413cde16440aaf1bfdb3dae851594` |
 | Fork node | Railway service `xlayer-fork` (anvil v1.7.1 forking chain 196, `/data` volume) — `https://xlayer-fork-production.up.railway.app` |
-| Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses anything but an X Layer fork or testnet executor) |
-| Contracts, X Layer testnet | XorrDelegation [`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer-test/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
+| Web builds | Vercel `xorr-xlayer` (mainnet) and `xorr-xlayer-demo` (sandbox), both from `npm run deploy:web` (`XORR_WEB_PROJECT` names the project) — which refuses an executor that is down, a fork RPC that is not a fork of X Layer, and a delegation pin the executor and the chain do not both agree on |
+| Contracts, X Layer testnet | XorrDelegation [`0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`](https://www.oklink.com/xlayer-test/address/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2) (per-agent budgets; the 2026-09-19 deployment without them is `0x156DCE9E…cA22`), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
 | Executor (X Layer testnet) | https://executor-testnet-production.up.railway.app — serves the testnet contracts; nothing fills there (no DEX) |
 
 Chain configuration lives in one place per side: `src/chain.ts` (app) and `server/src/evm/chains.ts` (executor), with
@@ -196,14 +240,34 @@ cd contracts && forge test                 # + XLAYER_RPC for the fork suite
 
 ## Known limitations — read these before you believe us
 
-- **The X Layer testnet has no DEX.** Contracts and wallet flows run there; fills happen on the fork, where the
-  pools are mainnet's. Nothing in this repo moves real money, and mainnet needs `ALLOW_MAINNET=yes` to start at all.
+- **Mainnet is real money, and it is new.** The mainnet executor starts only with `ALLOW_MAINNET=yes`, and it trades
+  only inside a permission the owner signed. Its database was seeded with the X Layer pool readings the fork executor
+  had recorded from the live mainnet pools since 2026-09-19 (each row says so in `source`), so its agents' price bands
+  start from real history; its own trail starts on 2026-09-25. The X Layer testnet has no DEX, so its contracts and
+  wallet flows run there, and fills happen on mainnet and on the fork.
+- **One key signs for every agent, and the budgets do not bind that key.** Agents are not separate wallets: the
+  executor holds one delegate key, and it signs every agent's trades. The budgets bound what the executor submits as
+  each agent's trade. Each such trade is charged to that agent's budget, a trade past it reverts, and only you can set
+  a budget. The hard limits on the key itself are the ones that bind it no matter which function it calls: the
+  daily cap, the venue allowlist, the expiry, the output floor that makes every fill pay you, and revoke. A stolen key
+  could skip the budgets by trading as "no agent" (`spend`), inside the daily cap, and could credit a sale to any
+  agent's budget. Future work: an owner opt-in on the contract so that every delegate spend must be charged to some
+  budget.
+- **Only an agent's exit of the lot it bought refills its budget.** When an agent enters a position on its own, it
+  arms an exit for exactly the units that entry filled. That exit sells only that lot, never the rest of your holding,
+  and its proceeds go back to the agent's budget (`closeForAgent`). Every other sale settles as yours
+  (`closePosition`) and refills no budget: an agent strategy's own close (a momentum stop, an event-driven close), the
+  order ticket, and "Sell everything". So a buy by an agent's strategy, including a proposal from it that you approve,
+  is charged to that agent and is not paid back when the strategy sells. Firing an agent pauses its strategies but
+  leaves its exits armed, so its positions keep their stops.
 - **A fork is pinned at a block.** Its pools stop moving while the market doesn't. So on a fork, prices, observations
   and the agent's signals read the live X Layer mainnet pools, while fills settle against the fork's own pools — the
   ticket shows both ("$362.38 each · mark $364.95"). Fill-vs-market figures on the fork therefore mix venue quality with
   fork drift; the app labels them.
-- **OKX DEX routing is dark without an API key.** The code, signing, contract path and tests are in; live quotes
-  need the key.
+- **OKX DEX routing needs an API key.** The deployed executor has one, so its trades go to OKX DEX first. A local
+  run without `OKX_API_KEY` settles everything on Uniswap v3. On a fork, OKX quotes mainnet while the fork's pools are
+  frozen at the fork block, so some OKX routes cannot fill there and those trades settle on Uniswap. The executor
+  simulates the exact contract call before it chooses, so such a route is set aside before anything is signed.
 - **Wrapped xStocks are not the underlying shares.** They track them through Backed's issuance; the backing screen
   shows exactly who can mint, pause and upgrade.
 

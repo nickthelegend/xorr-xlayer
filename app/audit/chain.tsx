@@ -34,6 +34,7 @@ import { useRouter } from 'expo-router';
 import { useAsync } from '@/data/useAsync';
 import { system } from '@/data/system';
 import { repos } from '@/data';
+import { eventTime } from '@/format';
 
 export default function AuditChain() {
   const goBack = useGoBack();
@@ -139,7 +140,7 @@ export default function AuditChain() {
                 height={size.rowLg}
                 onPress={() => router.push(`/audit/${e.id}`)}
                 title={e.action}
-                secondary={`${e.agent} · ${e.t}`}
+                secondary={`${e.agent} · ${eventTime(e)}`}
                 value={
                   e.amount ? (
                     <Text variant="rowPrimary">{e.amount}</Text>

@@ -39,7 +39,7 @@ function chain(contracts: Record<string, Contract>, receipt: 'success' | 'revert
       if (c?.policyUnreadable) throw new Error('rpc unavailable');
       return c?.policy ?? [NO_ADDRESS, 0n, 0n, false];
     },
-    waitForTransactionReceipt: async () => ({ status: receipt }),
+    getTransactionReceipt: async () => ({ status: receipt, blockNumber: 1n }),
   };
   return reader as unknown as ChainReader;
 }

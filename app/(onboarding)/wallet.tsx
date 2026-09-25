@@ -18,7 +18,7 @@
  * when `/wallet/connect` answers, asked again from here when it does not — and the way on waits for it.
  */
 import React, { useEffect, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import { Icon } from '@/design/Icon';
@@ -205,112 +205,123 @@ export default function WalletSetup() {
       )}
 
       <Fill style={{ marginTop: space.s22 }}>
-        {STEPS.map((s, i) => {
-          const isDone = i < step;
-          const isCurrent = i === step;
-          return (
-            <View
-              key={s.label}
-              style={{
-                height: STEP_H,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: space.s14,
-              }}
-            >
+        {/*
+          Scrolls (2026-09-25). On a 6.3" phone the four steps, three sign-in buttons and the email field are taller than
+          the screen, and the field sat under the pinned "Email me a code" button with nothing to move it out.
+        */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={{ paddingBottom: space.s16 }}
+        >
+          {STEPS.map((s, i) => {
+            const isDone = i < step;
+            const isCurrent = i === step;
+            return (
               <View
+                key={s.label}
                 style={{
-                  width: MARK,
-                  height: MARK,
-                  borderRadius: radius.full,
+                  height: STEP_H,
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isDone ? colors.up : 'transparent',
-                  borderWidth: isDone ? 0 : RING,
-                  borderColor: isCurrent ? colors.ink : colors.pending,
+                  gap: space.s14,
                 }}
               >
-                {isDone ? (
-                  <Icon name="check" size={14} color={colors.upInk} strokeWidth={2.4} />
-                ) : null}
-              </View>
-              <View style={{ flex: 1, gap: space.s2 }}>
-                <Text variant="rowPrimary" color={isDone || isCurrent ? colors.ink : colors.ink32}>
-                  {s.label}
-                </Text>
-                <Text
-                  variant="secondarySm"
-                  color={isDone || isCurrent ? colors.ink38 : colors.ink28}
+                <View
+                  style={{
+                    width: MARK,
+                    height: MARK,
+                    borderRadius: radius.full,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isDone ? colors.up : 'transparent',
+                    borderWidth: isDone ? 0 : RING,
+                    borderColor: isCurrent ? colors.ink : colors.pending,
+                  }}
                 >
-                  {s.detail}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-
-        {!authenticated ? (
-          <View style={{ gap: space.s10, marginTop: space.s8 }}>
-            {/* The ways in that need nothing typed, first — and gone once a code is on its way to an address. */}
-            {!codeSent ? (
-              <>
-                {SOCIAL_LOGINS.map((s) => (
-                  <Button
-                    key={s.id}
-                    label={`Continue with ${s.label}`}
-                    variant="ghost"
-                    loading={pending === s.id}
-                    disabled={!ready || busy || (!!pending && pending !== s.id)}
-                    onPress={() => void withSocial(s.id, s.label)}
-                  />
-                ))}
-                {/* Only where a wallet in another app can actually be reached — web today. */}
-                {walletLogin.login ? (
-                  <Button
-                    label="Continue with a wallet"
-                    variant="ghost"
-                    disabled={!ready || busy || !!pending}
-                    onPress={() => walletLogin.login?.()}
-                  />
-                ) : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s10, marginVertical: space.s2 }}>
-                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
-                  <Text variant="secondarySm" color={colors.ink40}>
-                    or an email code
-                  </Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                  {isDone ? (
+                    <Icon name="check" size={14} color={colors.upInk} strokeWidth={2.4} />
+                  ) : null}
                 </View>
-              </>
-            ) : null}
-            <Field
-              label="Email"
-              value={email}
-              onChange={setEmail}
-              placeholder="you@example.com"
-              editable={!codeSent}
-              keyboard="email-address"
-            />
-            {codeSent ? (
+                <View style={{ flex: 1, gap: space.s2 }}>
+                  <Text variant="rowPrimary" color={isDone || isCurrent ? colors.ink : colors.ink32}>
+                    {s.label}
+                  </Text>
+                  <Text
+                    variant="secondarySm"
+                    color={isDone || isCurrent ? colors.ink38 : colors.ink28}
+                  >
+                    {s.detail}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          {!authenticated ? (
+            <View style={{ gap: space.s10, marginTop: space.s8 }}>
+              {/* The ways in that need nothing typed, first — and gone once a code is on its way to an address. */}
+              {!codeSent ? (
+                <>
+                  {SOCIAL_LOGINS.map((s) => (
+                    <Button
+                      key={s.id}
+                      label={`Continue with ${s.label}`}
+                      variant="ghost"
+                      loading={pending === s.id}
+                      disabled={!ready || busy || (!!pending && pending !== s.id)}
+                      onPress={() => void withSocial(s.id, s.label)}
+                    />
+                  ))}
+                  {/* Only where a wallet in another app can actually be reached — web today. */}
+                  {walletLogin.login ? (
+                    <Button
+                      label="Continue with a wallet"
+                      variant="ghost"
+                      disabled={!ready || busy || !!pending}
+                      onPress={() => walletLogin.login?.()}
+                    />
+                  ) : null}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s10, marginVertical: space.s2 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                    <Text variant="secondarySm" color={colors.ink40}>
+                      or an email code
+                    </Text>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                  </View>
+                </>
+              ) : null}
               <Field
-                label="Code"
-                value={code}
-                onChange={setCode}
-                placeholder="6-digit code"
-                keyboard="number-pad"
+                label="Email"
+                value={email}
+                onChange={setEmail}
+                placeholder="you@example.com"
+                editable={!codeSent}
+                keyboard="email-address"
               />
-            ) : null}
-          </View>
-        ) : null}
+              {codeSent ? (
+                <Field
+                  label="Code"
+                  value={code}
+                  onChange={setCode}
+                  placeholder="6-digit code"
+                  keyboard="number-pad"
+                />
+              ) : null}
+            </View>
+          ) : null}
 
-        <NoteStrip kind={authenticated ? 'acted' : 'risk'} style={{ marginTop: space.s16 }}>
-          However you sign in is how you get back to this wallet.
-        </NoteStrip>
+          <NoteStrip kind={authenticated ? 'acted' : 'risk'} style={{ marginTop: space.s16 }}>
+            However you sign in is how you get back to this wallet.
+          </NoteStrip>
 
-        {shownError ? (
-          <Text variant="secondarySm" color={colors.down} style={{ marginTop: space.s14 }}>
-            {shownError}
-          </Text>
-        ) : null}
+          {shownError ? (
+            <Text variant="secondarySm" color={colors.down} style={{ marginTop: space.s14 }}>
+              {shownError}
+            </Text>
+          ) : null}
+        </ScrollView>
       </Fill>
 
       {done ? (

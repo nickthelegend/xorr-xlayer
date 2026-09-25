@@ -22,12 +22,14 @@
 import { randomUUID } from 'node:crypto';
 import { isAddress, type Address } from 'viem';
 import { one, query } from '../db/index.js';
+import { append } from '../audit/log.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
 import { log } from '../http/request-id.js';
 import { evaluate, type RuleVerdict } from '../rules/engine.js';
 import { XSTOCKS, xStockPriceUsd, type XStockToken } from '../venues/xstocks.js';
 import { armExits, placeOrder, type OrderResult } from '../executor/order.js';
-import { readPolicy, type OnChainPolicy } from '../evm/delegation.js';
+import { readAgentBudget, readPolicy, type OnChainPolicy } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { publicClient } from '../evm/client.js';
 import type { WalletRow } from '../routes/wallet-context.js';
 import { speak } from './llm.js';
@@ -235,6 +237,8 @@ export type AutonomousTradeResult =
       executed: false;
       reason: string;
       detail: string;
+      /** The agent a refusal is about, where it is one agent's — by name, as the trail writes it. */
+      agent?: string;
     };
 
 
@@ -511,7 +515,15 @@ export async function evaluateBestSetup(
   return candidates[0] ?? null;
 }
 
-type Refusal = { executed: false; reason: string; detail: string };
+/** Why an agent with too little budget on chain did not trade, in the words the trail keeps. */
+function noBudgetSentence(name: string, budgetUsd: number, minTradeUsd: number): string {
+  return budgetUsd < 0.01
+    ? `${name} has no budget on chain yet. Give it one on its page, and it can trade.`
+    : `${name} has $${budgetUsd.toFixed(2)} of its budget left on chain, under the $${minTradeUsd} smallest trade.`;
+}
+
+/** `agent`: the agent the refusal is about, where it is one agent's — its name, as the trail writes it. */
+type Refusal = { executed: false; reason: string; detail: string; agent?: string };
 
 /**
  * The permission as the XorrDelegation contract holds it, or the refusal that stands in for it.
@@ -711,7 +723,38 @@ export async function runAutonomousCycle(
       detail: `${options.setup.symbol} is already held; the agent enters a symbol once and lets its exit decide.`,
     };
   }
-  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held, hired));
+  /*
+   * Which hired agents have a budget to trade from, on chain (2026-09-25).
+   *
+   * An agent trades only from the budget its owner set for it on the contract. Scanning every hired agent and checking
+   * the winner's budget afterwards let an agent nobody budgeted, ranking first, block every agent that had one — on
+   * every tick. So every hired agent's budget is read first, and only an agent holding at least the smallest trade may
+   * take a setup; with none, nothing is scanned at all.
+   */
+  const budgetOf = new Map<PersonaId, number | null>(
+    await Promise.all(
+      [...hired].map(async (persona): Promise<[PersonaId, number | null]> => {
+        const id = agentIdFor(persona);
+        return [persona, id ? await readAgentBudget(wallet.address as `0x${string}`, agentKey(id)).catch(() => null) : null];
+      }),
+    ),
+  );
+  const funded = new Set([...hired].filter((persona) => (budgetOf.get(persona) ?? 0) >= settings.minTradeUsd));
+  if (!options.setup && funded.size === 0) {
+    const only = roster.length === 1 ? roster[0]! : undefined;
+    const unread = [...hired].every((persona) => budgetOf.get(persona) === null);
+    return {
+      executed: false,
+      reason: unread ? 'agent_budget_unread' : 'agent_budget',
+      detail: unread
+        ? `${only ? `${only.name}'s budget` : "Your agents' budgets"} could not be read on chain, so nothing was placed.`
+        : only
+          ? noBudgetSentence(only.name, budgetOf.get(only.persona_id as PersonaId) ?? 0, settings.minTradeUsd)
+          : `None of your agents has the $${settings.minTradeUsd} a trade needs in its budget on chain. Give one a budget on its page, and it can trade.`,
+      ...(only ? { agent: only.name } : {}),
+    };
+  }
+  const bestSetup = options.setup ?? (await evaluateBestSetup(settings, held, funded));
   if (!bestSetup) {
     return {
       executed: false,
@@ -753,10 +796,38 @@ export async function runAutonomousCycle(
 
   // What is left today is the smaller of our own tally and the contract's: the contract is final.
   const remainingUsd = Math.min(verdict.remainingUsd, policy.remainingTodayUsd);
+  /*
+   * And what the agent that found the setup has left of its own budget, on chain (2026-09-25). The contract charges an
+   * agent's trade to it and refuses past it, so a size above it would only be a refusal waiting to happen; an agent the
+   * owner never budgeted does not trade at all, and says so.
+   */
+  const agentId = agentIdFor(bestSetup.persona);
+  const agentBudgetUsd = !agentId
+    ? null
+    : budgetOf.has(bestSetup.persona)
+      ? (budgetOf.get(bestSetup.persona) ?? null)
+      : await readAgentBudget(wallet.address as `0x${string}`, agentKey(agentId)).catch(() => null);
+  if (agentId && agentBudgetUsd === null) {
+    return {
+      executed: false,
+      reason: 'agent_budget_unread',
+      detail: `${bestSetup.personaName}'s budget could not be read on chain, so nothing was placed.`,
+      agent: bestSetup.personaName,
+    };
+  }
   const sizeUsd = Math.min(
     options.fixedUsd ?? settings.maxTradeUsd,
     Math.max(settings.minTradeUsd, Math.floor(remainingUsd * settings.allowanceShare)),
+    agentBudgetUsd === null ? Number.POSITIVE_INFINITY : Math.floor(agentBudgetUsd * 100) / 100,
   );
+  if (agentBudgetUsd !== null && sizeUsd < settings.minTradeUsd) {
+    return {
+      executed: false,
+      reason: 'agent_budget',
+      detail: noBudgetSentence(bestSetup.personaName, agentBudgetUsd, settings.minTradeUsd),
+      agent: bestSetup.personaName,
+    };
+  }
   if (sizeUsd < settings.minTradeUsd || sizeUsd > remainingUsd) {
     return {
       executed: false,
@@ -806,6 +877,9 @@ export async function runAutonomousCycle(
       entryPrice: receipt.fillPrice,
       stopPrice: bestSetup.stopPrice,
       targetPrice: bestSetup.targetPrice,
+      // Its sale is the agent's too, so what it returns goes back to the agent's budget — for the lot it bought, only.
+      agentId: agentIdFor(bestSetup.persona),
+      lotUnits: receipt.filledUnits,
     });
     exitStrategyId = exits.strategyId;
   } catch (e) {
@@ -844,6 +918,31 @@ export async function runAutonomousCycle(
    */
 
   return { executed: true, setup: bestSetup, receipt, exitStrategyId, proposalId };
+}
+
+/**
+ * An agent that found a trade and could not place it for want of its own budget says so in the trail (2026-09-25).
+ *
+ * Without this an agent its owner never budgeted would simply never trade, and the only place saying why would be a log
+ * line on the server. Written when the answer changes, as the Bot tab's own declines are: the same sentence again from
+ * the next sweep is one decision observed twice, not a second one.
+ */
+async function sayBudgetRefusal(walletId: string, res: Refusal): Promise<void> {
+  // One agent's refusal is filed under it; one about all of them under `xorr`, the name the trail uses for the system.
+  const agent = res.agent ?? 'xorr';
+  const last = await one<{ action: string; detail: string | null }>(
+    `SELECT action, detail FROM audit_log WHERE wallet_id = $1 AND agent = $2 ORDER BY seq DESC LIMIT 1`,
+    [walletId, agent],
+  ).catch(() => null);
+  if (last?.action === 'Skipped a trade' && last.detail === res.detail) return;
+  await append({
+    walletId,
+    agent,
+    action: 'Skipped a trade',
+    detail: res.detail,
+    kind: 'block',
+    payload: { reason: res.reason },
+  }).catch((e: unknown) => log.warn(`[autonomous] could not record a budget refusal for ${walletId}:`, e));
 }
 
 /**
@@ -888,6 +987,9 @@ export async function autonomousAgentSweep(_now: Date = new Date()): Promise<num
       if (recent) continue;
 
       const res = await runAutonomousCycle(w.id);
+      if (!res.executed && (res.reason === 'agent_budget' || res.reason === 'agent_budget_unread')) {
+        await sayBudgetRefusal(w.id, res);
+      }
       if (res.executed) {
         executedCount += 1;
         log.info(

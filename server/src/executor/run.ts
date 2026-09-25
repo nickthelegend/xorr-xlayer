@@ -16,7 +16,8 @@ import { one, query, tx } from '../db/index.js';
 import { append } from '../audit/log.js';
 import { log } from '../http/request-id.js';
 import { evaluate, recordSpend } from '../rules/engine.js';
-import { closeAsDelegate, readPolicy, spendAsDelegate, usdToUnits, waitForTx } from '../evm/delegation.js';
+import { closeAsDelegate, readAgentBudget, readPolicy, spendAsDelegate, usdToUnits, waitForTx } from '../evm/delegation.js';
+import { agentKey } from '../evm/agentKey.js';
 import { erc20Abi, formatUnits } from 'viem';
 import { publicClient } from '../evm/client.js';
 import { gasStatus } from '../evm/gas.js';
@@ -57,11 +58,27 @@ export type RunOutcome =
    * gave permission to." Two accounts of one failure, and the user met the useless one first.
    */
   | { status: 'failed'; runId: string; error: string; raw: string }
-  | { status: 'skipped'; reason: 'already_ran_this_period' | 'nothing_to_do' | 'awaiting_approval' };
+  | { status: 'skipped'; reason: 'already_ran_this_period' | 'nothing_to_do' | 'awaiting_approval' }
+  /** An agent's strategy whose agent has nothing in its budget: asked again next tick, with no period spent. */
+  | { status: 'skipped'; reason: 'awaiting_budget'; detail: string };
+
+
+/**
+ * Who a strategy's rows in the trail are written under: the agent it belongs to, by name, when it has one — a made
+ * agent's weekly buy is that agent's, and "xorr" there hid it (2026-09-25) — else the persona that runs its kind.
+ */
+function trailAgent(strategy: { kind: string; agent_name?: string | null }): string {
+  return strategy.agent_name || agentForKind(strategy.kind);
+}
 
 export type StrategyRow = {
   id: string;
   wallet_id: string;
+  /**
+   * The name of the agent this strategy belongs to, looked up once per run (2026-09-25) — so its fills and skips are
+   * written under that agent, not under the system. Absent on rows read straight from `strategies`.
+   */
+  agent_name?: string | null;
   /** The user's own wallet address — the `owner` in the delegation policy. */
   owner_address?: string;
   kind: string;
@@ -241,8 +258,27 @@ async function runStrategyInner(
   strategy: StrategyRow,
   at: Date = new Date(),
 ): Promise<RunOutcome> {
+  if (strategy.agent_id && strategy.agent_name === undefined) {
+    const named = await one<{ name: string }>(`SELECT name FROM agents WHERE id = $1`, [strategy.agent_id]).catch(
+      () => null,
+    );
+    strategy = { ...strategy, agent_name: named?.name ?? null };
+  }
   const cadence = (strategy.cadence ?? 'daily') as Cadence;
   const key = periodKey(strategy.id, cadence, at);
+
+  /*
+   * An agent with nothing in its budget does not use up a period (2026-09-25).
+   *
+   * A made agent's strategies are live the moment it is made — before its owner has given it a budget. The first run
+   * was refused for having none, spent the week's period doing it, and "Run now" after the budget landed then did
+   * nothing until next week. So an agent whose budget holds nothing is asked again on the next tick instead, and the
+   * period is claimed once there is something to spend: seconds after the owner signs. It says why once, in the trail.
+   */
+  if (strategy.agent_id && strategy.state !== 'watch' && !CLOSE_ONLY_KINDS.has(strategy.kind)) {
+    const waiting = await awaitingBudget(strategy);
+    if (waiting) return waiting;
+  }
 
   // ── 1. Claim the period, atomically. ──
   const runId = await tx(async (client) => claimRun(client, strategy.id, key));
@@ -566,7 +602,7 @@ async function runStrategyInner(
      * proposed or placed — and never against a close, which only reduces risk.
      */
     if (strategy.agent_id && !isCloseIntent(intent)) {
-      const refusal = await agentLimitRefusal(strategy.agent_id, intent.usd);
+      const refusal = await agentLimitRefusal(strategy.agent_id, intent.usd, owner);
       if (refusal) return await finishBlocked(runId, walletId, strategy, refusal.reason, refusal.detail);
     }
 
@@ -667,12 +703,28 @@ async function runStrategyInner(
     const soldToken = VENUE_TOKENS[intent.inSymbol];
     if (!soldToken) throw new Error(`No token registry entry for ${intent.inSymbol}`);
     const closeAmount = intent.amountInRaw ?? BigInt(Math.floor(intent.amountIn * 10 ** soldToken.decimals));
+    /*
+     * An agent's trade is carried as the agent's (2026-09-25): a buy is charged to its on-chain budget, a sale credits
+     * the budget back. A strategy with no agent — the owner's own order, or anything armed before agents had budgets —
+     * trades on the owner's daily cap alone, as before.
+     */
+    const lotUnits = Number((strategy.params as Record<string, unknown> | null)?.lotUnits ?? 0);
+    /*
+     * A sale is credited to an agent only when it sells that agent's own lot — its exit, armed with the units its buy
+     * filled (`armExits`). Any other sale by an agent's strategy settles as the owner's close and credits nobody: a
+     * budget may never grow by the proceeds of shares it did not pay for.
+     */
+    const agent =
+      strategy.agent_id && (!isClose || (strategy.kind === 'exit-rules' && lotUnits > 0))
+        ? agentKey(strategy.agent_id)
+        : undefined;
     const { payToken, swap, venue, floor, spender } = await chooseSettlement({
       intent,
       owner,
       isClose: isCloseIntent(intent),
       delegationFrom: DELEGATION_FROM,
       send: isClose ? { via: 'closePosition', amount: closeAmount } : { via: 'spend', amount: usdToUnits(intent.usd) },
+      agent,
     });
 
     /*
@@ -702,6 +754,7 @@ async function runStrategyInner(
           // The amount the route was measured with on a fork — see `closeAmount` above.
           amount: closeAmount,
           data: swap.data,
+          agent,
           ...floor,
         })
       : await spendAsDelegate({
@@ -711,6 +764,7 @@ async function runStrategyInner(
           spender,
           usd: intent.usd,
           data: swap.data,
+          agent,
           ...floor,
         });
 
@@ -883,7 +937,7 @@ async function runStrategyInner(
       const auditRow = await append(
         {
           walletId,
-          agent: typeof placedBy === 'string' && placedBy ? placedBy : agentForKind(strategy.kind),
+          agent: typeof placedBy === 'string' && placedBy ? placedBy : trailAgent(strategy),
           action: describeLeg(intent, filledUnits, venue),
           detail: intent.direct
             ? `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} moved. ${intent.because}`
@@ -1046,7 +1100,7 @@ async function failRun(p: {
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Could not run ${strategy.label}`,
         detail: humanFailure(error),
         kind: 'block',
@@ -1075,7 +1129,7 @@ async function proposeInstead(p: {
 }): Promise<RunOutcome> {
   const { runId, walletId, strategy, intent, at } = p;
   const symbol = intent.outSymbol;
-  const agent = agentForKind(strategy.kind);
+  const agent = trailAgent(strategy);
   const usdText = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
   const open = await one<{ id: string }>(
@@ -1160,7 +1214,11 @@ async function proposeInstead(p: {
  * allows between the agents they hired, so neither can raise anything — the cap and the contract still
  * apply on top.
  */
-async function agentLimitRefusal(agentId: string, usd: number): Promise<{ reason: string; detail: string } | null> {
+async function agentLimitRefusal(
+  agentId: string,
+  usd: number,
+  owner: Address,
+): Promise<{ reason: string; detail: string } | null> {
   const agent = await one<{ name: string; risk_limits: Record<string, unknown> | null }>(
     `SELECT name, risk_limits FROM agents WHERE id = $1`,
     [agentId],
@@ -1168,6 +1226,27 @@ async function agentLimitRefusal(agentId: string, usd: number): Promise<{ reason
   if (!agent) return null;
   const limits = agent.risk_limits ?? {};
   const dollars = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  /*
+   * The agent's own budget, on chain (2026-09-25). The contract refuses an agent's trade past it
+   * (`AgentBudgetExceeded`); asking first turns that revert into a sentence, and keeps a trade the chain would refuse
+   * from ever being signed. A read that fails refuses too: an unchecked budget is not a budget.
+   */
+  const budget = await readAgentBudget(owner, agentKey(agentId)).catch(() => null);
+  if (budget === null) {
+    return { reason: 'agent_budget_unread', detail: `I could not read ${agent.name}'s budget on chain, so I did not place this.` };
+  }
+  // In the token's own units, as the contract compares them: a dollar test with a half-cent of slack let through a trade
+  // the chain then refused with a raw revert instead of this sentence.
+  if (usdToUnits(usd) > BigInt(Math.round(budget * 1e6))) {
+    return {
+      reason: 'agent_budget',
+      detail:
+        budget < 0.01
+          ? `${agent.name} has no budget on chain. Give it one on its page, and it can trade.`
+          : `${agent.name} has ${dollars(budget)} of its budget left on chain, and this asks for ${dollars(usd)}.`,
+    };
+  }
 
   const perTrade = Number(limits.maxUsdPerTrade);
   if (Number.isFinite(perTrade) && perTrade > 0 && usd > perTrade + 0.005) {
@@ -1255,7 +1334,7 @@ async function watchRun(p: {
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: leg ? `Would have ${leg.charAt(0).toLowerCase()}${leg.slice(1)}` : 'Would have done nothing',
         detail: intent
           ? `Simulated · ${strategy.label}${price > 0 ? ` · $${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}. ${intent.because} No capital moved.`
@@ -1294,6 +1373,39 @@ function describeLeg(intent: TradeIntent, units: number, venue?: SettlementVenue
 }
 
 /**
+ * The skip for an agent's strategy while its agent's budget on chain holds nothing, or null to run as usual — when the
+ * agent has a budget, and also when the budget cannot be read: the run's own check then refuses in the trail, as it does
+ * for anything it cannot verify. Written to the trail when the sentence changes, not on every tick that asks.
+ */
+async function awaitingBudget(strategy: StrategyRow): Promise<RunOutcome | null> {
+  const row = await one<{ address: string | null; name: string | null }>(
+    `SELECT w.address, a.name FROM wallets w LEFT JOIN agents a ON a.id = $2 WHERE w.id = $1`,
+    [strategy.wallet_id, strategy.agent_id],
+  ).catch(() => null);
+  if (!row?.address) return null;
+  const budget = await readAgentBudget(row.address as Address, agentKey(strategy.agent_id!)).catch(() => null);
+  if (budget === null || budget >= 0.01) return null;
+
+  const name = row.name ?? 'This agent';
+  const detail = `${name} has no budget on chain yet, so "${strategy.label}" waits. Give it one on its page, and it runs.`;
+  const last = await one<{ detail: string | null }>(
+    `SELECT detail FROM audit_log WHERE wallet_id = $1 AND payload->>'strategyId' = $2 ORDER BY seq DESC LIMIT 1`,
+    [strategy.wallet_id, strategy.id],
+  ).catch(() => null);
+  if (last?.detail !== detail) {
+    await append({
+      walletId: strategy.wallet_id,
+      agent: name,
+      action: 'Waiting for a budget',
+      detail,
+      kind: 'block',
+      payload: { strategyId: strategy.id, reason: 'agent_budget' },
+    }).catch(() => undefined);
+  }
+  return { status: 'skipped', reason: 'awaiting_budget', detail };
+}
+
+/**
  * The run happened, looked, and correctly did nothing.
  *
  * Distinct from `blocked`, which means a limit stopped it. Collapsing the two would make a healthy
@@ -1314,7 +1426,7 @@ async function finishNoop(
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Nothing to do for ${strategy.label}`,
         detail,
         kind: 'risk',
@@ -1347,7 +1459,7 @@ async function finishBlocked(
     const auditRow = await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Skipped ${strategy.symbol}`,
         detail,
         kind: 'block',

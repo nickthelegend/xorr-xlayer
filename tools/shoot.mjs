@@ -30,7 +30,8 @@ try {
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8082';
 const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8788';
-const OUT = path.resolve(import.meta.dirname, '../docs/screens');
+// SHOOT_OUT sends the screenshots elsewhere, for iterating on a screen without touching the committed set.
+const OUT = process.env.SHOOT_OUT ? path.resolve(process.env.SHOOT_OUT) : path.resolve(import.meta.dirname, '../docs/screens');
 // design.md: the canvas is 402 x 874.
 const VIEWPORT = { width: 402, height: 874 };
 
@@ -158,6 +159,11 @@ const ROUTES = [
   ['97-portfolio', '/portfolio'],
   // An agent whose kind can be set up by hand (exit rules); momentum and events run inside the hired agent itself.
   ['98-agent', '/agent/drawdown-guard'],
+  // A hired agent: its own budget, read from the contract, and the controls to set it (2026-09-25).
+  ['98b-agent-budget', '/agent/momentum-scout'],
+  // Making one of your own, and picking what it runs (2026-09-25).
+  ['98c-agent-new', '/agent/new'],
+  ['98d-agent-strategies', '/agent/strategies'],
   // Money and markets screens the sweep never opened (docs/qa/SCREENS.md, "tools/shoot.mjs drift").
   ['99a-deposit', '/deposit'],
   ['99b-withdraw-everything', '/withdraw-everything'],
@@ -252,8 +258,9 @@ const EXPECT = {
    */
   // The Messages inbox: every agent with its latest line. "Today" was the chat's greeting, which this screen no longer
   // opens on. TSLAx is quoted and filled here, so an agent saying it has no market for it is a defect (propose.ts).
+  // Only the agents this wallet hired or made (2026-09-25) — the demo wallet hired these two; nobody else is listed.
   '25-bot': {
-    must: [/Momentum Scout/, /Earnings Desk/, /Yield Keeper/, /Drawdown Guard/],
+    must: [/Momentum Scout/, /Yield Keeper/, /New agent/],
     never: [/No live market for (TSLAx|NVDAx|AAPLx|SPYx|QQQx)/],
   },
   '26-bot-roster': { must: [/Momentum Scout/] },
@@ -291,7 +298,8 @@ const EXPECT = {
    * allocation made a wallet holding no equities display "Tokenized equities 30%" as though it
    * did. This expectation pinned the wording that was wrong.
    */
-  '33-holdings': { must: [/PORTFOLIO VALUE/, /Target mix/i, /0x[0-9a-fA-F]{40}/] },
+  // The target mix shows only once someone approved one (2026-09-25), so it is not required here.
+  '33-holdings': { must: [/PORTFOLIO VALUE/, /Holdings/, /0x[0-9a-fA-F]{40}/] },
   '34-activity': { must: [/Activity/, /Export audit trail/, /Disposals/] },
   '35-history': { must: [/History|settled|spend/i] },
   '36-briefing': { must: [/Briefing|briefing/] },
@@ -428,8 +436,17 @@ const EXPECT = {
   '97-portfolio': { must: [/TOTAL BALANCE/, /Deposit/, /Withdraw/, /Positions/, /Profit/] },
   // One agent: money in and out, what it runs, and a way to add to it — without the long caveats.
   '98-agent': {
-    must: [/Drawdown Guard/, /Add funds/, /Withdraw/, /Strategies/, /Add strategy/],
+    // An agent this wallet has not hired: its name, the way to hire it, and what it runs. No wallet buttons on an agent's
+    // page since 2026-09-25 — an agent has a budget, not a wallet.
+    must: [/Drawdown Guard/, /Hire Drawdown Guard/, /Strategies/, /Add strategy/],
     never: [/Past performance of a strategy/, /runs are recorded against strategies/],
+  },
+  // A hired agent's own budget, as the contract holds it, and the owner's controls on it (2026-09-25).
+  '98c-agent-new': { must: [/Name/, /Make agent/], never: [/NaN/, /undefined/] },
+  '98d-agent-strategies': { must: [/Strateg/], never: [/NaN/, /undefined/] },
+  '98b-agent-budget': {
+    must: [/Momentum Scout/, /HIRED/, /Budget/, /Held on chain/, /\$[\d,]+\.\d\d/, /Choose an amount|Set budget/, /key can’t change it/],
+    never: [/Couldn’t read it from the chain/, /NaN/, /undefined/],
   },
   /*
    * The five routes the sweep never opened. Each asserts its title and the one line that must stay true, not the copy

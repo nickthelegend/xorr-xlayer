@@ -1,0 +1,35 @@
+{
+  "network": "xlayer",
+  "chainId": 196,
+  "deployer": "0x1725a1B284D58dC9bb79DfB7B205d4d0D5d4E4eA",
+  "sourceCommit": "2489dc2c0a1f5ea0c2a93b4418a828dd42724f71",
+  "deployedAt": "2026-09-25T14:11:09Z",
+  "contracts": {
+    "XorrDelegation": {
+      "address": "0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+      "deployTx": "0xa41777fcb1d232ded2227fb5e3319cc2cff48033eee10a586cf5255a9bc60a58",
+      "blockNumber": 71576425,
+      "constructorArgs": {
+        "settlementToken": "0xB6CEceAB302E2E4948951eE7843FC24E92933061"
+      },
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-25",
+        "lookup": "https://sourcify.dev/server/v2/contract/196/0x156DCE9E9d523775AB51f882616A431EdBfBcA22",
+        "repository": "https://repo.sourcify.dev/196/0x156DCE9E9d523775AB51f882616A431EdBfBcA22"
+      }
+    },
+    "XorrAuditAnchor": {
+      "address": "0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+      "deployTx": "0x49a71e2b3ef24ecea42ef7b9cc651adaf9bb75a1180592ab60e002f545883d23",
+      "blockNumber": 71576433,
+      "verification": {
+        "sourcify": "exact_match",
+        "verifiedAt": "2026-09-25",
+        "lookup": "https://sourcify.dev/server/v2/contract/196/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196",
+        "repository": "https://repo.sourcify.dev/196/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196"
+      }
+    }
+  },
+  "explorer": "https://www.oklink.com/xlayer/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22"
+}

@@ -81,17 +81,17 @@ export function Messages({ onClose, onOpen, onOpenScreen, footerInset }: Message
     if (roster.data) remember(roster.data);
   }, [roster.data, remember]);
 
-  const names = useMemo(() => agents.map((a) => a.name), [agents]);
-  const list = useMemo(() => summaries(messages, names, read), [messages, names, read]);
   const added = useMemo(
     () => new Set((roster.data ?? []).filter((a) => a.hired).map((a) => a.name)),
     [roster.data],
   );
-  // Added agents first across the top: they are the ones allowed to act for you.
-  const featured = useMemo(
-    () => [...agents].sort((a, b) => Number(added.has(b.name)) - Number(added.has(a.name))),
-    [agents, added],
-  );
+  /*
+   * Only the agents this wallet hired or made (2026-09-25), as on Home: a new account talked to four agents it never
+   * had. Until the roster has answered, nobody is listed rather than everybody.
+   */
+  const featured = useMemo(() => agents.filter((a) => added.has(a.name)), [agents, added]);
+  const names = useMemo(() => featured.map((a) => a.name), [featured]);
+  const list = useMemo(() => summaries(messages, names, read), [messages, names, read]);
   const initial = (name?.replace(/^@/, '') ?? address?.replace(/^0x/i, '') ?? '').charAt(0).toUpperCase();
 
   /* The drawer goes down first, so the screen it opens is not underneath it. */
@@ -217,6 +217,8 @@ export function Messages({ onClose, onOpen, onOpenScreen, footerInset }: Message
 
             {signedOut ? (
               <SignInCard text="Sign in to talk to your agents." onPress={goSignIn} />
+            ) : roster.data && featured.length === 0 ? (
+              <SignInCard text="No agents yet. Make one, and you can talk to it here." label="Make an agent" onPress={makeAgent} />
             ) : (
               list.map((summary) => (
                 <ConversationRow
@@ -446,7 +448,7 @@ function ResultRow({ agent, line, time, onPress }: { agent: string; line: string
   );
 }
 
-function SignInCard({ text, onPress }: { text: string; onPress: () => void }) {
+function SignInCard({ text, onPress, label = 'Sign in' }: { text: string; onPress: () => void; label?: string }) {
   return (
     <View
       style={{
@@ -465,7 +467,7 @@ function SignInCard({ text, onPress }: { text: string; onPress: () => void }) {
       <Text color={chat.inkSoft} style={chatType.body} align="center">
         {text}
       </Text>
-      <PrimaryPill label="Sign in" onPress={onPress} />
+      <PrimaryPill label={label} onPress={onPress} />
     </View>
   );
 }

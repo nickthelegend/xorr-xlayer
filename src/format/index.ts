@@ -124,6 +124,14 @@ export function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+/**
+ * When a trail entry happened, in this phone's time zone (2026-09-26): from its moment where the executor sent one, else
+ * the executor's own clock string, which is in the server's zone.
+ */
+export function eventTime(e: { t: string; at?: number }): string {
+  return typeof e.at === 'number' && Number.isFinite(e.at) ? clock(e.at) : e.t;
+}
+
 /** A day as a person reads one: "Sep 14", with the year only when it is not this year. */
 export function day(ms: number, now: number = Date.now()): string {
   if (!Number.isFinite(ms)) return '—';

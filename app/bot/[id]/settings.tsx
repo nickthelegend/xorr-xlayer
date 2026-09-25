@@ -24,6 +24,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useGoBack } from '@/nav/useGoBack';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -61,6 +62,8 @@ const MARKER_H = 10;
 
 export default function TradeSettings() {
   const goBack = useGoBack();
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const reduced = useReducedMotion();
   const signedOut = useSignedOut();
   const [localError, setLocalError] = useState<string>();
@@ -105,7 +108,7 @@ export default function TradeSettings() {
           on-chain permission per wallet, and every agent runs inside it. Someone who set a $200
           cap here believing it applied to Earnings Desk alone would have set it for all four.
         */}
-        One permission for the whole wallet, not just this agent.
+        One permission for the whole wallet, not just this agent. Inside it, each agent spends from a budget of its own.
       </Text>
 
       {/*
@@ -183,6 +186,16 @@ export default function TradeSettings() {
             </View>
           </View>
         </SheetCard>
+
+        {/*
+          The agent's own budget (2026-09-25) is on its page: the cap here bounds the wallet, and an agent with no budget
+          of its own does not trade at all, so the way to it sits right under the cap.
+        */}
+        {id ? (
+          <View style={{ marginTop: space.s14 }}>
+            <Button label="Set this agent’s budget" variant="ghost" onPress={() => router.push(`/agent/${id}`)} />
+          </View>
+        ) : null}
 
         {error ? (
           <Text variant="secondarySm" color={colors.down} style={{ marginTop: space.s14 }}>

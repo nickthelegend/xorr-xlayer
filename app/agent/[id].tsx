@@ -1,9 +1,9 @@
 /**
  * One agent (2026-09-12): who it is, money in and out, and what it runs.
  *
- * Rebuilt to the product owner's brief — add funds, withdraw, the strategies this agent runs and a way
- * to add one — with the long caveats taken off the page. The identity glyph is the same one the roster
- * draws.
+ * Rebuilt to the product owner's brief — the agent's money, the strategies it runs and a way to add one — with
+ * the long caveats taken off the page. Since 2026-09-25 its money is its on-chain budget, set here; the wallet's
+ * own Deposit and Withdraw are Home's. The identity glyph is the same one the roster draws.
  *
  * Which strategies are "its": strategies are not tagged by agent in the data, so this reads the
  * strategy kind each agent's mandate covers — breakouts for Momentum Scout, earnings events for
@@ -47,6 +47,7 @@ import { winRate } from '@/state/derived';
 import { labelFigure, setupFor } from '@/strategies/ladder';
 import type { StrategyKind } from '@/data/types';
 import { CHAT_AGENTS } from '@/chat/agents';
+import { AgentBudgetCard } from '@/wallet/AgentBudgetCard';
 
 /** The strategy kind each agent's mandate covers. See the header comment. */
 const MANDATE_KINDS: Readonly<Record<string, readonly StrategyKind[]>> = {
@@ -91,8 +92,10 @@ export default function AgentDetail() {
   const kinds = mandateOf ? (MANDATE_KINDS[mandateOf] ?? []) : [];
   // Plain: the React Compiler memoizes this itself, and could not preserve a hand-written memo keyed
   // on a joined string.
+  // Its own strategies by id, and — for one of the four — the kind its mandate covers as well (2026-09-25: a buy given to
+  // Momentum Scout by id showed "Nothing running yet" on its page).
   const mine = (strategies.data ?? []).filter(
-    (s) => s.state !== 'ended' && (agent?.custom ? s.agentId === agent.id : kinds.includes(s.kind)),
+    (s) => s.state !== 'ended' && (s.agentId === agent?.id || (!agent?.custom && kinds.includes(s.kind))),
   );
   const setup = setupFor(kinds);
 
@@ -194,14 +197,22 @@ export default function AgentDetail() {
             </Rise>
           ) : null}
 
-          <Rise index={1} style={{ flexDirection: 'row', gap: space.s10 }}>
-            <View style={{ flex: 1 }}>
-              <Button label="Add funds" variant={agent.hired ? 'primary' : 'ghost'} onPress={() => router.push('/deposit')} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button label="Withdraw" variant="ghost" onPress={() => router.push('/send')} />
-            </View>
-          </Rise>
+          {/*
+            Its own budget, on chain (2026-09-25), first under its name: this is the agent's money. Only an agent this
+            wallet has — hired or made — has a key to file one under. "Add funds" and "Withdraw" sat here and opened the
+            wallet's own Deposit and Send, which read as if the agent had a wallet of its own; it has a budget, and the
+            wallet stays yours, one tap away on Home.
+          */}
+          {agent.onChainKey ? (
+            <Rise index={1}>
+              <AgentBudgetCard
+                agentId={agent.id}
+                name={agent.name}
+                budgetUsd={agent.budgetUsd ?? null}
+                onChanged={agents.reload}
+              />
+            </Rise>
+          ) : null}
 
           <Rise index={2} style={{ flexDirection: 'row', gap: space.s10 }}>
             <Stat label="30 days" value={money(agent.pnl30d)} tone={pnlTone(agent.pnl30d)} />

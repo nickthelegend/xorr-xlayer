@@ -81,13 +81,23 @@ export type Agent = GradientStops & {
   custom?: boolean;
   /** For a made agent: the persona id of the one of the four it follows. */
   style?: string;
+  /**
+   * The key the delegation contract files this agent's budget under (2026-09-25); null for one nobody hired yet, which
+   * has nothing to budget.
+   */
+  onChainKey?: string | null;
+  /** What this agent may still spend, as the contract holds it; null when the chain could not be read. */
+  budgetUsd?: number | null;
 };
 
 export type ActivityKind = 'trade' | 'risk' | 'block' | 'yield';
 
 export type ActivityEvent = {
   id: string;
+  /** The server's clock time, in the server's time zone. Shown only when `at` is missing (an older executor). */
   t: string;
+  /** When it happened, epoch ms — printed in this phone's own time zone (`eventTime`). */
+  at?: number;
   agent: string;
   action: string;
   detail: string;

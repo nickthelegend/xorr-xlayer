@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { agentKey } from '../evm/agentKey.js';
 
 const oneMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
 const queryMock = vi.fn<(sql: string, params?: unknown[]) => Promise<unknown[]>>();
@@ -15,6 +16,8 @@ const ALL_HIRED = [
 ];
 const evaluateMock = vi.fn();
 const readPolicyMock = vi.fn();
+/** Each agent's budget on chain, in dollars. Larger than any trade here unless a test sets it. */
+const readAgentBudgetMock = vi.fn<(...a: unknown[]) => Promise<number>>(async () => 1_000_000);
 const placeOrderMock = vi.fn();
 const armExitsMock = vi.fn();
 const notifyEntryMock = vi.fn();
@@ -89,6 +92,7 @@ vi.mock('../db/index.js', () => ({
 vi.mock('../rules/engine.js', () => ({ evaluate: (...a: unknown[]) => evaluateMock(...a) }));
 vi.mock('../evm/delegation.js', () => ({
   readPolicy: (...a: unknown[]) => readPolicyMock(...a),
+  readAgentBudget: (...a: unknown[]) => readAgentBudgetMock(...a),
 }));
 vi.mock('../executor/order.js', () => ({
   armExits: (...a: unknown[]) => armExitsMock(...a),
@@ -186,6 +190,7 @@ describe('autonomous xStocks trading agent', () => {
     vi.setSystemTime(REGULAR_HOURS);
 
     hiredRoster = [...ALL_HIRED];
+    readAgentBudgetMock.mockResolvedValue(1_000_000);
     queryMock.mockResolvedValue([]);
     oneMock.mockResolvedValue(null);
     earningsCalendarMock.mockResolvedValue(null);
@@ -680,6 +685,76 @@ describe('autonomous xStocks trading agent', () => {
       expect(agentId).toBe(hiredRoster.find((a) => a.name === persona)!.id);
     });
 
+    /*
+     * Each agent's own budget, on chain (2026-09-25). The contract charges an agent's trade to it and refuses past it,
+     * so the agent sizes to it — and an agent the owner never budgeted does not trade, and says why.
+     */
+    it("sizes the entry to what the agent's on-chain budget holds", async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(12.5);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      expect(placeOrderMock.mock.calls.at(-1)![2]).toBe(12.5);
+    });
+
+    it('an agent with no budget on chain places nothing, and says so', async () => {
+      ready();
+      hiredRoster = [{ id: 'agent-momentum', persona_id: 'momentum-scout', name: 'Momentum Scout' }];
+      readAgentBudgetMock.mockResolvedValue(0);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget', agent: 'Momentum Scout' });
+      expect((result as { detail: string }).detail).toMatch(/Momentum Scout has no budget on chain yet/);
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('with no agent budgeted, nothing is scanned at all, and the refusal names them together', async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(0);
+      xStockPriceMock.mockClear();
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
+      expect((result as { detail: string }).detail).toMatch(/None of your agents has the \$\d+ a trade needs/);
+      expect((result as { agent?: string }).agent).toBeUndefined();
+      expect(xStockPriceMock).not.toHaveBeenCalled();
+    });
+
+    /*
+     * An agent nobody budgeted must not stand in the way of one that has a budget: only funded agents take setups.
+     */
+    it('an agent with a budget trades while the others have none', async () => {
+      ready();
+      readAgentBudgetMock.mockImplementation(async (_owner: unknown, key: unknown) =>
+        key === agentKey('agent-momentum') ? 100 : 0,
+      );
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      expect(placeOrderMock.mock.calls.at(-1)![5]).toBe('agent-momentum');
+    });
+
+    it('a budget under the smallest trade places nothing', async () => {
+      ready();
+      readAgentBudgetMock.mockResolvedValue(4);
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it('a budget that cannot be read places nothing: an unchecked budget is not a budget', async () => {
+      ready();
+      readAgentBudgetMock.mockRejectedValue(new Error('rpc down'));
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result).toMatchObject({ executed: false, reason: 'agent_budget_unread' });
+      expect(placeOrderMock).not.toHaveBeenCalled();
+    });
+
+    it("arms the entry's exits as the agent's, so its sale credits the agent's budget", async () => {
+      ready();
+      const result = await runAutonomousCycle('wallet-1');
+      expect(result.executed).toBe(true);
+      const agentId = placeOrderMock.mock.calls.at(-1)![5] as string;
+      expect(armExitsMock.mock.calls.at(-1)![1]).toMatchObject({ agentId });
+    });
+
     it('hands over no agent when the persona that acted is not on the roster', async () => {
       ready();
       hiredRoster = [{ id: 'agent-yield', persona_id: 'yield-keeper', name: 'Yield Keeper' }];
@@ -1043,6 +1118,44 @@ describe('autonomous xStocks trading agent', () => {
      * granted a permission to trade for themselves — or to earn on idle cash — had an agent they never hired buying
      * shares with their money. The app has shown "Hired" and "Not hired" per agent all along.
      */
+    /*
+     * An agent its owner never budgeted does not trade (2026-09-25) — and says so in the trail, once. The sweep is the
+     * only thing that finds it out, and a refusal nobody can see reads as an agent that simply stopped.
+     */
+    it("records an agent's missing budget in the trail, and not again while nothing changed", async () => {
+      let lastRow: { action: string; detail: string } | null = null;
+      queryMock.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM wallets')) return [{ id: 'wallet-a' }];
+        if (sql.includes('price_observations')) return readings(200, 240, 238);
+        return [];
+      });
+      oneMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (sql.includes('FROM proposals')) return null;
+        if (sql.includes('FROM audit_log')) return lastRow;
+        if (sql.includes('FROM wallets')) {
+          return { id: params?.[0], address: OWNER, agents_stopped: false, risk_profile: 'balanced' };
+        }
+        return null;
+      });
+      readPolicyMock.mockResolvedValue(livePolicy());
+      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 500 });
+      readAgentBudgetMock.mockResolvedValue(0);
+      appendMock.mockClear();
+
+      expect(await autonomousAgentSweep()).toBe(0);
+      expect(placeOrderMock).not.toHaveBeenCalled();
+      expect(appendMock).toHaveBeenCalledTimes(1);
+      const [entry] = appendMock.mock.calls[0]! as [{ agent: string; action: string; detail: string; kind: string }];
+      expect(entry).toMatchObject({ action: 'Skipped a trade', kind: 'block' });
+      // Three agents hired, none budgeted: one row for all of them, under the system's own name.
+      expect(entry.detail).toMatch(/budget on chain/);
+      expect(entry.agent).toBe('xorr');
+
+      lastRow = { action: entry.action, detail: entry.detail };
+      await autonomousAgentSweep();
+      expect(appendMock).toHaveBeenCalledTimes(1);
+    });
+
     it('asks only for wallets that have hired an agent', async () => {
       const asked: string[] = [];
       queryMock.mockImplementation(async (sql: string) => {

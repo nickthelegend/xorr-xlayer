@@ -9,7 +9,7 @@
  * Anything without a real feed is returned with feed:'unavailable' so the UI can label it.
  * PLAN.md §1.3 item 8: "Never present synthetic data as live."
  */
-import { assetClasses } from './fixtures/markets';
+import { shownClasses } from './fixtures/markets';
 import { sleeveFixtures } from './fixtures/sleeves';
 import {
   StillWarming,
@@ -53,11 +53,11 @@ import type {
 } from './repositories';
 import { percent, price as fmtPrice } from '../format';
 
-const allInstruments: Instrument[] = assetClasses.flatMap((c) => c.instruments);
+const allInstruments: Instrument[] = shownClasses.flatMap((c) => c.instruments);
 
 /** Which symbols are tokenized equities, and therefore priced by the venue rather than a feed. */
 const STOCK_SYMBOLS = new Set(
-  assetClasses.find((c) => c.id === 'stocks')?.instruments.map((i) => i.sym) ?? [],
+  shownClasses.find((c) => c.id === 'stocks')?.instruments.map((i) => i.sym) ?? [],
 );
 
 export const LocalRepositories: Repositories = {
@@ -96,7 +96,7 @@ export const LocalRepositories: Repositories = {
         }),
         fetchStockQuotes().catch((): Record<string, StockQuote> => ({})),
       ]);
-      return assetClasses.map((c) => ({
+      return shownClasses.map((c) => ({
         ...c,
         instruments: c.instruments.map((i) => {
           const s = stocks[i.sym];

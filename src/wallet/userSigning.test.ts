@@ -3,7 +3,7 @@
  * standing in for Privy's provider — so what the check refuses is a real signature over real bytes, not a string.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { encodeFunctionData, erc20Abi, keccak256, toHex, type Hex, type TransactionSerializable } from 'viem';
+import { encodeFunctionData, erc20Abi, keccak256, parseTransaction, toHex, type Hex, type TransactionSerializable } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   WrongChainError,
@@ -140,6 +140,44 @@ describe('on a fork build the wallet only signs, and the app broadcasts to the f
     const f = fork();
     await expect(sendAsUser(signerOf(w, f.access, true), USDC, DATA)).rejects.toThrow(/signed a different transaction/);
     expect(f.sent).toHaveLength(0);
+  });
+});
+
+/*
+ * Seventeen signatures back to back, against an RPC whose `pending` count can lag the broadcast just made (2026-09-25):
+ * the chain's count is a floor, and this session never reuses a nonce it has already broadcast for the wallet.
+ */
+describe('back-to-back signatures never reuse a nonce', () => {
+  it('signs the next nonce even when the chain still reports the old count', async () => {
+    const w = wallet();
+    const f = fork();
+    await sendAsUser(signerOf(w, f.access, true), USDC, DATA);
+    await sendAsUser(signerOf(w, f.access, true), USDC, DATA);
+    const nonces = f.sent.map((raw) => parseTransaction(raw).nonce);
+    expect(nonces).toEqual([7, 8]);
+  });
+
+  it('follows the chain when it is ahead', async () => {
+    const w = wallet();
+    let count = 7;
+    const f = fork({ getTransactionCount: vi.fn(async () => count) });
+    await sendAsUser(signerOf(w, f.access, true), USDC, DATA);
+    count = 12;
+    await sendAsUser(signerOf(w, f.access, true), USDC, DATA);
+    expect(f.sent.map((raw) => parseTransaction(raw).nonce)).toEqual([7, 12]);
+  });
+
+  it('keeps no memory of a signature that was never broadcast', async () => {
+    const w = wallet();
+    const refused = fork({
+      sendRawTransaction: vi.fn(async () => {
+        throw new Error('nonce too low');
+      }),
+    });
+    await expect(sendAsUser(signerOf(w, refused.access, true), USDC, DATA)).rejects.toThrow(/nonce too low/);
+    const f = fork();
+    await sendAsUser(signerOf(w, f.access, true), USDC, DATA);
+    expect(parseTransaction(f.sent[0]!).nonce).toBe(7);
   });
 });
 
