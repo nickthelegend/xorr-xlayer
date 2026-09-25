@@ -68,3 +68,6 @@ docs/demo/*.webm
 dist-base/
 dist/
 dist-web/
+
+# A mainnet rehearsal against a local fork writes its addresses here; they exist on no real chain.
+contracts/deployments/*.rehearsal.json
