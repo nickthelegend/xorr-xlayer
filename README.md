@@ -186,9 +186,10 @@ Open **https://xorr-xlayer.vercel.app** and sign in; `/judge` re-runs every clai
 | | |
 |---|---|
 | Executor (X Layer fork) | https://executor-fork-production-2db8.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-fork`, `node scripts/deploy-executor.mjs executor-fork`) |
+| Contracts, hosted fork | XorrDelegation `0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058` (per-agent budgets, 2026-09-25), XorrAuditAnchor `0x4c4eda9a67c413cde16440aaf1bfdb3dae851594` |
 | Fork node | Railway service `xlayer-fork` (anvil v1.7.1 forking chain 196, `/data` volume) — `https://xlayer-fork-production.up.railway.app` |
-| Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses anything but an X Layer fork or testnet executor) |
-| Contracts, X Layer testnet | XorrDelegation [`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer-test/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
+| Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses an executor that is down, a fork RPC that is not a fork of X Layer, and a delegation pin the executor and the chain do not both agree on) |
+| Contracts, X Layer testnet | XorrDelegation [`0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`](https://www.oklink.com/xlayer-test/address/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2) (per-agent budgets; the 2026-09-19 deployment without them is `0x156DCE9E…cA22`), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
 | Executor (X Layer testnet) | https://executor-testnet-production.up.railway.app — serves the testnet contracts; nothing fills there (no DEX) |
 
 Chain configuration lives in one place per side: `src/chain.ts` (app) and `server/src/evm/chains.ts` (executor), with

@@ -158,6 +158,8 @@ const ROUTES = [
   ['97-portfolio', '/portfolio'],
   // An agent whose kind can be set up by hand (exit rules); momentum and events run inside the hired agent itself.
   ['98-agent', '/agent/drawdown-guard'],
+  // A hired agent: its own budget, read from the contract, and the controls to set it (2026-09-25).
+  ['98b-agent-budget', '/agent/momentum-scout'],
   // Money and markets screens the sweep never opened (docs/qa/SCREENS.md, "tools/shoot.mjs drift").
   ['99a-deposit', '/deposit'],
   ['99b-withdraw-everything', '/withdraw-everything'],
