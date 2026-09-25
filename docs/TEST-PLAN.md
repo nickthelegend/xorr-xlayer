@@ -251,3 +251,17 @@ Added after the plan was written (`/playbook`, `/playbook/:slug`, the home sheet
 | R05 | Live exits measured from their fill | every live `exit-rules` entry | within 0.5% of the opening fill's USDC ÷ units | migration `20260923T001500`, read back |
 | R06 | The fork keeps real time | hosted fork node | newest block within one block time + 15s of UTC, across a restart; the contract's day rolls at 00:00 UTC | lag measured; `/limits` chain = executor at 00:00 |
 | R07 | The deployed web build names its commit | `deploy:web` from a clean tree | the bundle contains HEAD's full SHA and says whether the executor runs the same server code | SHA in the served bundle |
+
+## K — Each agent's own budget, and OKX DEX first (added 2026-09-25)
+
+| ID | Target | Steps | Expected exact result | PASS |
+|---|---|---|---|---|
+| K01 | The contract | `forge test --match-contract XorrAgentBudgetTest -vv` | 19 pass, including the 256-run fuzz: no sequence of agent trades takes an agent past its budget | 19/19 |
+| K02 | Set from the agent's page | signed in, a hired agent's page → a preset → "Set budget to $N" → one confirmation | the card shows the figure the chain answers; `GET /agents` reads the same off the contract; Activity has "Budget set" with the transaction | `flows.mjs` §3e |
+| K03 | An agent's trade is charged to it | `tools/prove-agent-budget.mjs TSLAx 10` | the fill's receipt carries `AgentSpent` under that agent's key, and the budget read back fell by the amount | event + read-back |
+| K04 | Past the budget | a strategy of an agent whose budget is under the run's size | refused before signing: "X has $B of its budget left on chain, and this asks for $U."; nothing sent | exact sentence |
+| K05 | No budget yet | a made agent's live strategy before its owner sets a budget | skipped without claiming the period ("… waits. Give it one on its page, and it runs."), once in the trail; runs on the first tick after the budget lands | `agent-limits.test.ts`, observed |
+| K06 | Only funded agents take setups | sweep with one agent budgeted, others not | the budgeted agent trades; with none budgeted nothing is scanned and one "Skipped a trade" is written | `autonomous.test.ts` |
+| K07 | A sale credits only the agent's own lot | an agent's exit | sells min(lot, unclaimed) as the agent's (`closeForAgent`); every other sale settles as the owner's | `planners.test.ts`, `agent-limits.test.ts` |
+| K08 | Firing keeps exits | `DELETE /agents/:id` | its strategies pause except `exit-rules` | `agent-budget.test.ts` |
+| K09 | OKX DEX first | a buy OKX can route and the contract would fill | venue `okx-dex`; Uniswap v3 only when OKX has no route, would not fill here, or delivers >0.5% less | `settle.test.ts`, a fork fill naming `okx-dex` |
