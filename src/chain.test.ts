@@ -25,25 +25,36 @@ const facts = (c: typeof import('./chain')) => ({
 });
 
 describe('the chain a build signs on', () => {
-  it('on X Layer mainnet, is real money: no Test label, a deposit code, and the wallet sends', async () => {
+  /*
+   * The wallet only signs, on every chain, since 2026-09-25: the app broadcasts to the RPC it reads (see `walletSignsOnly`).
+   */
+  it('on X Layer mainnet, is real money: no Test label, a deposit code, and the wallet signs while the app broadcasts', async () => {
     expect(facts(await buildFor('xlayer'))).toEqual({
       id: 196,
       label: 'X Layer',
       test: false,
       chip: 'X Layer',
       code: true,
-      signsOnly: false,
+      signsOnly: true,
     });
   });
 
-  it('on X Layer testnet, is test funds, with a deposit code, and the wallet sends', async () => {
+  it('lets the wallet send again with EXPO_PUBLIC_WALLET_SENDS=1 — but never on a copy', async () => {
+    vi.stubEnv('EXPO_PUBLIC_WALLET_SENDS', '1');
+    expect((await buildFor('xlayer')).walletSignsOnly).toBe(false);
+    vi.resetModules();
+    vi.stubEnv('EXPO_PUBLIC_WALLET_SENDS', '1');
+    expect((await buildFor('xlayer-fork')).walletSignsOnly).toBe(true);
+  });
+
+  it('on X Layer testnet, is test funds, with a deposit code, and the wallet signs while the app broadcasts', async () => {
     expect(facts(await buildFor('xlayer-testnet'))).toEqual({
       id: 1952,
       label: 'X Layer testnet',
       test: true,
       chip: 'Test network',
       code: true,
-      signsOnly: false,
+      signsOnly: true,
     });
   });
 

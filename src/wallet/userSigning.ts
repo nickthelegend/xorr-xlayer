@@ -107,6 +107,21 @@ export async function assertSignedAsAsked(
 /** A quarter over the estimate: it is made against this block and the transaction runs against a later one. */
 const withHeadroom = (gas: bigint) => (gas * 125n) / 100n;
 
+/**
+ * The next nonce this session may use for each wallet (2026-09-25).
+ *
+ * The grant is seventeen signatures back to back, and X Layer's public RPC sits behind a load balancer: right after a
+ * broadcast, the next read of the `pending` count can come from a node that has not seen it yet, and the next signature
+ * would reuse the nonce — a replacement the chain refuses, or worse, accepts. So the count read from the chain is only a
+ * floor: this session never goes below one past the last nonce it broadcast for that wallet.
+ */
+const nextNonce = new Map<string, number>();
+
+/** For tests: forget what this session has broadcast. */
+export function resetNonceMemoryForTests(): void {
+  nextNonce.clear();
+}
+
 /** Send `data` to `to` as the user. Returns the transaction hash. */
 export async function sendAsUser(signer: UserSigner, to: Address, data: Hex): Promise<Hex> {
   const { provider, from, chain, chainAccess } = signer;
@@ -133,11 +148,12 @@ export async function sendAsUser(signer: UserSigner, to: Address, data: Hex): Pr
   }
 
   // Everything the signature commits to, read from the chain the transaction will actually run on.
-  const [nonce, gas, fees] = await Promise.all([
+  const [pending, gas, fees] = await Promise.all([
     chainAccess.getTransactionCount({ address: from, blockTag: 'pending' }),
     chainAccess.estimateGas({ account: from, to, data }),
     chainAccess.estimateFeesPerGas(),
   ]);
+  const nonce = Math.max(pending, nextNonce.get(from.toLowerCase()) ?? 0);
   const raw = (await provider.request({
     method: 'eth_signTransaction',
     params: [
@@ -156,7 +172,9 @@ export async function sendAsUser(signer: UserSigner, to: Address, data: Hex): Pr
     ],
   })) as Hex;
   await assertSignedAsAsked(raw, { from, to, data, chainId: chain.id, nonce });
-  return chainAccess.sendRawTransaction({ serializedTransaction: raw as TransactionSerialized });
+  const hash = await chainAccess.sendRawTransaction({ serializedTransaction: raw as TransactionSerialized });
+  nextNonce.set(from.toLowerCase(), nonce + 1);
+  return hash;
 }
 
 /**
