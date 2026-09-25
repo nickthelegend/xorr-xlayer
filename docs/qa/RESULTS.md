@@ -341,3 +341,33 @@ the date of its last PASS is given where there is one. BLOCKED = needs a credent
 shows; the tests added are unit tests beside the code (mocks there are test doubles, as the suites already use) and
 checks against the committed data. **Console and network:** zero errors on every item driven in Chrome, the 104
 screens and every flow step — the only console line seen was Privy's own `DEBUG` "Detected injected providers".
+
+## 2026-09-25 — keys, the Privy move, a fresh fork, and everything again
+
+**Changed:** OKX DEX and OpenRouter keys live on the executors; Privy moved to the app with Google, X and GitHub on
+(`cmqjx4iu…`, key quorum `nl4l7bet…`); the hosted fork re-taken at X Layer block 71,554,238 (XorrDelegation
+`0x141e…5ef5`, anchor `0x4c4e…1594`); landing deployed at xorr-xlayer-landing.vercel.app; mainnet prepared and
+rehearsed but not run (`docs/MAINNET.md`); the iOS simulator build is this repo's (`npm run ios:sim`).
+
+**Found and fixed**
+
+| # | Found | Fix | Verified |
+|---|---|---|---|
+| 1 | OKX quoted mainnet, the fork filled on stale pools: an OKX pick could revert where Uniswap would fill | `viaWouldFill` simulates the exact `spendVia` call first (`188f8d0`) | `prove:okx` ALL PASSED on a fresh fork; on the hosted fork a $50 USDT0 order and Momentum Scout's own $19 METAx buy settled through OKX DEX, allowance to OKX 0 after |
+| 2 | Google / X / GitHub answered 403 `disallowed_login_method` (read from Privy's public app config) | moved to the owner's app with them on; GitHub button added (`b9db107`, `c0900a6`) | each hands off to accounts.google.com, x.com/i/oauth2, github.com/login/oauth; the wallet list opens with OKX Wallet first |
+| 3 | The judge's proof wallet id belonged to the old Privy app | checked before use and re-minted when unknown (`c0900a6`) | `privy-refusal` passes on both executors |
+| 4 | Test tokens failed on the new app: 403 "Must specify origin" | `e2e-token.ts` logs in naming the site (`9909beb`) | tokens verified by the live executor |
+| 5 | A funded wallet with no permission saw "Buy" live | the ticket says there is no permission and disables the button (`9909beb`) | 3 unit tests |
+| 6 | `/wallet/tokens` took 31.7s cold: prices awaited uncapped, then discarded | `heldUnits` — balances without prices (`9947f54`) | 3.3s cold, 0.4s warm; Holdings passes; Deposit shows the 50.0032 USDT0 |
+| 7 | The simulator ran the Solana build (same bundle id); an unsigned rebuild had no keychain entitlement | this repo's build, ad-hoc signed (`7738d9f`) | welcome screen on the iPhone 17 Pro; no keychain errors since |
+| 8 | Landing CTAs went to app.xorr.finance (the Base app) | point at the X Layer app (`3036f60`) | served page: "Built on X Layer", 6 links to xorr-xlayer.vercel.app, none to the Base app |
+
+**Final measurement, against web and executors at `9947f54`:** app tests 2,520/2,520 · executor tests 1,214/1,214 ·
+typechecks and lint clean · CI green (`checks`, `contracts`, `fork-e2e`) · endpoints 205/205 · screens 104/104
+(`/disposals` failed once on a request Railway's edge dropped before it reached the executor — every logged
+`/delegation` was 200 with the CORS header — and passed 3/3 re-taken alone) · signed-in flows 31/31 on the new
+Privy app, and the 17-signature grant signed in the app · `/judge` 20/20 for the demo wallet · the mainnet code path
+booted in mainnet mode against a fork of mainnet: 12 pass, 0 real failures (CoinGecko rate-limited that machine's IP).
+
+**Not done:** the orphan reconcile on the old chain's fills (they belong to the previous Privy identities, which no
+longer sign in; the audit trail is untouched); mainnet itself, which waits for funds and the owner's go-ahead.

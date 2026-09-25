@@ -717,7 +717,13 @@ const main = async () => {
   console.log(positionId ? `position ${positionId}` : 'no open position on this account — position screens will show not-found');
 
   const report = [];
-  for (const [stem, template] of ROUTES) {
+  /*
+   * `SHOOT_ONLY=67-disposals,33-holdings` re-takes just those screens, by stem or route substring — for re-checking one
+   * item without the whole sweep. Unset, every route runs, as it always has.
+   */
+  const only = (process.env.SHOOT_ONLY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const routes = only.length ? ROUTES.filter(([stem, route]) => only.some((o) => stem === o || route.includes(o))) : ROUTES;
+  for (const [stem, template] of routes) {
     // `AGENT:` routes are filled in from this account's own roster.
     const route = template.startsWith('AGENT:')
       ? template.slice('AGENT:'.length).replace('{id}', agentId ?? 'none')
@@ -782,7 +788,8 @@ const main = async () => {
         (content.length ? `\n       content: ${content.join(' | ')}` : ''),
     );
   }
-  await fs.writeFile(path.join(OUT, 'qa-report.json'), JSON.stringify(report, null, 1));
+  // A partial run reports beside the full one rather than over it: the full report is the record of the whole sweep.
+  await fs.writeFile(path.join(OUT, only.length ? 'qa-report.partial.json' : 'qa-report.json'), JSON.stringify(report, null, 1));
 
   await browser.close();
   console.log(`\n${ROUTES.length} screens -> docs/screens/`);

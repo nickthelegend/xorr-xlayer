@@ -71,3 +71,5 @@ dist-web/
 
 # A mainnet rehearsal against a local fork writes its addresses here; they exist on no real chain.
 contracts/deployments/*.rehearsal.json
+# A SHOOT_ONLY run reports beside the full sweep, not over it.
+docs/screens/qa-report.partial.json
