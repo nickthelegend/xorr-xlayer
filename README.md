@@ -22,6 +22,20 @@ and XorrAuditAnchor
 both Sourcify exact match, behind **https://xorr-xlayer.vercel.app** — real USDC, inside a permission you sign. The same
 app on a fork of mainnet, with test funds on Deposit, is the no-money sandbox at **https://xorr-xlayer-demo.vercel.app**.
 
+**The first real run, 2026-09-26** — a new wallet in the iOS app, funded with 90 USDT0 on X Layer, every step on OKLink:
+
+1. The owner converted the USDT0 to 89.97 USDC, signed with their own wallet —
+   [`0xbe2868ca…4885`](https://www.oklink.com/xlayer/tx/0xbe2868ca13c41f19b5b18314e0ccd13afd46fd730360c964fc56d86f84424885).
+2. They granted the bot a $100-a-day, 7-day permission —
+   [`0x79bf486f…f70c`](https://www.oklink.com/xlayer/tx/0x79bf486f5cc0368e6052884c81f76cb297698c21647d938853083be9be35f70c).
+3. They made an agent, *Weekly Stacker* (a weekly OKB buy), and set its budget to $50 on chain —
+   [`0x0879c7d5…7f9d`](https://www.oklink.com/xlayer/tx/0x0879c7d5203c2e2ecedc0226d3337c3a8d95014279baf3b83346e52466c27f9d).
+4. The agent bought 0.2070 WOKB for $25 through the OKX DEX aggregator, and the transaction carries `AgentSpent` for
+   that agent: $25 spent, $25 left —
+   [`0x3df85bc7…cbf9a`](https://www.oklink.com/xlayer/tx/0x3df85bc700db96e97abce805d1f268eec6b25bcb63b1034a525d7d58480cbf9a).
+5. Stop all revoked the permission on chain, and the funds never left the wallet —
+   [`0x56945e3e…45a3`](https://www.oklink.com/xlayer/tx/0x56945e3e32aaa0a86a39d19fd26c10a317b07a349fa06916241e9503ca3345a3).
+
 **[▶ Watch the demo](docs/demo/xorr-demo.mp4)** (2:43) — the permission, the agent's own fills, the cap refusing an order,
 and `/judge` re-checking all 20 claims against the chain. Recorded against the live build by
 [`tools/record-demo.mjs`](tools/record-demo.mjs); re-run it and you get a fresh one.
