@@ -178,17 +178,22 @@ and pushed to the phone.
 
 ## Deployment
 
-Open **https://xorr-xlayer.vercel.app** and sign in; `/judge` re-runs every claim below against the live chain.
+Open **https://xorr-xlayer.vercel.app** (X Layer mainnet) or **https://xorr-xlayer-demo.vercel.app** (the sandbox, no
+money) and sign in; `/judge` re-runs every claim below against the live chain.
 
 <!-- MAINNET: fill after deploy -->
 
 
 | | |
 |---|---|
+| **Contracts, X Layer mainnet** | XorrDelegation [`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`](https://www.oklink.com/xlayer/address/0x156DCE9E9d523775AB51f882616A431EdBfBcA22), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — chain 196, both Sourcify exact match (`contracts/deployments/xlayer-mainnet.json`) |
+| **Executor (X Layer mainnet)** | https://executor-mainnet-production.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-mainnet`, its own Postgres; starts only with `ALLOW_MAINNET=yes`) |
+| **Web app (mainnet)** | **https://xorr-xlayer.vercel.app** — real USDC, deposited from OKX as USDT on X Layer |
+| Sandbox (no money) | **https://xorr-xlayer-demo.vercel.app** — the same app on a fork of X Layer mainnet, with test funds on Deposit, for trying it without money |
 | Executor (X Layer fork) | https://executor-fork-production-2db8.up.railway.app — `/health`, `/verify` (Railway `xorr-xlayer / executor-fork`, `node scripts/deploy-executor.mjs executor-fork`) |
 | Contracts, hosted fork | XorrDelegation `0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058` (per-agent budgets, 2026-09-25), XorrAuditAnchor `0x4c4eda9a67c413cde16440aaf1bfdb3dae851594` |
 | Fork node | Railway service `xlayer-fork` (anvil v1.7.1 forking chain 196, `/data` volume) — `https://xlayer-fork-production.up.railway.app` |
-| Web app | **https://xorr-xlayer.vercel.app** (Vercel `xorr-xlayer`, `npm run deploy:web` — refuses an executor that is down, a fork RPC that is not a fork of X Layer, and a delegation pin the executor and the chain do not both agree on) |
+| Web builds | Vercel `xorr-xlayer` (mainnet) and `xorr-xlayer-demo` (sandbox), both from `npm run deploy:web` (`XORR_WEB_PROJECT` names the project) — which refuses an executor that is down, a fork RPC that is not a fork of X Layer, and a delegation pin the executor and the chain do not both agree on |
 | Contracts, X Layer testnet | XorrDelegation [`0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`](https://www.oklink.com/xlayer-test/address/0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2) (per-agent budgets; the 2026-09-19 deployment without them is `0x156DCE9E…cA22`), XorrAuditAnchor [`0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`](https://www.oklink.com/xlayer-test/address/0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196) — both Sourcify exact match (`contracts/deployments/xlayer-testnet.json`) |
 | Executor (X Layer testnet) | https://executor-testnet-production.up.railway.app — serves the testnet contracts; nothing fills there (no DEX) |
 
