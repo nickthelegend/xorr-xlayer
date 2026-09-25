@@ -5,8 +5,9 @@ trust boundary. Written against the code as it stands, not against intentions.
 
 ## 1. The delegation primitive — the thing standing between a bug and someone's capital
 
-**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on the hosted fork of X Layer
-mainnet (`0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058`, chain 196) and on X Layer testnet
+**What it is.** `XorrDelegation` (`contracts/src/XorrDelegation.sol`), deployed on **X Layer mainnet**
+(`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, chain 196, Sourcify exact match — `contracts/deployments/xlayer-mainnet.json`),
+on the hosted fork of X Layer mainnet (`0xAf70b1ee53B459f35A9dC29BE17b439d3ee27058`, chain 196) and on X Layer testnet
 (`0x0b8363E351588c4De2c5CeD667b7a2ef53F9E6B2`, chain 1952, Sourcify exact match — `contracts/deployments/xlayer-testnet.json`). The owner calls
 `grant(delegate, dailyCap, expiresAt, venues)` from their own wallet; the bot's key may then call `spend()`,
 `spendVia()`, `closePosition()` and `closePositionVia()` for that owner, and nothing else.

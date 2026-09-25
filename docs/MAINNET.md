@@ -1,8 +1,14 @@
 # Going live on X Layer mainnet
 
-Everything the demo does on the fork, on the real chain with real money. Prepared and rehearsed 2026-09-25; **nothing
-here has been run against mainnet yet** — it waits for the owner's funds and go-ahead, because it spends real OKB and
-the agent will trade real USDC inside the permission the owner signs.
+> **Deployed 2026-09-25.** XorrDelegation `0x156DCE9E9d523775AB51f882616A431EdBfBcA22` and XorrAuditAnchor
+> `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196` on X Layer mainnet (chain 196), both Sourcify exact match
+> (`contracts/deployments/xlayer-mainnet.json`); executor `executor-mainnet` at
+> https://executor-mainnet-production.up.railway.app on its own Postgres. The simulator app runs against it with
+> `npm run start:mainnet`. The steps below are how it was done.
+
+Everything the demo does on the fork, on the real chain with real money. Prepared and rehearsed on a fork of mainnet,
+then run on 2026-09-25 once the owner funded the deployer and the delegate: it spends real OKB, and the agent trades
+real USDC inside the permission the owner signs.
 
 ## What it costs
 
