@@ -468,6 +468,12 @@ export default function Home() {
    * user on a fresh device is not bounced back through sign-up.
    */
   if (hydrated && walletChecked && !wallet) return <Redirect href="/welcome" />;
+  /*
+   * Only the background until it is known whether this device has a wallet (2026-09-25). A first launch drew Home — the
+   * setup steps, an agents row, the tab bar — for the second the check took, then swapped it for the welcome screen. A
+   * device that remembers a wallet goes straight to Home, as before.
+   */
+  if (!hydrated || (!wallet && !walletChecked)) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
     <Screen tabBar gutter="none">
