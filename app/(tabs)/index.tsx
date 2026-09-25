@@ -76,6 +76,7 @@ import { contractToRead } from '@/wallet/contractToRead';
 import { killSwitchChip } from '@/state/killSwitch';
 import { KillSwitchChip } from '@/ui/KillSwitchChip';
 import { TradingTicker } from '@/ui/TradingTicker';
+import { AgentDesk } from '@/desk/AgentDesk';
 import { usePoll } from '@/data/usePoll';
 import { ratio } from '@/format';
 
@@ -790,6 +791,15 @@ export default function Home() {
                         </Text>
                       </Press>
                     </Rise>
+                    {/* The desk: what each agent will do next, and what they did, as it lands (2026-09-26). */}
+                    <View style={{ width: '100%' }}>
+                      <AgentDesk
+                        agents={roster}
+                        standing={standing.data}
+                        onOpenAgent={(id) => router.push(`/agent/${id}`)}
+                        onSeeAll={() => router.push('/activity')}
+                      />
+                    </View>
                   </View>
                 )
               ) : tab === 'gainers' ? (
