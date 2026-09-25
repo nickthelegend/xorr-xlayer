@@ -176,7 +176,7 @@ async function main() {
    * Whatever it refuses on, it says so: the permission's allowance, or the cash in the wallet. A brand-new wallet is
    * refused for having no USDC ("You have $0.00.") long before its permission is the reason.
    */
-  const said = ticket.match(/(Your permission[^.]*\.|You have \$[\d,.]+\.|You hold [^.]*\.)/)?.[0] ?? '';
+  const said = ticket.match(/(There is no permission[^.]*\.|Your permission[^.]*\.|You have \$[\d,.]+\.|You hold [^.]*\.)/)?.[0] ?? '';
   const pressable = await page
     .getByText(/^(Buy|Sell) \$/)
     .first()

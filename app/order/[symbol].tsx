@@ -208,6 +208,7 @@ export default function OrderTicket() {
     amountUsd: amount,
     cashUsd: availableUsd,
     remainingTodayUsd: limitsRead.data?.granted === false ? undefined : limitsRead.data?.remainingUsd,
+    granted: limitsRead.data?.granted,
     held: heldRead,
     text: orderAmt,
   });

@@ -115,3 +115,25 @@ describe('the day\'s allowance', () => {
     expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 250, cashUsd: 1_000, held: 0 }).state).toBe('ok');
   });
 });
+
+describe('a wallet with no permission', () => {
+  /*
+   * Found on the hosted fork: a funded wallet that had never granted saw "Buy $250 of TSLAx" live, and the executor
+   * could only answer `no_delegation`. The day's allowance reads $0 there, and "nothing left today" would be the wrong
+   * reason — so it says the right one.
+   */
+  it('refuses a buy with the reason, whatever the cash', () => {
+    const r = ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 250, cashUsd: 1000, held: 0, granted: false });
+    expect(r).toEqual({ state: 'refused', reason: 'There is no permission on this wallet yet, so nothing can trade. Set one up first.' });
+  });
+
+  it('refuses a sale too — closing needs the permission as well', () => {
+    const r = ticketLimit({ side: 'sell', symbol: 'TSLAx', amountUsd: 20, cashUsd: 1000, held: 50, granted: false });
+    expect(r.state).toBe('refused');
+  });
+
+  it('changes nothing for a wallet that has one, or whose permission is still being read', () => {
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 20, cashUsd: 1000, held: 0, granted: true }).state).toBe('ok');
+    expect(ticketLimit({ side: 'buy', symbol: 'TSLAx', amountUsd: 20, cashUsd: 1000, held: 0 }).state).toBe('ok');
+  });
+});

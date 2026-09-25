@@ -35,6 +35,12 @@ export function ticketLimit(input: {
    * and the executor still enforces the cap either way.
    */
   remainingTodayUsd?: number;
+  /**
+   * Whether this wallet has granted a permission at all (`/limits` granted), once read. Without one nothing can trade —
+   * the contract has no delegate to act for — so the ticket says that, rather than the day's allowance (which reads $0
+   * and would be the wrong reason) or nothing at all, which left "Buy" live for an order the executor could only refuse.
+   */
+  granted?: boolean;
   /** What the position is worth — 0 when there is none — or where the read of it stands. */
   held: number | 'loading' | 'unread';
   /** The field exactly as typed, where the caller has it: `0.001` and `0.00` are not the same state. */
@@ -46,6 +52,10 @@ export function ticketLimit(input: {
    * `parseFloat` makes them the same one, so the ticket passes the text through where it has it.
    */
   const text = input.text ?? String(amountUsd);
+
+  if (input.granted === false) {
+    return { state: 'refused', reason: 'There is no permission on this wallet yet, so nothing can trade. Set one up first.' };
+  }
 
   if (side === 'buy') {
     const amount = checkAmount({
