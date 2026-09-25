@@ -74,7 +74,7 @@ vi.mock('./settle.js', () => ({
 }));
 vi.mock('../portfolio/snapshots.js', () => ({ snapshotWallet: vi.fn(async () => true) }));
 vi.mock('./kinds/index.js', () => ({
-  PLANNERS: { momentum: vi.fn(), 'exit-rules': vi.fn() },
+  PLANNERS: { momentum: vi.fn(), 'exit-rules': vi.fn(), dca: vi.fn() },
   observationFor: vi.fn(async () => null),
 }));
 
@@ -108,7 +108,8 @@ function strategy(overrides: Partial<StrategyRow> = {}): StrategyRow {
   } as StrategyRow;
 }
 
-const agentLookups = () => h.statements.filter((s) => /FROM agents/.test(s.text));
+// The limits' own read — the run also looks the agent's name up, for the trail, which is not a limit.
+const agentLookups = () => h.statements.filter((s) => /risk_limits FROM agents/.test(s.text));
 
 beforeEach(() => {
   h.statements.length = 0;
@@ -230,6 +231,22 @@ describe("an agent's limits", () => {
     vi.mocked(PLANNERS['exit-rules']!).mockResolvedValue(close);
     await runStrategy(strategy({ id: 'strategy-2', kind: 'exit-rules', params: {} as never }), at);
     expect(vi.mocked(chooseSettlement).mock.calls[0]![0]).toMatchObject({ agent: undefined });
+  });
+
+  /*
+   * A made agent's weekly buy is that agent's in the trail (2026-09-25). `dca` belongs to no persona, so its rows read
+   * "xorr" — the system — and the phone's banner for an agent's own first trade named nobody.
+   */
+  it("write an agent's strategy under the agent's own name in the trail", async () => {
+    const { append } = await import('../audit/log.js');
+    vi.mocked(PLANNERS.dca!).mockResolvedValue(entry);
+    vi.mocked(append).mockClear();
+    await runStrategy(strategy({ id: 'strategy-dca', kind: 'dca' }), at);
+    expect(vi.mocked(append).mock.calls.at(-1)![0]).toMatchObject({ agent: 'Momentum Scout' });
+
+    vi.mocked(append).mockClear();
+    await runStrategy(strategy({ id: 'strategy-mine', kind: 'dca', agent_id: null }), at);
+    expect(vi.mocked(append).mock.calls.at(-1)![0]).toMatchObject({ agent: 'xorr' });
   });
 
   it('let a trade inside both carry on to settlement', async () => {

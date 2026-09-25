@@ -62,9 +62,23 @@ export type RunOutcome =
   /** An agent's strategy whose agent has nothing in its budget: asked again next tick, with no period spent. */
   | { status: 'skipped'; reason: 'awaiting_budget'; detail: string };
 
+
+/**
+ * Who a strategy's rows in the trail are written under: the agent it belongs to, by name, when it has one — a made
+ * agent's weekly buy is that agent's, and "xorr" there hid it (2026-09-25) — else the persona that runs its kind.
+ */
+function trailAgent(strategy: { kind: string; agent_name?: string | null }): string {
+  return strategy.agent_name || agentForKind(strategy.kind);
+}
+
 export type StrategyRow = {
   id: string;
   wallet_id: string;
+  /**
+   * The name of the agent this strategy belongs to, looked up once per run (2026-09-25) — so its fills and skips are
+   * written under that agent, not under the system. Absent on rows read straight from `strategies`.
+   */
+  agent_name?: string | null;
   /** The user's own wallet address — the `owner` in the delegation policy. */
   owner_address?: string;
   kind: string;
@@ -244,6 +258,12 @@ async function runStrategyInner(
   strategy: StrategyRow,
   at: Date = new Date(),
 ): Promise<RunOutcome> {
+  if (strategy.agent_id && strategy.agent_name === undefined) {
+    const named = await one<{ name: string }>(`SELECT name FROM agents WHERE id = $1`, [strategy.agent_id]).catch(
+      () => null,
+    );
+    strategy = { ...strategy, agent_name: named?.name ?? null };
+  }
   const cadence = (strategy.cadence ?? 'daily') as Cadence;
   const key = periodKey(strategy.id, cadence, at);
 
@@ -917,7 +937,7 @@ async function runStrategyInner(
       const auditRow = await append(
         {
           walletId,
-          agent: typeof placedBy === 'string' && placedBy ? placedBy : agentForKind(strategy.kind),
+          agent: typeof placedBy === 'string' && placedBy ? placedBy : trailAgent(strategy),
           action: describeLeg(intent, filledUnits, venue),
           detail: intent.direct
             ? `$${intent.usd.toLocaleString('en-US', { maximumFractionDigits: 2 })} moved. ${intent.because}`
@@ -1080,7 +1100,7 @@ async function failRun(p: {
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Could not run ${strategy.label}`,
         detail: humanFailure(error),
         kind: 'block',
@@ -1109,7 +1129,7 @@ async function proposeInstead(p: {
 }): Promise<RunOutcome> {
   const { runId, walletId, strategy, intent, at } = p;
   const symbol = intent.outSymbol;
-  const agent = agentForKind(strategy.kind);
+  const agent = trailAgent(strategy);
   const usdText = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
   const open = await one<{ id: string }>(
@@ -1314,7 +1334,7 @@ async function watchRun(p: {
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: leg ? `Would have ${leg.charAt(0).toLowerCase()}${leg.slice(1)}` : 'Would have done nothing',
         detail: intent
           ? `Simulated · ${strategy.label}${price > 0 ? ` · $${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}. ${intent.because} No capital moved.`
@@ -1406,7 +1426,7 @@ async function finishNoop(
     await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Nothing to do for ${strategy.label}`,
         detail,
         kind: 'risk',
@@ -1439,7 +1459,7 @@ async function finishBlocked(
     const auditRow = await append(
       {
         walletId,
-        agent: agentForKind(strategy.kind),
+        agent: trailAgent(strategy),
         action: `Skipped ${strategy.symbol}`,
         detail,
         kind: 'block',
