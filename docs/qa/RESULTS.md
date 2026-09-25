@@ -371,3 +371,46 @@ booted in mainnet mode against a fork of mainnet: 12 pass, 0 real failures (Coin
 
 **Not done:** the orphan reconcile on the old chain's fills (they belong to the previous Privy identities, which no
 longer sign in; the audit trail is untouched); mainnet itself, which waits for funds and the owner's go-ahead.
+
+## 2026-09-25 (afternoon) — each agent's own budget, OKX DEX first, and X Layer mainnet
+
+**Changed:** `XorrDelegation` gained a budget per agent (`setAgentBudget`, `spendForAgent`, `closeForAgent`, filed under
+`keccak256("xorr-agent:" + agent id)`); the executor settles every agent-attributed buy through it and reads the budget
+before it signs; the app sets it from the agent's page with the owner's own signature. Routing is OKX DEX first, Uniswap
+v3 only where OKX has no route, would not fill here, or delivers more than 0.5% less. Redeployed with the new contract:
+hosted fork `0xAf70…7058`, testnet `0x0b83…E6B2` (Sourcify exact), and **X Layer mainnet — XorrDelegation
+`0x156DCE9E9d523775AB51f882616A431EdBfBcA22`, XorrAuditAnchor `0x36d503D1893CAB30B5D68DC9A96e8B91bfcBe196`, both
+Sourcify exact match**, with a mainnet executor (`executor-mainnet`) on its own database.
+
+**Found and fixed (a read-only review by a second session, then fixed here)**
+
+| # | Found | Fix | Verified |
+|---|---|---|---|
+| 1 | Firing an agent paused its exits too, now that exits carry the agent | `kind <> 'exit-rules'` on the fire (`2412174`) | `agent-budget.test.ts` |
+| 2 | An unbudgeted agent ranking first blocked every budgeted agent, every tick | budgets read first; only funded agents take setups; none funded → nothing scanned (`2412174`) | `autonomous.test.ts` (3 new) |
+| 3 | A sale could credit an agent for shares it never paid for | an agent's exit sells its own lot (`lotUnits`) and only that credits; every other sale is the owner's (`2412174`) | `planners.test.ts`, `agent-limits.test.ts` |
+| 4 | An approved proposal from an agent's strategy was not charged to the agent | `placeOrder` gets the strategy's agent (`2412174`) | `extra.test.ts` (2 new) |
+| 5 | Half a cent over the budget passed the pre-check and reverted | compared in raw units (`2412174`) | `agent-limits.test.ts` |
+| 6 | A made agent's first run, before its budget, spent the week's period | no budget → wait without claiming; runs on the first tick after the owner signs (`073bc45`) | `agent-limits.test.ts`; observed |
+| 7 | The mainnet service had no pre-deploy migration (created empty) | `npm run migrate` set as its pre-deploy command | `/verify` on mainnet: 13 pass, 0 fail |
+
+**Measured**
+
+- Gates: app 2,559/2,559 · executor 1,250/1,250 · both typechecks and lint clean · forge 70/70 (64 unit incl. 19 budget
+  tests with a 256-run fuzz, plus the 6 X Layer mainnet-fork tests).
+- Flows, signed, on the hosted fork with the new contract: ALL PASSED twice — stop all (revoke) held down, the
+  17-signature grant ($1,000/day), and **one signature setting Momentum Scout's budget from its page** (the card reads
+  the chain's figure; `GET /agents` reads the same; Activity has "Budget set" with the transaction).
+- **An agent's own trades, charged on chain:** Momentum Scout's autonomous MSFTx buy `0x0434b037…c32ec` carries
+  `AgentSpent(owner, key, $25, $25 left)`; its TSLAx strategy run `0x0f222b34…6f16b` settled through **OKX DEX** and
+  carries `AgentSpent($10, $40 left)`; `GET /agents` then reads $40 (`tools/prove-agent-budget.mjs`).
+- `/verify` for the demo wallet on the fork: 20/20. On mainnet with no wallet: 13 pass, 0 fail, 7 not applicable yet.
+- Endpoints: 202/205 on the fork. The three: E073 was the harness given a short SHA (passes with the full one); E057
+  and E077 expect `/limits` spent today to equal the chain's, and the executor's own tally is larger ($134 against the
+  new contract's $35) because it also counts today's fills under the previous contract — the stricter figure binds by
+  design, and the two agree again at 00:00 UTC.
+- Screens: 105/105 signed in on the fork build (the new `98b-agent-budget` screen — a hired agent's page with its
+  budget read from the contract — failed once only for having no expectation written yet, and passed with one).
+- Mainnet: the executor boots with `ALLOW_MAINNET=yes`, migrations applied; its database was seeded with 55,730 X Layer
+  pool readings for the 11 xStocks (since 2026-09-19), which the fork executor had recorded from the live mainnet pools
+  — each row's `source` says so — so the agents' bands and the charts start from real history rather than from nothing.

@@ -433,6 +433,11 @@ const EXPECT = {
     must: [/Drawdown Guard/, /Add funds/, /Withdraw/, /Strategies/, /Add strategy/],
     never: [/Past performance of a strategy/, /runs are recorded against strategies/],
   },
+  // A hired agent's own budget, as the contract holds it, and the owner's controls on it (2026-09-25).
+  '98b-agent-budget': {
+    must: [/Momentum Scout/, /HIRED/, /Budget/, /Held on chain/, /\$[\d,]+\.\d\d/, /Set budget/, /The bot’s key cannot change it/],
+    never: [/Couldn’t read it from the chain/, /NaN/, /undefined/],
+  },
   /*
    * The five routes the sweep never opened. Each asserts its title and the one line that must stay true, not the copy
    * around it: the address and balance on Deposit (and no raw locale timestamp for the faucet), the division of labour
