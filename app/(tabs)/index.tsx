@@ -341,11 +341,14 @@ export default function Home() {
   );
   const logos = useLogos(markSyms);
 
-  /* Hired agents first — the ones actually allowed to act on this wallet. */
-  const roster = useMemo<Agent[]>(
-    () => [...(agents.data ?? [])].sort((a, b) => Number(!!b.hired) - Number(!!a.hired)),
-    [agents.data],
-  );
+  /*
+   * This wallet's own agents only — the ones it hired or made (2026-09-25).
+   *
+   * The four built-in personas came back from `/agents` whether or not anyone had hired them, and all four were drawn
+   * here as "Not hired": a brand-new account opened onto a row of agents it never had. They are a catalog to hire from
+   * (`/bot/roster`), not agents you have; until you hire or make one, this row is empty and says so.
+   */
+  const roster = useMemo<Agent[]>(() => (agents.data ?? []).filter((a) => a.hired), [agents.data]);
 
   const total = balance.data?.total ?? null;
 
@@ -717,6 +720,11 @@ export default function Home() {
                   <TabFailed what="agents" error={agents.error} onRetry={agents.reload} />
                 ) : (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.s18, marginTop: space.s18 }}>
+                    {roster.length === 0 ? (
+                      <Text variant="body" color={colors.ink55} style={{ width: '100%' }}>
+                        No agents yet. Make your first one — it trades only inside the permission you sign.
+                      </Text>
+                    ) : null}
                     {roster.map((a, i) => (
                       <Rise key={a.id} index={ROWS_FROM + i} style={{ width: TILE_W }}>
                         <Press
