@@ -15,6 +15,7 @@
     "reconcile:orphans": "tsx src/fork/reconcile-orphans.ts",
     "mirror:mongo": "tsx src/db/mirror-to-mongo.ts",
     "prove:fork": "tsx src/prove-xlayer.ts",
+    "prove:okx": "tsx src/fork/prove-okx.ts",
     "prove:testnet": "tsx src/prove-testnet.ts"
   },
   "dependencies": {

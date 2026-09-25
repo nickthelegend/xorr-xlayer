@@ -21,6 +21,7 @@ import type { OutputFloor } from '../evm/delegation.js';
 import { slippageFor, SLIPPAGE, TOKENS as VENUE_TOKENS } from '../venues/tokens.js';
 import { buildSwap, quote } from '../venues/uniswap.js';
 import { okxConfigured, okxRoute } from '../venues/okxdex.js';
+import { viaWouldFill } from '../evm/delegation.js';
 import type { TradeIntent } from './kinds/index.js';
 
 /**
@@ -120,7 +121,27 @@ export async function chooseSettlement(params: {
       receiver: owner,
       slippagePct: tolerancePct,
     }).catch(() => null);
-    if (okx && okx.minOut > uniswap.minOut) {
+    /*
+     * And only a route this chain would actually fill. OKX quotes mainnet; on a fork its route runs through the fork's
+     * pools, and a floor set from mainnet's price can be one the fork cannot meet — the contract would revert the trade
+     * that Uniswap, quoted on the fork itself, would have filled. `viaWouldFill` asks the delegation contract, as the
+     * delegate, with the exact call and floor; on mainnet it answers yes whenever the route is real.
+     */
+    if (
+      okx &&
+      okx.minOut > uniswap.minOut &&
+      (await viaWouldFill({
+        via: send.via,
+        owner,
+        token: payToken.address,
+        spender: okx.spender,
+        venue: okx.to,
+        amount: send.amount,
+        data: okx.data,
+        tokenOut: outToken.address,
+        minOut: okx.minOut,
+      }))
+    ) {
       return {
         payToken,
         swap: { to: okx.to, data: okx.data },

@@ -31,10 +31,12 @@ vi.mock('../venues/tokens.js', () => ({
 }));
 vi.mock('../venues/uniswap.js', () => ({ quote: vi.fn(), buildSwap: vi.fn() }));
 vi.mock('../venues/okxdex.js', () => ({ okxConfigured: vi.fn(), okxRoute: vi.fn() }));
+vi.mock('../evm/delegation.js', () => ({ viaWouldFill: vi.fn() }));
 
 const { slippageFor } = await import('../venues/tokens.js');
 const { buildSwap, quote } = await import('../venues/uniswap.js');
 const { okxConfigured, okxRoute } = await import('../venues/okxdex.js');
+const { viaWouldFill } = await import('../evm/delegation.js');
 const { chooseSettlement } = await import('./settle.js');
 
 const USDC = TOKENS.USDC.address;
@@ -110,6 +112,7 @@ beforeEach(() => {
   vi.mocked(slippageFor).mockReset().mockReturnValue(WIDENED);
   vi.mocked(okxConfigured).mockReset().mockReturnValue(false);
   vi.mocked(okxRoute).mockReset().mockResolvedValue(OKX_BETTER);
+  vi.mocked(viaWouldFill).mockReset().mockResolvedValue(true);
 });
 
 describe('best execution across venues (PLAN.md 3.20)', () => {
@@ -154,6 +157,37 @@ describe('best execution across venues (PLAN.md 3.20)', () => {
 
     vi.mocked(okxRoute).mockResolvedValue({ ...OKX_BETTER, minOut: ROUTER_CALL.minOut });
     expect((await settle(buy())).venue).toBe('uniswap-v3');
+  });
+
+  /*
+   * OKX quotes mainnet. On the hosted fork its route runs through pools frozen at the fork block, and a floor set from
+   * mainnet's price can be one the fork cannot meet: the contract reverts, and the order fails where Uniswap — quoted
+   * on the fork itself — would have filled.
+   */
+  it('keeps Uniswap when the contract would not fill OKX\'s route here, however good its quote', async () => {
+    vi.mocked(okxConfigured).mockReturnValue(true);
+    vi.mocked(viaWouldFill).mockResolvedValue(false);
+
+    const s = await settle(buy());
+    expect(s.venue).toBe('uniswap-v3');
+    expect(s.swap.to).toBe(ROUTER);
+    expect(s.spender).toBeUndefined();
+  });
+
+  it('asks the contract with the exact call that would carry the route: its spender, venue, amount and floor', async () => {
+    vi.mocked(okxConfigured).mockReturnValue(true);
+
+    await settle(buy());
+    expect(viaWouldFill).toHaveBeenCalledWith(
+      expect.objectContaining({
+        via: 'spend',
+        owner: OWNER,
+        spender: OKX_SPENDER,
+        venue: OKX_ROUTER,
+        data: OKX_BETTER.data,
+        minOut: OKX_BETTER.minOut,
+      }),
+    );
   });
 
   it('treats an OKX route that cannot be built as no candidate', async () => {

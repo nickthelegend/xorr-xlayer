@@ -420,6 +420,41 @@ export async function spendAsDelegate(
 }
 
 /**
+ * Whether a route through an aggregator's approval contract would fill here, asked of the contract itself before any
+ * venue is chosen for it.
+ *
+ * OKX DEX quotes X Layer MAINNET. On mainnet a route it builds fills; on a fork of it the route runs through the fork's
+ * pools, which stand where they stood at the fork block, and can come in under the floor OKX's quote implies — the
+ * contract then reverts the trade (the owner's funds are safe) and the order fails where Uniswap would have filled it.
+ * So the exact call that would carry the route — `spendVia` or `closePositionVia`, with its floor — is simulated as the
+ * delegate, and a route the contract would refuse is not a candidate. Nothing is signed or sent.
+ */
+export async function viaWouldFill(
+  params: {
+    via: 'spend' | 'closePosition';
+    owner: Address;
+    token: Address;
+    spender: Address;
+    venue: Address;
+    /** What the call pulls: the settlement token's raw units on a spend, the sold token's on a close. */
+    amount: bigint;
+    data: Hex;
+  } & OutputFloor,
+): Promise<boolean> {
+  const functionName = params.via === 'spend' ? 'spendVia' : 'closePositionVia';
+  return publicClient
+    .simulateContract({
+      account: delegateAccount,
+      address: DELEGATION_ADDRESS,
+      abi: DELEGATION_ABI,
+      functionName,
+      args: [params.owner, params.token, params.spender, params.venue, params.amount, params.tokenOut, params.minOut, params.data],
+    })
+    .then(() => true)
+    .catch(() => false);
+}
+
+/**
  * Which of this chain's venues this owner has actually allowed.
  *
  * The mapping is not enumerable on chain — by design, since an unbounded array in storage is a gas
