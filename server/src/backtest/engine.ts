@@ -108,7 +108,7 @@ export async function okxDailyCloses(pair: string, days: number): Promise<[numbe
   let after: string | undefined;
   while (out.length < days) {
     const url = `${OKX_CANDLES}?instId=${pair}&bar=1Dutc&limit=100${after ? `&after=${after}` : ''}`;
-    const json = await getJson<{ code?: string; data?: string[][] }>(url, 10 * 60_000);
+    const json = await getJson<{ code?: string; data?: string[][] }>(url, 10 * 60_000, 6_000, {}, { attempts: 2 });
     const rows = json.data ?? [];
     if (json.code !== '0' || rows.length === 0) break;
     for (const r of rows) out.push([Number(r[0]), Number(r[4])]);
@@ -179,6 +179,13 @@ export async function history(symbol: string, days: number): Promise<[number, nu
       `${COINGECKO}/coins/${id}/market_chart?vs_currency=usd&days=${span}`,
       // History changes once a day; caching it hard is both correct and kind to the upstream.
       10 * 60_000,
+      8_000,
+      {},
+      /*
+       * One attempt: a refused one falls through to the fallbacks below at once. Five, with the lane's backoff, spent
+       * about twenty-five seconds against a 429, past the replay's twelve-second budget, so the fallback never ran.
+       */
+      { attempts: 1 },
     );
     full = daily(json.prices ?? []);
     if (full.length < 5) throw new Error(`not enough history for ${symbol}`);

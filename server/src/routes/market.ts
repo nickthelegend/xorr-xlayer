@@ -695,7 +695,8 @@ export function warmMarketCache(): void {
    * instant for all three symbols. Warming the short windows instead would be twelve requests and
    * buy less.
    */
-  for (const symbol of ['BTC', 'ETH', 'WETH']) {
+  // XBTC and WOKB are what X Layer's agents buy and replay (2026-09-26); they were not warmed, so every replay started cold.
+  for (const symbol of ['XBTC', 'WOKB', 'BTC', 'ETH', 'WETH']) {
     const id = COINGECKO_IDS[symbol];
     if (id) urls.push(`${COINGECKO}/coins/${id}/market_chart?vs_currency=usd&days=365`);
   }
