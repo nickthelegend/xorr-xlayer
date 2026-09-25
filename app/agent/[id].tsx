@@ -47,6 +47,7 @@ import { winRate } from '@/state/derived';
 import { labelFigure, setupFor } from '@/strategies/ladder';
 import type { StrategyKind } from '@/data/types';
 import { CHAT_AGENTS } from '@/chat/agents';
+import { AgentBudgetCard } from '@/wallet/AgentBudgetCard';
 
 /** The strategy kind each agent's mandate covers. See the header comment. */
 const MANDATE_KINDS: Readonly<Record<string, readonly StrategyKind[]>> = {
@@ -210,7 +211,22 @@ export default function AgentDetail() {
             <Stat label="Trades" value={String(agent.trades)} />
           </Rise>
 
-          <Rise index={3} style={{ borderRadius: radius.panel, backgroundColor: colors.surfaceAlt, padding: space.s16 }}>
+          {/*
+            Its own budget, on chain (2026-09-25): only an agent this wallet has — hired or made — has a key to file one
+            under. The contract charges this agent's buys to it and refuses a trade past it.
+          */}
+          {agent.onChainKey ? (
+            <Rise index={3}>
+              <AgentBudgetCard
+                agentId={agent.id}
+                name={agent.name}
+                budgetUsd={agent.budgetUsd ?? null}
+                onChanged={agents.reload}
+              />
+            </Rise>
+          ) : null}
+
+          <Rise index={4} style={{ borderRadius: radius.panel, backgroundColor: colors.surfaceAlt, padding: space.s16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text variant="cardTitle">Strategies</Text>
               <Press

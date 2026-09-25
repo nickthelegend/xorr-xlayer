@@ -7,8 +7,10 @@
  *   1. **Every venue that can serve the leg says what it would deliver.** Uniswap v3 is quoted through QuoterV2 against
  *      the pools of the chain the executor settles on; OKX DEX, when this deployment has an API key, is asked for its
  *      route too (`venues/okxdex.ts`).
- *   2. **The leg settles where the owner receives the most**, net of nothing we invent: each venue's own answer, held to
- *      the owner's tolerance by the contract's output floor.
+ *   2. **OKX DEX settles the leg whenever it can** (2026-09-25): its aggregator routes across every pool on X Layer,
+ *      Uniswap's included. Uniswap v3 settles only what OKX cannot — a pair it has no route for, a route the contract
+ *      would not fill on this chain, or one that would deliver more than `OKX_GIVE_BPS` less than Uniswap's own floor, so
+ *      "OKX first" never costs the owner more than a rounding. Each fill names the venue it used.
  *
  * On a fork of X Layer the Uniswap quote is read from the fork's own pools (`venues/uniswap.ts`), so the price quoted is
  * the price a fill would get there — the Base build had to dry-run 1inch's routes on its fork because 1inch priced them
@@ -50,6 +52,12 @@ export type Settlement = {
   /** What the owner must receive for the trade to stand — enforced by the contract against the owner's own balance. */
   floor: OutputFloor;
 };
+
+/**
+ * How much less than Uniswap's floor OKX's may be and still settle the leg, in basis points (0.5%). OKX's aggregator
+ * includes Uniswap's pools, so on the chain it quotes it is never meaningfully worse; this is the guard for the day it is.
+ */
+export const OKX_GIVE_BPS = 50n;
 
 /**
  * @param owner  The user whose capital is being spent — never ours.
@@ -100,60 +108,69 @@ export async function chooseSettlement(params: {
   // The delegation and the venue must be handed the same figure: on a close, what `closePosition` will send.
   const amountRaw = send.via === 'closePosition' ? send.amount : intent.amountInRaw;
 
-  const uniswap = await buildSwap({
-    inSymbol: intent.inSymbol,
-    outSymbol: intent.outSymbol,
-    amount: intent.amountIn,
-    amountRaw,
-    from: delegationFrom,
-    receiver: owner,
-    slippagePct: tolerancePct,
-  });
-
   /*
-   * OKX DEX, when this deployment is keyed for it: its route wins only when it delivers more than Uniswap's, and never on
-   * a guess — a route it cannot build is simply not a candidate.
+   * Both venues asked at once. Uniswap's failure is kept rather than thrown: a pair only OKX can route still settles, and
+   * the router's own refusal is the answer only when neither venue has a route.
    */
-  if (okxConfigured()) {
-    const okx = await okxRoute({
+  let uniswapRefusal: unknown;
+  const [uniswap, okx] = await Promise.all([
+    buildSwap({
       inSymbol: intent.inSymbol,
       outSymbol: intent.outSymbol,
-      amountRaw: amountRaw ?? BigInt(Math.round(intent.amountIn * 10 ** payToken.decimals)),
+      amount: intent.amountIn,
+      amountRaw,
       from: delegationFrom,
       receiver: owner,
       slippagePct: tolerancePct,
-    }).catch(() => null);
-    /*
-     * And only a route this chain would actually fill. OKX quotes mainnet; on a fork its route runs through the fork's
-     * pools, and a floor set from mainnet's price can be one the fork cannot meet — the contract would revert the trade
-     * that Uniswap, quoted on the fork itself, would have filled. `viaWouldFill` asks the delegation contract, as the
-     * delegate, with the exact call and floor; on mainnet it answers yes whenever the route is real.
-     */
-    if (
-      okx &&
-      okx.minOut > uniswap.minOut &&
-      (await viaWouldFill({
-        via: send.via,
-        owner,
-        token: payToken.address,
-        spender: okx.spender,
-        venue: okx.to,
-        amount: send.amount,
-        data: okx.data,
-        tokenOut: outToken.address,
-        minOut: okx.minOut,
-        agent: params.agent,
-      }))
-    ) {
-      return {
-        payToken,
-        swap: { to: okx.to, data: okx.data },
-        spender: okx.spender,
-        venue: 'okx-dex',
-        floor: { tokenOut: outToken.address, minOut: okx.minOut },
-      };
-    }
+    }).catch((e: unknown) => {
+      uniswapRefusal = e;
+      return null;
+    }),
+    // A route OKX cannot build is simply not a candidate.
+    okxConfigured()
+      ? okxRoute({
+          inSymbol: intent.inSymbol,
+          outSymbol: intent.outSymbol,
+          amountRaw: amountRaw ?? BigInt(Math.round(intent.amountIn * 10 ** payToken.decimals)),
+          from: delegationFrom,
+          receiver: owner,
+          slippagePct: tolerancePct,
+        }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  /*
+   * OKX DEX first — and only a route this chain would actually fill. OKX quotes mainnet; on a fork its route runs through
+   * the fork's pools, and a floor set from mainnet's price can be one the fork cannot meet — the contract would revert
+   * the trade that Uniswap, quoted on the fork itself, would have filled. `viaWouldFill` asks the delegation contract, as
+   * the delegate, with the exact call and floor; on mainnet it answers yes whenever the route is real.
+   */
+  if (
+    okx &&
+    (!uniswap || okx.minOut * 10_000n >= uniswap.minOut * (10_000n - OKX_GIVE_BPS)) &&
+    (await viaWouldFill({
+      via: send.via,
+      owner,
+      token: payToken.address,
+      spender: okx.spender,
+      venue: okx.to,
+      amount: send.amount,
+      data: okx.data,
+      tokenOut: outToken.address,
+      minOut: okx.minOut,
+      agent: params.agent,
+    }))
+  ) {
+    return {
+      payToken,
+      swap: { to: okx.to, data: okx.data },
+      spender: okx.spender,
+      venue: 'okx-dex',
+      floor: { tokenOut: outToken.address, minOut: okx.minOut },
+    };
   }
+
+  if (!uniswap) throw uniswapRefusal;
 
   return {
     payToken,

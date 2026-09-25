@@ -1092,6 +1092,43 @@ describe('autonomous xStocks trading agent', () => {
      * granted a permission to trade for themselves — or to earn on idle cash — had an agent they never hired buying
      * shares with their money. The app has shown "Hired" and "Not hired" per agent all along.
      */
+    /*
+     * An agent its owner never budgeted does not trade (2026-09-25) — and says so in the trail, once. The sweep is the
+     * only thing that finds it out, and a refusal nobody can see reads as an agent that simply stopped.
+     */
+    it("records an agent's missing budget in the trail, and not again while nothing changed", async () => {
+      let lastRow: { action: string; detail: string } | null = null;
+      queryMock.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM wallets')) return [{ id: 'wallet-a' }];
+        if (sql.includes('price_observations')) return readings(200, 240, 238);
+        return [];
+      });
+      oneMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (sql.includes('FROM proposals')) return null;
+        if (sql.includes('FROM audit_log')) return lastRow;
+        if (sql.includes('FROM wallets')) {
+          return { id: params?.[0], address: OWNER, agents_stopped: false, risk_profile: 'balanced' };
+        }
+        return null;
+      });
+      readPolicyMock.mockResolvedValue(livePolicy());
+      evaluateMock.mockResolvedValue({ allowed: true, spentTodayUsd: 0, remainingUsd: 500 });
+      readAgentBudgetMock.mockResolvedValue(0);
+      appendMock.mockClear();
+
+      expect(await autonomousAgentSweep()).toBe(0);
+      expect(placeOrderMock).not.toHaveBeenCalled();
+      expect(appendMock).toHaveBeenCalledTimes(1);
+      const [entry] = appendMock.mock.calls[0]! as [{ agent: string; action: string; detail: string; kind: string }];
+      expect(entry).toMatchObject({ action: 'Skipped a trade', kind: 'block' });
+      expect(entry.detail).toContain('no budget on chain');
+      expect(entry.detail).toContain(entry.agent);
+
+      lastRow = { action: entry.action, detail: entry.detail };
+      await autonomousAgentSweep();
+      expect(appendMock).toHaveBeenCalledTimes(1);
+    });
+
     it('asks only for wallets that have hired an agent', async () => {
       const asked: string[] = [];
       queryMock.mockImplementation(async (sql: string) => {

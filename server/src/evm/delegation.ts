@@ -256,6 +256,16 @@ export const DELEGATION_ABI = [
       { name: 'delegate', type: 'address', indexed: true },
     ],
   },
+  // An owner's budget for one agent (2026-09-25): set by the owner, recorded from this event and nothing else.
+  {
+    type: 'event',
+    name: 'AgentBudgetSet',
+    inputs: [
+      { name: 'owner', type: 'address', indexed: true },
+      { name: 'agent', type: 'bytes32', indexed: true },
+      { name: 'budget', type: 'uint256', indexed: false },
+    ],
+  },
 
   /*
    * The contract's own errors, so a refusal arrives as a sentence.

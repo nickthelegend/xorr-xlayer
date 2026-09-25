@@ -1,10 +1,11 @@
 /**
  * Where a leg settles on X Layer, with every venue stood in for (PLAN.md 3.8 and 3.20).
  *
- * `chooseSettlement` is best execution: Uniswap v3 is quoted, the tolerance is set from that quote (or from the person's
- * own), Uniswap builds the route, and OKX DEX — only when this deployment is keyed for it — wins only when its floor is
- * higher, carrying the approval contract it pulls through. A direct leg goes to its own venue. These cases prove which
- * builder is asked, with what, which venue wins, and which floor the leg is held to.
+ * `chooseSettlement`: Uniswap v3 is quoted, the tolerance is set from that quote (or from the person's own), and both
+ * venues build a route. OKX DEX — when this deployment is keyed for it — settles the leg whenever it can (2026-09-25),
+ * carrying the approval contract it pulls through: unless the contract would not fill its route here, or its floor
+ * trails Uniswap's by more than half a percent. Uniswap settles the rest. A direct leg goes to its own venue. These cases
+ * prove which builder is asked, with what, which venue wins, and which floor the leg is held to.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeFunctionData, parseAbi } from 'viem';
@@ -147,16 +148,46 @@ describe('best execution across venues (PLAN.md 3.20)', () => {
     });
   });
 
-  it('keeps Uniswap when OKX delivers less, or only ties it', async () => {
+  it("settles through OKX DEX when it ties Uniswap's floor, or trails it by no more than half a percent", async () => {
     vi.mocked(okxConfigured).mockReturnValue(true);
 
-    vi.mocked(okxRoute).mockResolvedValue({ ...OKX_BETTER, minOut: 497_000_000_000_000_000n });
-    const worse = await settle(buy());
-    expect(worse.venue).toBe('uniswap-v3');
-    expect(worse.spender).toBeUndefined();
-
     vi.mocked(okxRoute).mockResolvedValue({ ...OKX_BETTER, minOut: ROUTER_CALL.minOut });
-    expect((await settle(buy())).venue).toBe('uniswap-v3');
+    expect((await settle(buy())).venue).toBe('okx-dex');
+
+    // 0.15% under Uniswap's floor: still OKX's leg.
+    vi.mocked(okxRoute).mockResolvedValue({ ...OKX_BETTER, minOut: 497_000_000_000_000_000n });
+    const close = await settle(buy());
+    expect(close.venue).toBe('okx-dex');
+    expect(close.spender).toBe(OKX_SPENDER);
+    expect(close.floor.minOut).toBe(497_000_000_000_000_000n);
+  });
+
+  it('keeps Uniswap when OKX would deliver more than half a percent less', async () => {
+    vi.mocked(okxConfigured).mockReturnValue(true);
+    // 0.55% under Uniswap's floor.
+    vi.mocked(okxRoute).mockResolvedValue({ ...OKX_BETTER, minOut: 495_000_000_000_000_000n });
+
+    const s = await settle(buy());
+    expect(s.venue).toBe('uniswap-v3');
+    expect(s.spender).toBeUndefined();
+    expect(viaWouldFill).not.toHaveBeenCalled();
+  });
+
+  it('settles through OKX DEX when Uniswap has no route at all', async () => {
+    vi.mocked(okxConfigured).mockReturnValue(true);
+    vi.mocked(buildSwap).mockRejectedValue(new Error('No route for USDC -> WOKB: no pool with liquidity'));
+
+    const s = await settle(buy());
+    expect(s.venue).toBe('okx-dex');
+    expect(s.floor.minOut).toBe(OKX_BETTER.minOut);
+  });
+
+  it("fails with the router's own refusal when neither venue has a route", async () => {
+    vi.mocked(okxConfigured).mockReturnValue(true);
+    vi.mocked(buildSwap).mockRejectedValue(new Error('No route for USDC -> WOKB: no pool with liquidity'));
+    vi.mocked(okxRoute).mockRejectedValue(new Error('OKX DEX /swap refused: Insufficient liquidity'));
+
+    await expect(settle(buy())).rejects.toThrow('no pool with liquidity');
   });
 
   /*

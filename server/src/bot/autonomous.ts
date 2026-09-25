@@ -22,6 +22,7 @@
 import { randomUUID } from 'node:crypto';
 import { isAddress, type Address } from 'viem';
 import { one, query } from '../db/index.js';
+import { append } from '../audit/log.js';
 import { THIS_CHAIN } from '../db/chain-scope.js';
 import { log } from '../http/request-id.js';
 import { evaluate, type RuleVerdict } from '../rules/engine.js';
@@ -236,6 +237,8 @@ export type AutonomousTradeResult =
       executed: false;
       reason: string;
       detail: string;
+      /** The agent a refusal is about, where it is one agent's — by name, as the trail writes it. */
+      agent?: string;
     };
 
 
@@ -512,7 +515,8 @@ export async function evaluateBestSetup(
   return candidates[0] ?? null;
 }
 
-type Refusal = { executed: false; reason: string; detail: string };
+/** `agent`: the agent the refusal is about, where it is one agent's — its name, as the trail writes it. */
+type Refusal = { executed: false; reason: string; detail: string; agent?: string };
 
 /**
  * The permission as the XorrDelegation contract holds it, or the refusal that stands in for it.
@@ -766,6 +770,7 @@ export async function runAutonomousCycle(
       executed: false,
       reason: 'agent_budget_unread',
       detail: `${bestSetup.personaName}'s budget could not be read on chain, so nothing was placed.`,
+      agent: bestSetup.personaName,
     };
   }
   const sizeUsd = Math.min(
@@ -781,6 +786,7 @@ export async function runAutonomousCycle(
         agentBudgetUsd < 0.01
           ? `${bestSetup.personaName} has no budget on chain yet. Give it one on its page, and it can trade.`
           : `${bestSetup.personaName} has $${agentBudgetUsd.toFixed(2)} of its budget left on chain, under the $${settings.minTradeUsd} smallest trade.`,
+      agent: bestSetup.personaName,
     };
   }
   if (sizeUsd < settings.minTradeUsd || sizeUsd > remainingUsd) {
@@ -875,6 +881,30 @@ export async function runAutonomousCycle(
 }
 
 /**
+ * An agent that found a trade and could not place it for want of its own budget says so in the trail (2026-09-25).
+ *
+ * Without this an agent its owner never budgeted would simply never trade, and the only place saying why would be a log
+ * line on the server. Written when the answer changes, as the Bot tab's own declines are: the same sentence again from
+ * the next sweep is one decision observed twice, not a second one.
+ */
+async function sayBudgetRefusal(walletId: string, res: Refusal): Promise<void> {
+  const agent = res.agent ?? 'Agent';
+  const last = await one<{ action: string; detail: string | null }>(
+    `SELECT action, detail FROM audit_log WHERE wallet_id = $1 AND agent = $2 ORDER BY seq DESC LIMIT 1`,
+    [walletId, agent],
+  ).catch(() => null);
+  if (last?.action === 'Skipped a trade' && last.detail === res.detail) return;
+  await append({
+    walletId,
+    agent,
+    action: 'Skipped a trade',
+    detail: res.detail,
+    kind: 'block',
+    payload: { reason: res.reason },
+  }).catch((e: unknown) => log.warn(`[autonomous] could not record a budget refusal for ${walletId}:`, e));
+}
+
+/**
  * One scheduler tick's worth: the eligible wallets, each past its own cooldown.
  */
 export async function autonomousAgentSweep(_now: Date = new Date()): Promise<number> {
@@ -916,6 +946,9 @@ export async function autonomousAgentSweep(_now: Date = new Date()): Promise<num
       if (recent) continue;
 
       const res = await runAutonomousCycle(w.id);
+      if (!res.executed && (res.reason === 'agent_budget' || res.reason === 'agent_budget_unread')) {
+        await sayBudgetRefusal(w.id, res);
+      }
       if (res.executed) {
         executedCount += 1;
         log.info(

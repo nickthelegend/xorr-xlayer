@@ -17,8 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { one, query } from '../db/index.js';
-import type { Address } from 'viem';
-import { readAgentBudget } from '../evm/delegation.js';
+import { isAddressEqual, parseEventLogs, type Address, type Hex } from 'viem';
+import { DELEGATION_ABI, DELEGATION_ADDRESS, readAgentBudget, waitForReceipt } from '../evm/delegation.js';
 import { agentKey } from '../evm/agentKey.js';
 import { append } from '../audit/log.js';
 import { currentWallet } from '../routes/wallet-context.js';
@@ -612,6 +612,59 @@ agents.post('/agents/custom', async (c) => {
 });
 
 /** PATCH /agents/:id — tone and limits. */
+/**
+ * An agent's budget, just set by its owner on chain, written into the trail (2026-09-25).
+ *
+ * The owner signs `setAgentBudget` with their own wallet; the executor could not set a budget if it tried. So this
+ * records one and never makes one: the figure is the transaction's own `AgentBudgetSet` event, from the delegation
+ * contract, for this wallet and this agent's key — not anything the app says it asked for.
+ */
+agents.post('/agents/:id/budget', async (c) => {
+  const body = z
+    .object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'must be a 32-byte transaction hash') })
+    .parse(await c.req.json());
+  const w = await currentWallet(c);
+  if (!w?.address) return c.json({ error: 'no_wallet' }, 400);
+  const row = await one<{ id: string; name: string }>(`SELECT id, name FROM agents WHERE id = $1 AND wallet_id = $2`, [
+    c.req.param('id'),
+    w.id,
+  ]);
+  if (!row) return c.json({ error: 'not_found', message: 'This wallet has no such agent.' }, 404);
+
+  const receipt = await waitForReceipt(body.txHash as Hex).catch(() => undefined);
+  if (!receipt) {
+    return c.json({ error: 'tx_not_found', message: 'That transaction is not on this chain, so nothing was recorded.' }, 422);
+  }
+  if (receipt.status !== 'success') {
+    return c.json({ error: 'tx_reverted', message: 'That transaction failed on chain, so it set no budget.' }, 422);
+  }
+  const key = agentKey(row.id);
+  const set = parseEventLogs({ abi: DELEGATION_ABI, logs: receipt.logs, eventName: 'AgentBudgetSet' }).find(
+    (l) =>
+      isAddressEqual(l.address, DELEGATION_ADDRESS) &&
+      isAddressEqual(l.args.owner, w.address as Address) &&
+      l.args.agent === key,
+  );
+  if (!set) {
+    return c.json({ error: 'not_a_budget', message: `That transaction did not set ${row.name}'s budget.` }, 422);
+  }
+
+  const budgetUsd = Number(set.args.budget) / 1e6;
+  await append({
+    walletId: w.id,
+    agent: row.name,
+    action: 'Budget set',
+    detail:
+      budgetUsd > 0
+        ? `${row.name} may spend $${budgetUsd.toFixed(2)} from here, held by the contract. Its buys come out of it, and its sales go back in.`
+        : `${row.name} has no budget now, so the contract will refuse any trade it tries.`,
+    kind: 'risk',
+    signature: body.txHash,
+    payload: { agentKey: key, budgetUsd },
+  });
+  return c.json({ budgetUsd, onChainKey: key });
+});
+
 agents.patch('/agents/:id', async (c) => {
   const body = PatchInput.parse(await c.req.json());
   const id = await walletId(c);
