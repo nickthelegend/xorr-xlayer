@@ -58,16 +58,16 @@ edit keeps the order above.
 
 ## Your part (shots 4–15): how to record it
 
-The app is installed on the booted simulator, signed out. Serve it against X Layer mainnet:
+The app is already installed on the **"xorr-xlayer iPhone 17 Pro"** simulator: a Release build with the mainnet app
+built in, so nothing else needs to run. Open it from that simulator's home screen. It starts signed out.
+
+**Don't use the other "iPhone 17 Pro" simulator.** It belongs to the Solana recording, and both apps share one bundle
+id, so this app cannot live on that device.
+
+Start recording in the Terminal. Two simulators are booted, so the command names this one:
 
 ```bash
-npm run start:mainnet
-```
-
-Then open the app on the simulator, and start recording in another Terminal tab:
-
-```bash
-xcrun simctl io booted recordVideo ~/Desktop/xorr-iphone.mov
+xcrun simctl io 7672263E-97D0-4606-B190-B9FD5193E85C recordVideo ~/Desktop/xorr-iphone.mov
 ```
 
 Do shots 4 → 15 in one go (mistakes are fine — pause a second and redo the step; it gets cut). Press **Ctrl-C** in
